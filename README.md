@@ -38,8 +38,16 @@ cập nhật firmware qua UART và RS485. Dựng lại từ
   <img src="docs/kit/board-view-top.png" alt="Sơ đồ mặt trên của bo: màn hình ở giữa, ba nút S1 S2 S3 phía dưới, các hàng chân RS485, UART3, I2C bên phải, SWD và console bên trái" width="49%">
 </p>
 
+<p align="center">
+  <a href="https://hohoanganh.github.io/ak-mcu-base/kit/ak-base-kit-3i0-3d.html"><img src="docs/kit/ak-base-kit-3i0-render-top.jpg" alt="Bản dựng 3D mặt trên của AK Base Kit 3.0: màn hình OLED, bốn nút bấm, các hàng chân có tên" width="49%"></a>
+  <a href="https://hohoanganh.github.io/ak-mcu-base/kit/ak-base-kit-3i0-3d.html"><img src="docs/kit/ak-base-kit-3i0-render-bottom.jpg" alt="Bản dựng 3D mặt dưới của AK Base Kit 3.0: vi điều khiển, pin đồng hồ, còi, các cổng nối, USB Type-C" width="49%"></a>
+</p>
+
+<p align="center"><b><a href="https://hohoanganh.github.io/ak-mcu-base/kit/ak-base-kit-3i0-3d.html">Xem mô hình 3D của bo trên trình duyệt →</a></b><br>
+xoay, phóng to, và nhấn vào từng linh kiện để xem nó là gì (118 linh kiện, có ô tìm)</p>
+
 STM32L151CBT6, màn hình OLED 1,54 inch 128×64, ba nút bấm, còi, RTC có pin, flash SPI 1 MB, RS485, UART, I2C,
-USB Type-C có sẵn mạch USB–UART. Ảnh và sơ đồ bo: [AK Foundation](https://github.com/the-ak-foundation/ak-base-kit-stm32l151/tree/main/hardware/images) (giấy phép MIT).
+USB Type-C có sẵn mạch USB–UART. Hai ảnh trên là bản dựng từ file thiết kế bo 3.0, không phải ảnh chụp. Ảnh và sơ đồ bo: [AK Foundation](https://github.com/the-ak-foundation/ak-base-kit-stm32l151/tree/main/hardware/images) (giấy phép MIT).
 
 ### Trên bo có gì
 

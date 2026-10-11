@@ -25,8 +25,17 @@ C code in your browser as WebAssembly. No kit needed.
   <img src="docs/kit/board-view-top.png" alt="Top view of the board: display in the middle, buttons S1 S2 S3 below, RS485, UART3 and I2C headers on the right, SWD and console on the left" width="49%">
 </p>
 
+<p align="center">
+  <a href="https://hohoanganh.github.io/ak-mcu-base/kit/ak-base-kit-3i0-3d.html"><img src="docs/kit/ak-base-kit-3i0-render-top.jpg" alt="3D render of the top side of the AK Base Kit 3.0: OLED display, four buttons, labelled pin headers" width="49%"></a>
+  <a href="https://hohoanganh.github.io/ak-mcu-base/kit/ak-base-kit-3i0-3d.html"><img src="docs/kit/ak-base-kit-3i0-render-bottom.jpg" alt="3D render of the bottom side of the AK Base Kit 3.0: microcontroller, clock battery, buzzer, connectors, USB Type-C" width="49%"></a>
+</p>
+
+<p align="center"><b><a href="https://hohoanganh.github.io/ak-mcu-base/kit/ak-base-kit-3i0-3d.html">Open the 3D model of the board in the browser →</a></b><br>
+rotate it, zoom in, click a part to see what it is (118 parts, with a search box; the page is in Vietnamese)</p>
+
 STM32L151CBT6, a 1.54 inch 128×64 OLED, three buttons, a buzzer, a battery-backed RTC, 1 MB of SPI flash, RS485,
-UART, I2C, USB Type-C with a USB-to-UART bridge on board. Photo and board drawing: [AK Foundation](https://github.com/the-ak-foundation/ak-base-kit-stm32l151/tree/main/hardware/images) (MIT licence).
+UART, I2C, USB Type-C with a USB-to-UART bridge on board. The two pictures above are renders from the design files
+of board 3.0, not photographs. Photo and board drawing: [AK Foundation](https://github.com/the-ak-foundation/ak-base-kit-stm32l151/tree/main/hardware/images) (MIT licence).
 
 <p align="center">
   <img src="docs/kit/block-diagram.svg" alt="Block diagram of the AK Base Kit: the STM32L151CBT6 in the middle; USB Type-C, CH340E, SWD and the crystal on the left; OLED, SPI flash, RTC, RS485 on the right; expansion connectors above; buttons, buzzer and LED below" width="860">

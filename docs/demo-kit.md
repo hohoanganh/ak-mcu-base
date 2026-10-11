@@ -391,7 +391,19 @@ Hai điều schematic cho thấy, firmware đã sửa theo từ v1.3.7:
 - **Chân chọn chip của mô-đun SPI ở J6 là PA4.** Tuỳ chọn `PORT_KIT_NRF24_CSN` (mặc định tắt) giờ giữ PA4 ở mức cao;
   trước đó nó trỏ PB9 theo kit đời trước.
 
-<details><summary>Bản dựng 3D của bo mạch (không phải ảnh chụp)</summary>
+### Mô hình 3D của bo
+
+| Mặt trên | Mặt dưới |
+|---|---|
+| ![Bản dựng 3D mặt trên của AK Base Kit 3.0](kit/ak-base-kit-3i0-render-top.jpg) | ![Bản dựng 3D mặt dưới của AK Base Kit 3.0](kit/ak-base-kit-3i0-render-bottom.jpg) |
+
+**[Mở mô hình 3D trên trình duyệt](https://hohoanganh.github.io/ak-mcu-base/kit/ak-base-kit-3i0-3d.html)**: xoay, phóng to, nhấn vào một linh kiện để xem tên, giá trị, mô tả,
+hãng, kiểu chân và các linh kiện cùng loại; có ô tìm và danh sách 118 linh kiện. Trang là một file HTML tự chứa
+(`docs/kit/ak-base-kit-3i0-3d.html`, 11,8 MB), tải về mở bằng trình duyệt cũng chạy, không cần mạng.
+
+Mô hình và hai ảnh dựng từ file STEP của bo 3.0; thông tin linh kiện lấy từ BOM. Đây là bản dựng, không phải ảnh chụp.
+
+<details><summary>Bản dựng 3D cũ của bo mạch</summary>
 
 ![Bản dựng 3D của PCB](kit/pcb-3d-render.jpg)
 

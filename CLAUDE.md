@@ -127,6 +127,8 @@ máy tính.
 
 ## 9. Git và nội dung
 
+- Nếu có thư mục `_mailbox/` (hộp thư giữa các session, không vào git): khi bắt đầu một lượt làm việc và khi vừa xong
+  một việc, đọc `_mailbox/den-ak-kit.md` và xử lý các tin còn `[ ]`; quy ước ở `_mailbox/README.md`.
 - Nhánh `main`. Thông điệp commit tiếng Việt, ngắn, nói thay đổi gì và đã kiểm bằng gì.
 - Không commit `.pio/`, `build/`, `*.img`, `__pycache__/` (đã có trong `.gitignore`).
 - Repo là **cá nhân**: không đưa tên công ty, thông tin liên hệ hay tên sản phẩm thương mại vào mã và tài liệu.

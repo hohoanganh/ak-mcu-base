@@ -9,6 +9,8 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 
 ## ak-mcu-base — sau v1.3.7, chưa phát hành
 
+- **Mô hình 3D của AK Base Kit 3.0** (`docs/kit/ak-base-kit-3i0-3d.html`): trang tự chứa, xoay được, nhấn vào linh kiện
+  thì hiện thông tin; kèm hai ảnh dựng mặt trên và mặt dưới. Gắn vào hai README, tài liệu demo, trang web và trang chạy thử.
 - **Kit làm dụng cụ đo trên bàn** (`src/demo`, `src/port/stm32l151`): lệnh `i2c` quét và đọc cổng I2C1, có trong mọi bản
   demo. Bản build mới `kit_tools` (demo cộng thêm) có lệnh `spi` bắt gói SPI trên các chân J6 và lệnh `rf` nghe / phát
   bằng nRF24L01+. Hai lệnh sau tách riêng vì bộ đệm bắt SPI chiếm 5,6 KB RAM. Cách dùng: `docs/demo-kit.md`.
