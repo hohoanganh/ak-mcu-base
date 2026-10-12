@@ -15,25 +15,27 @@
 /*----------------------------------------------------------------------------
  * Partitions: same maps as port stm32l151
  *   internal staging: boot 12K | app 58K | staging 58K (all internal flash)
- *   external staging: boot 12K | app 116K, staging 116K on emulated SPI NOR
- *                     (4K sectors, byte writes, erased 0xFF)
+ *   external staging: boot 12K | app 116K, staging 116K + backup 116K on
+ *                     emulated SPI NOR (4K sectors, byte writes, erased 0xFF)
  *--------------------------------------------------------------------------*/
 static const flash_part_info_t parts_internal[FLASH_PART_NUM] = {
 	/* addr                           size        erase           write  erased */
 	{ HOST_FLASH_BASE + 0x00000UL,   0x03000UL,  HOST_PAGE_SIZE, 4,     0xFF },
 	{ HOST_FLASH_BASE + 0x03000UL,   0x0E800UL,  HOST_PAGE_SIZE, 4,     0xFF },
 	{ HOST_FLASH_BASE + 0x11800UL,   0x0E800UL,  HOST_PAGE_SIZE, 4,     0xFF },
+	{ 0,                             0,          HOST_PAGE_SIZE, 4,     0xFF },	/* no backup: no rollback */
 };
 static const flash_part_info_t parts_external[FLASH_PART_NUM] = {
 	{ HOST_FLASH_BASE + 0x00000UL,   0x03000UL,  HOST_PAGE_SIZE, 4,     0xFF },
 	{ HOST_FLASH_BASE + 0x03000UL,   0x1D000UL,  HOST_PAGE_SIZE, 4,     0xFF },
 	{ HOST_EXT_STAGING_ADDR,         HOST_EXT_STAGING_SIZE, HOST_EXT_SECTOR, 1, 0xFF },
+	{ HOST_EXT_BACKUP_ADDR,          HOST_EXT_BACKUP_SIZE,  HOST_EXT_SECTOR, 1, 0xFF },
 };
 static flash_part_info_t parts_rt[FLASH_PART_NUM];
 static uint8_t layout_external = 1;
 
 static uint8_t flash_mem[HOST_FLASH_SIZE];
-static uint8_t ext_mem[HOST_EXT_STAGING_SIZE];
+static uint8_t ext_mem[HOST_EXT_MEM_SIZE];
 static uint8_t nvm_mem[HAL_NVM_SIZE];
 
 static uint32_t flash_ops;
@@ -72,7 +74,7 @@ void host_reset_state(uint8_t erased_val) {
 	memcpy(parts_rt, layout_external ? parts_external : parts_internal, sizeof(parts_rt));
 	for (int i = 0; i < FLASH_PART_NUM; i++) {
 		/* erased_val models the MCU flash; SPI NOR always erases to 0xFF */
-		if (!(layout_external && i == FLASH_PART_STAGING)) {
+		if (!(layout_external && (i == FLASH_PART_STAGING || i == FLASH_PART_BACKUP))) {
 			parts_rt[i].erased_val = erased_val;
 		}
 	}
@@ -496,8 +498,8 @@ static uint8_t* part_ptr(flash_part_t part, uint32_t off, uint32_t len) {
 	if (p == 0 || off > p->size || len > p->size - off) {
 		return 0;
 	}
-	if (layout_external && part == FLASH_PART_STAGING) {
-		return ext_mem + off;
+	if (layout_external && (part == FLASH_PART_STAGING || part == FLASH_PART_BACKUP)) {
+		return ext_mem + (p->addr - HOST_EXT_STAGING_ADDR) + off;
 	}
 	return flash_mem + (p->addr - HOST_FLASH_BASE) + off;
 }

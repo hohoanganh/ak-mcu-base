@@ -9,7 +9,40 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 
 ## Chưa phát hành
 
-Bootloader **1.2.2**. Rà lại toàn bộ mã để gọn và nhẹ hơn; không đổi giao thức, không đổi bản đồ flash.
+Bootloader **1.3.0**: xác nhận ảnh và quay lui. Log bản ghi trên flash SPI, trạm thời tiết giữ số liệu qua reset.
+Rà lại toàn bộ mã để gọn và nhẹ hơn.
+
+### Xác nhận và quay lui (confirm + rollback)
+
+- Phân vùng mới **BACKUP** 116K trên flash SPI ở `0xA0000` (`FLASH_PART_BACKUP` trong HAL; board staging trong
+  flash trong không có, mọi lệnh quay lui bị bỏ qua có thông báo). Trước khi cài, bootloader chép ảnh đang chạy sang
+  BACKUP (header chép sau cùng, kiểm CRC) rồi mới chép STAGING → APP.
+- Ảnh mới chạy **thử**: `boot_ctrl` có thêm `trial`, `trial_boots`, `rolled_back` (bản ghi 24 B, vẫn trong ô 32 B;
+  **bootloader cũ không đọc được**, nạp bootloader 1.3.0 trước). Mỗi lần bootloader khởi động ảnh thử là một lượt, ghi
+  EEPROM trước khi nhảy. App xác nhận bằng `boot_ctrl_confirm()`: `task_system` làm sau `APP_FW_CONFIRM_MS` (30 s; 0 =
+  dự án tự gọi), hoặc shell `fw confirm`, hoặc lệnh giao thức `0x09`. Chưa xác nhận sau 3 lượt thì bootloader cài lại
+  BACKUP và xoá header STAGING. `fw rollback` / `ak_fw.py rollback` / lệnh `0x0A` quay lui chủ động. APP hỏng mà
+  STAGING không dùng được thì cứu từ BACKUP.
+- Shell: `fw` (trạng thái thử, ảnh backup), `info` và `verify` in thêm phân vùng backup; app báo lúc khởi động nếu đang
+  chạy ảnh do quay lui khôi phục.
+- Test: `boot_decide` 14 ca mới; cài kèm sao lưu, quay lui vì không xác nhận, quay lui theo lệnh, cứu từ BACKUP, cắt điện
+  ở từng thao tác flash của cài (10.081 điểm) và của quay lui; giả lập đầu-cuối thêm 12 bước (thử, xác nhận, quay lui
+  theo lệnh, reset 3 lần không xác nhận → quay lui). Bootloader 8,2 → 9,7 KB (ngân sách CI 10 KB). **Chưa chạy trên
+  kit thật.**
+
+### Log bản ghi trên flash (`services/sys/flog.c`)
+
+- Vòng ghi bản ghi cố định trên flash xoá theo sector: header `[magic][seq][~seq]` mỗi sector, CRC16 từng bản ghi,
+  không chỉ mục trong RAM, mount lại từ flash. Bản ghi cắt điện giữa chừng bị bỏ qua, log ghi tiếp. Cách dùng:
+  `docs/tien-ich.md` mục 2b.
+- **Trạm thời tiết** ghi mẫu nhịp 1 phút / 15 phút vào 16 sector cuối kho media (dưới sector chương trình khối); reset
+  xong đồ thị và nhịp quay lại từ log; `th log` in CSV kèm giờ RTC, `th clear` xoá. Nhịp 1 giây vẫn chỉ trong RAM.
+- Test: ghi đầy vòng nhiều lần, cắt điện ở từng thao tác (296 điểm) rồi mount lại; nạp lại đồ thị sau reset trong
+  `test_demo`. Demo 56,7 → 59,9 KB flash.
+
+### Gọn và nhẹ hơn
+
+Không đổi giao thức.
 
 Số đo (arm-none-eabi-gcc 13.2, `-Os -flto`), trước → sau:
 
@@ -27,7 +60,7 @@ Số đo (arm-none-eabi-gcc 13.2, `-Os -flto`), trước → sau:
   `xprintf` bốn tham số ở từng chỗ ghi log.
 - **Ảnh firmware:** `fw_image_verify()` và `fw_update_finish()` đọc thẳng vào header của người gọi, bớt hai bản 256 B
   trên stack khi COMMIT (đỉnh stack −512 B). So tên board bằng vòng lặp nhỏ thay cho `strncmp` (gcc đổi nó thành
-  `strcmp` của newlib, 440 B, trong bootloader). Vì mã bootloader đổi: **bootloader 1.2.2**.
+  `strcmp` của newlib, 440 B, trong bootloader). Vì mã bootloader đổi: bootloader 1.2.2 (rồi 1.3.0 với quay lui, ở trên).
 - **Nhật ký sự cố:** `crash_log_count()` tìm bản ghi mới nhất một lần rồi đếm, thay vì gọi `crash_log_read(n)` n lần
   (mỗi lần quét cả 8 ô và tính CRC16). `task_poll_modbus` chỉ cập nhật thanh ghi số sự cố mỗi giây một lần thay vì mỗi
   vòng lặp kernel.

@@ -22,6 +22,7 @@
 #include "fw_update.h"
 #include "fw_proto.h"
 #include "crash_log.h"
+#include "boot_core.h"
 
 #include "app.h"
 #include "task_list.h"
@@ -94,10 +95,14 @@ static void cmd_info(const char* args) {
 	xprintf("partitions (header check, 'verify' for the full CRC):\n");
 	print_part("app", FLASH_PART_APP, 0);
 	print_part("staging", FLASH_PART_STAGING, 0);
+	if (hal_flash_info(FLASH_PART_BACKUP)->size) {
+		print_part("backup", FLASH_PART_BACKUP, 0);
+	}
 
 	boot_ctrl_load(&ctrl);
-	xprintf("boot_ctrl: cmd %d, attempts %d, last %s, installs %u\n", ctrl.cmd,
-			ctrl.install_attempts, fw_err_str((fw_err_t)ctrl.last_result), ctrl.install_count);
+	xprintf("boot_ctrl: cmd %d, attempts %d, last %s, installs %u%s%s\n", ctrl.cmd,
+			ctrl.install_attempts, fw_err_str((fw_err_t)ctrl.last_result), ctrl.install_count,
+			ctrl.trial ? ", on trial" : "", ctrl.rolled_back ? ", rolled back" : "");
 	xprintf("reset reason %d, uptime %u ms\n", hal_reset_reason(), hal_millis());
 }
 
@@ -105,6 +110,40 @@ static void cmd_verify(const char* args) {
 	(void)args;
 	print_part("app", FLASH_PART_APP, 1);
 	print_part("staging", FLASH_PART_STAGING, 1);
+	if (hal_flash_info(FLASH_PART_BACKUP)->size) {
+		print_part("backup", FLASH_PART_BACKUP, 1);
+	}
+}
+
+/* "fw": trial / rollback state. "fw confirm": the running image is fine.
+ * "fw rollback": reboot into the image before the last update. */
+static void cmd_fw(const char* args) {
+	boot_ctrl_t ctrl;
+
+	if (strcmp(args, "confirm") == 0) {
+		int r = boot_ctrl_confirm();
+		xprintf(r > 0 ? "image confirmed\n" : r == 0 ? "nothing to confirm: not on trial\n" : "boot_ctrl write failed\n");
+		return;
+	}
+	if (strcmp(args, "rollback") == 0) {
+		task_post_pure_msg(TASK_FW_ID, FW_SIG_ROLLBACK);
+		return;
+	}
+	boot_ctrl_load(&ctrl);
+	if (hal_flash_info(FLASH_PART_BACKUP)->size == 0) {
+		xprintf("no backup partition on this board: no rollback\n");
+	}
+	else if (ctrl.trial) {
+		xprintf("image on trial, boot %d of %d: 'fw confirm' keeps it, else the bootloader rolls back\n",
+				ctrl.trial_boots, BOOT_MAX_TRIAL_BOOTS);
+	}
+	else {
+		xprintf("image confirmed%s; 'fw rollback' returns to the backup image\n",
+				ctrl.rolled_back ? " (restored by a rollback)" : "");
+	}
+	if (hal_flash_info(FLASH_PART_BACKUP)->size) {
+		print_part("backup", FLASH_PART_BACKUP, 0);
+	}
 }
 
 static void cmd_stat(const char* args) {
@@ -211,6 +250,7 @@ static const shell_cmd_t shell_cmds[] = {
 	{ "ver",	"firmware version",				cmd_ver		},
 	{ "info",	"partitions + boot state",		cmd_info	},
 	{ "verify",	"full CRC of app + staging",	cmd_verify	},
+	{ "fw",		"trial state (fw confirm, fw rollback)",	cmd_fw	},
 	{ "stat",	"pools, stack, crash count",	cmd_stat	},
 	{ "crash",	"crash log (crash clear)",		cmd_crash	},
 #if defined(APP_MODBUS_SLAVE)
@@ -220,7 +260,7 @@ static const shell_cmd_t shell_cmds[] = {
 #endif
 #if defined(APP_KIT_DEMO)
 	{ "ui",		"demo: ui 1|2|3|back|auto|open <name>|dump|stream",	cmd_ui	},
-	{ "th",		"temperature, humidity (th csv)",	cmd_th		},
+	{ "th",		"temperature, humidity (th csv | th log | th clear)",	cmd_th		},
 	{ "plot",	"plot <number>: point on the Scope screen",	cmd_plot	},
 	{ "blk",	"block program: blk | blk run | blk stop",	cmd_blk	},
 	{ "i2c",	"scan I2C1, or: i2c <addr> <reg> [n] (hex)",	cmd_i2c	},
@@ -354,6 +394,10 @@ void task_poll_console(void) {
 
 	case FW_PROTO_ACT_RESET:
 		task_post_pure_msg(TASK_FW_ID, FW_SIG_RESET);
+		break;
+
+	case FW_PROTO_ACT_ROLLBACK:
+		task_post_pure_msg(TASK_FW_ID, FW_SIG_ROLLBACK);
 		break;
 
 	default:	/* RUN: already running the app */

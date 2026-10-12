@@ -90,9 +90,13 @@ Thêm lệnh shell: một dòng trong `shell_cmds[]` của `src/app/task_console
 - **Mọi `XXX_InitTypeDef` của SPL phải qua `XXX_StructInit()` trước khi gán field.** Thiếu một field là rác stack bị OR
   vào thanh ghi, đổi theo từng bản build, không báo lỗi.
 - Bản đồ bộ nhớ: BOOT 12K `0x08000000` · APP 116K `0x08003000` (header ảnh 256 B, vector ở `0x08003100`) · ảnh chờ cài
-  ở flash SPI ngoài `0x80000` · EEPROM: `[0,64)` boot_ctrl, `[64,224)` nhật ký sự cố, `[224,256)` dành cho dự án.
+  ở flash SPI ngoài `0x80000`, bản sao app cũ (quay lui) ở `0xA0000` · EEPROM: `[0,64)` boot_ctrl, `[64,224)` nhật ký
+  sự cố, `[224,256)` dành cho dự án. Kho media của demo là flash SPI `[0,0x80000)`: clip từ 0, log thời tiết ở 16
+  sector cuối trừ một, chương trình khối ở sector cuối.
+- Ảnh mới cài xong chạy **thử** (`boot_ctrl.trial`): app tự xác nhận sau `APP_FW_CONFIRM_MS` (30 s) hoặc `fw confirm`;
+  không xác nhận sau 3 lần khởi động thì bootloader cài lại ảnh cũ từ BACKUP. `fw rollback` quay lui chủ động.
 - Bootloader chỉ chạy ảnh có CRC đúng: nạp `app.img`, không nạp `.bin` trần. **App và bootloader lấy cùng một bản
-  phát hành.**
+  phát hành** (bootloader 1.3.0 đổi bố cục `boot_ctrl`: bootloader cũ không đọc được trạng thái app mới ghi).
 - Chân của AK Base Kit 3.0 nằm trong `src/port/stm32l151/port_cfg.h` và `kit.c`, đã đối chiếu schematic
   (`docs/kit/`). LED PB8 sáng khi chân ở mức thấp.
 - Thao tác lên board thật (nạp, xoá flash, reset) phải nói rõ sẽ làm gì và được đồng ý trước; board đang có firmware

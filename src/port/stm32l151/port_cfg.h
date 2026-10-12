@@ -10,6 +10,7 @@
  *    0x08000000  BOOT     12K  bootloader
  *    0x08003000  APP     116K  [header 256 B][app, vector @ 0x08003100]
  *    NOR 0x80000 STAGING 116K  OTA image waiting for install (4K sectors)
+ *    NOR 0xA0000 BACKUP  116K  the APP image before the last install (rollback)
  *
  *  PORT_STAGING_EXTERNAL = 0 (board without SPI flash):
  *    0x08000000  BOOT     12K
@@ -39,10 +40,14 @@
 #define PORT_APP_SIZE			(0x1D000UL)		/* 116K: rest of internal flash */
 #define PORT_STAGING_ADDR		(0x00080000UL)	/* SPI NOR offset (same as ak-base-kit) */
 #define PORT_STAGING_SIZE		(0x1D000UL)
+#define PORT_BACKUP_ADDR		(0x000A0000UL)	/* SPI NOR offset, above STAGING */
+#define PORT_BACKUP_SIZE		(0x1D000UL)
 #else
 #define PORT_APP_SIZE			(0xE800UL)
 #define PORT_STAGING_ADDR		(0x08011800UL)
 #define PORT_STAGING_SIZE		(0xE800UL)
+#define PORT_BACKUP_ADDR		(0UL)			/* no room in internal flash: no rollback */
+#define PORT_BACKUP_SIZE		(0UL)
 #endif
 
 #define PORT_RAM_START			(0x20000000UL)

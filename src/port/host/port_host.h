@@ -27,10 +27,13 @@ extern "C"
 #define HOST_RAM_END			(0x20004000UL)
 #define HOST_BOARD_NAME			"ak-host"
 
-/* Emulated external SPI NOR staging (same as stm32l151 external mode) */
+/* Emulated external SPI NOR: staging + backup (same as stm32l151 external mode) */
 #define HOST_EXT_STAGING_ADDR	(0x00080000UL)
 #define HOST_EXT_STAGING_SIZE	(0x1D000UL)
+#define HOST_EXT_BACKUP_ADDR	(0x000A0000UL)
+#define HOST_EXT_BACKUP_SIZE	(0x1D000UL)
 #define HOST_EXT_SECTOR			(4096UL)
+#define HOST_EXT_MEM_SIZE		(HOST_EXT_BACKUP_ADDR + HOST_EXT_BACKUP_SIZE - HOST_EXT_STAGING_ADDR)
 
 /* Reset all port state (flash erased, NVM blank). */
 extern void host_reset_state(uint8_t erased_val);

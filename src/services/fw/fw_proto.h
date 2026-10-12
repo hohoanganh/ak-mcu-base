@@ -21,6 +21,8 @@
  *  06   LOADER   -                     -   (app: reset into bootloader)
  *  07   RESET    -                     -
  *  08   RUN      -                     -   (boot: leave loader, run app)
+ *  09   CONFIRM  -                     was_on_trial[1]  (end the trial of the running image)
+ *  0A   ROLLBACK -                     -   (then: install the image before the last update)
  *  40.. application commands, handled by cfg->ext if set (else "unknown cmd")
  ******************************************************************************
 **/
@@ -51,6 +53,8 @@ extern "C"
 #define FW_PROTO_CMD_LOADER		(0x06)
 #define FW_PROTO_CMD_RESET		(0x07)
 #define FW_PROTO_CMD_RUN		(0x08)
+#define FW_PROTO_CMD_CONFIRM	(0x09)	/* end the trial of the running image (boot_ctrl_confirm) */
+#define FW_PROTO_CMD_ROLLBACK	(0x0A)	/* put the image before the last install back */
 #define FW_PROTO_CMD_EXT		(0x40)	/* first command passed to cfg->ext */
 #define FW_PROTO_EXT_RESP_MAX	(32)	/* response payload after the status byte */
 #define FW_PROTO_RESP			(0x80)
@@ -64,6 +68,7 @@ typedef enum {
 	FW_PROTO_ACT_LOADER,
 	FW_PROTO_ACT_RESET,
 	FW_PROTO_ACT_RUN,
+	FW_PROTO_ACT_ROLLBACK,	/* app: set BOOT_CMD_ROLLBACK and reset; boot: roll back now */
 } fw_proto_action_t;
 
 typedef struct {

@@ -458,21 +458,23 @@ static flash_part_info_t parts[FLASH_PART_NUM] = {
 	{ PORT_BOOT_ADDR,		PORT_BOOT_SIZE,		PORT_FLASH_PAGE, 4, 0x00 },
 	{ PORT_APP_ADDR,		PORT_APP_SIZE,		PORT_FLASH_PAGE, 4, 0x00 },
 #if PORT_STAGING_EXTERNAL
-	/* size stays 0 until the chip is detected (OTA then reports "too big") */
+	/* sizes stay 0 until the chip is detected (OTA then reports "too big") */
 	{ PORT_STAGING_ADDR,	0,					SPI_NOR_SECTOR_SIZE, 1, 0xFF },
+	{ PORT_BACKUP_ADDR,		0,					SPI_NOR_SECTOR_SIZE, 1, 0xFF },
 #else
 	{ PORT_STAGING_ADDR,	PORT_STAGING_SIZE,	PORT_FLASH_PAGE, 4, 0x00 },
+	{ PORT_BACKUP_ADDR,		PORT_BACKUP_SIZE,	PORT_FLASH_PAGE, 4, 0x00 },	/* size 0: no rollback */
 #endif
 };
 
 #if PORT_STAGING_EXTERNAL
-static uint8_t staging_is_external(flash_part_t part) {
-	return part == FLASH_PART_STAGING;
+static uint8_t part_is_external(flash_part_t part) {
+	return part == FLASH_PART_STAGING || part == FLASH_PART_BACKUP;
 }
 #endif
 
-/* External mode: detect the SPI NOR and enable STAGING only if the chip is
- * present and large enough. Internal mode: nothing to do. */
+/* External mode: detect the SPI NOR and enable STAGING (and BACKUP) only if
+ * the chip is present and large enough. Internal mode: nothing to do. */
 static void staging_init(void) {
 #if PORT_STAGING_EXTERNAL
 	uint32_t size = spi_nor_init();
@@ -482,6 +484,12 @@ static void staging_init(void) {
 	}
 	else {
 		xprintf("[port] SPI NOR not found (JEDEC 0x%06X), OTA staging disabled\n", spi_nor_jedec_id());
+	}
+	if (size >= PORT_BACKUP_ADDR + PORT_BACKUP_SIZE) {
+		parts[FLASH_PART_BACKUP].size = PORT_BACKUP_SIZE;
+	}
+	else if (parts[FLASH_PART_STAGING].size) {
+		xprintf("[port] SPI NOR too small for a backup image, no rollback\n");
 	}
 #endif
 }
@@ -499,7 +507,7 @@ static int range_ok(flash_part_t part, uint32_t off, uint32_t len, uint32_t alig
  * brick the running image); only the bootloader writes APP. */
 static int part_writable(flash_part_t part) {
 #if defined(AK_BOOTLOADER)
-	return part == FLASH_PART_APP || part == FLASH_PART_STAGING;
+	return part == FLASH_PART_APP || part == FLASH_PART_STAGING || part == FLASH_PART_BACKUP;
 #else
 	return part == FLASH_PART_STAGING;
 #endif
@@ -519,7 +527,7 @@ int hal_flash_erase(flash_part_t part, uint32_t off, uint32_t len) {
 	}
 
 #if PORT_STAGING_EXTERNAL
-	if (staging_is_external(part)) {
+	if (part_is_external(part)) {
 		for (uint32_t a = parts[part].addr + off; a < parts[part].addr + off + len; a += SPI_NOR_SECTOR_SIZE) {
 			if (spi_nor_erase_sector(a) != SPI_NOR_OK) {
 				return HAL_FLASH_ERR_HW;
@@ -619,7 +627,7 @@ int hal_flash_write(flash_part_t part, uint32_t off, const void* data, uint32_t 
 	}
 
 #if PORT_STAGING_EXTERNAL
-	if (staging_is_external(part)) {
+	if (part_is_external(part)) {
 		return spi_nor_write(parts[part].addr + off, data, len) == SPI_NOR_OK ? HAL_FLASH_OK : HAL_FLASH_ERR_HW;
 	}
 #endif
@@ -649,7 +657,7 @@ int hal_flash_read(flash_part_t part, uint32_t off, void* buf, uint32_t len) {
 		return HAL_FLASH_ERR_ARG;
 	}
 #if PORT_STAGING_EXTERNAL
-	if (staging_is_external(part)) {
+	if (part_is_external(part)) {
 		return spi_nor_read(parts[part].addr + off, buf, len) == SPI_NOR_OK ? HAL_FLASH_OK : HAL_FLASH_ERR_HW;
 	}
 #endif

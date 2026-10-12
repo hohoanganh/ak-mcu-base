@@ -235,6 +235,32 @@ void cmd_th(const char* args) {
 	int16_t t;
 	uint16_t h;
 
+	if (strcmp(args, "clear") == 0) {
+		weather_log_clear();
+		xprintf("weather log cleared\n");
+		return;
+	}
+	if (strcmp(args, "log") == 0) {
+		uint32_t n = weather_log_count();
+		weather_rec_t r;
+
+		xprintf("%u record(s) on flash (rates 1 min and 15 min only)\n", n);
+		xprintf("n,time,temp_c,rh_pct,every_s\n");
+		for (uint32_t i = 0; i < n; i++) {
+			if (weather_log_read(i, &r) != 1) {
+				continue;		/* cut by a power loss */
+			}
+			xprintf("%u,", i);
+			if (r.hh == 0xFF) {
+				xprintf("-");
+			}
+			else {
+				xprintf("%02d:%02d:%02d", r.hh, r.mm, r.ss);
+			}
+			xprintf(",%s,%s,%u\n", weather_fmt(a, r.t10), weather_fmt(b, r.rh10), r.period == 2 ? 900 : 60);
+		}
+		return;
+	}
 	if (!weather_now(&t, &h)) {
 		xprintf("no answer from the SHT45\n");
 		return;

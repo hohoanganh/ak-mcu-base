@@ -39,10 +39,20 @@
 #endif
 #define APP_MB_RESPONSE_TIMEOUT_MS		(200)		/* master: wait for an answer */
 
+/* A freshly installed image runs on trial (boot_ctrl.trial): the bootloader
+ * rolls back to the previous one unless the app confirms itself. The sample
+ * app confirms after this long without a reset: kernel, watchdog, console
+ * and the heartbeat all proved to work. 0 = never automatically (the app
+ * calls boot_ctrl_confirm() itself, or the shell: "fw confirm"). */
+#ifndef APP_FW_CONFIRM_MS
+#define APP_FW_CONFIRM_MS		(30000)
+#endif
+
 /* TASK_SYSTEM_ID */
 enum {
 	SYSTEM_SIG_INIT = AK_USER_DEFINE_SIG,
 	SYSTEM_SIG_HEARTBEAT,
+	SYSTEM_SIG_CONFIRM,		/* timer: the trial image has run long enough */
 };
 
 /* TASK_CONSOLE_ID */
@@ -55,6 +65,7 @@ enum {
 enum {
 	FW_SIG_INSTALL = AK_USER_DEFINE_SIG,	/* verified image ready in STAGING */
 	FW_SIG_LOADER,							/* reset into bootloader */
+	FW_SIG_ROLLBACK,						/* reset, bootloader puts the previous image back */
 	FW_SIG_RESET,
 	FW_SIG_DO_RESET,						/* timer: reset once logs are flushed */
 	FW_SIG_TEST_STARVE,						/* crash test: keeps the CPU, starves lower tasks */

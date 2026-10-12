@@ -15,6 +15,7 @@
 #include "ak_log.h"
 #include "boot_ctrl.h"
 #include "fw_update.h"
+#include "hal_flash.h"
 
 #include "app.h"
 #include "task_list.h"
@@ -49,6 +50,19 @@ void task_fw(ak_msg_t* msg) {
 			break;
 		}
 		LOG_I(TAG, "rebooting into bootloader loader\n");
+		schedule_reset();
+		break;
+
+	case FW_SIG_ROLLBACK:
+		if (hal_flash_info(FLASH_PART_BACKUP)->size == 0) {
+			LOG_W(TAG, "rollback ignored: this board keeps no backup image\n");
+			break;
+		}
+		if (boot_ctrl_set_cmd(BOOT_CMD_ROLLBACK) != 0) {
+			LOG_E(TAG, "boot_ctrl write failed\n");
+			break;
+		}
+		LOG_I(TAG, "rebooting to roll back to the previous image\n");
 		schedule_reset();
 		break;
 

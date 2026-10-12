@@ -91,7 +91,10 @@ Ba nút dưới màn hình, từ trái sang phải: B1, B2, B3. Dòng cuối mà
   lát tường. Bấm hoặc giữ B1/B2 để quay, B3 để đi; tới cửa có sọc là xong, màn hình báo số giây.
 - **Video** phát clip nằm trong flash SPI, lặp lại khi hết. Chưa nạp clip thì màn hình nhắc cách nạp (xem mục dưới).
 - **Trạm thời tiết** cần một mô-đun SHT45 cắm vào cổng I2C (J7 hoặc J9); cảm biến này không nằm trên bo. Nó đọc SHT45 mỗi giây, kể cả khi đang mở màn hình khác. Đồ thị có 96 điểm; B2 chọn mỗi điểm cách nhau
-  1 giây, 1 phút hoặc 15 phút (96 điểm × 15 phút = 24 giờ). Đổi nhịp là xoá đồ thị. Số liệu nằm trong RAM, mất khi reset.
+  1 giây, 1 phút hoặc 15 phút (96 điểm × 15 phút = 24 giờ). Đổi nhịp là xoá đồ thị. Mẫu ở nhịp 1 phút và 15 phút còn
+  được ghi vào **log trên flash SPI** (16 sector ở cuối kho media, dưới sector của chương trình khối; vòng tròn, có CRC
+  từng bản ghi, chịu mất điện: `services/sys/flog.c`): reset xong đồ thị và nhịp lấy mẫu quay lại từ log, `th log` in cả
+  log dạng CSV kèm giờ RTC, `th clear` xoá. Nhịp 1 giây chỉ nằm trong RAM (ghi flash mỗi giây là mòn vô ích).
 - **Hệ thống** hiện uptime, mức dùng pool message, RAM chưa từng dùng, số bản ghi sự cố, thời gian vẽ khung trước.
 
 ## Pong qua RS485: hai kit, hoặc một kit với máy tính
@@ -371,7 +374,7 @@ display ok, screen: Snake, last frame 20 ms, 3 of 8 pages sent, buttons 0x00
 > ui back     (giữ B3: về menu)
 > ui open tetris   (mở thẳng một màn hình theo một phần tên trong menu; ui open menu để về menu)
 > ui auto     (bật/tắt tự chơi: mở một game thì game tự chạy, mở máy hát thì phát lần lượt; bấm nút để giành lại quyền điều khiển)
-> th          (nhiệt độ, độ ẩm hiện tại; th csv in thêm cả đồ thị dạng CSV)
+> th          (nhiệt độ, độ ẩm hiện tại; th csv in thêm cả đồ thị dạng CSV; th log in log trên flash; th clear xoá)
 > ui dump     (gửi màn hình hiện tại một lần; ui stream: gửi mỗi khi đổi, gõ lần nữa để tắt)
 29.3 C, 65.1 %RH, 37 samples, one every 1 s
 ```

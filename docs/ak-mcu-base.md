@@ -71,11 +71,12 @@ nên APP dùng được toàn bộ phần flash trong còn lại.
 | BOOT | `0x08000000` | 12K | bootloader (đang dùng 7,9K, build LTO) |
 | APP | `0x08003000` | **116K** | `[header 256 B][app]`, vector table ở `0x08003100` |
 | STAGING | SPI NOR `0x80000` | 116K | ảnh OTA chờ cài (sector 4K), cùng địa chỉ với base cũ |
-| boot_ctrl | `0x08080000` | 2 × 32 B | data EEPROM: lệnh boot ↔ app, hai bản ghi luân phiên |
+| BACKUP | SPI NOR `0xA0000` | 116K | bản sao của APP trước lần cài gần nhất: ảnh để **quay lui** |
+| boot_ctrl | `0x08080000` | 2 × 32 B | data EEPROM: lệnh boot ↔ app, trạng thái thử, hai bản ghi luân phiên |
 | crash log | `0x08080040` | 8 × 20 B | data EEPROM: tám sự cố gần nhất |
 
 Board không gắn chip SPI thì build với `AK_STAGING=internal` (`make stm32-internal`): APP 58K tại
-`0x08003000`, STAGING 58K tại `0x08011800` trong flash trong.
+`0x08003000`, STAGING 58K tại `0x08011800` trong flash trong; không có chỗ cho BACKUP nên không quay lui được.
 
 Flash SPI: W25Qxx trên SPI1 (PA5 SCK, PA6 MISO, PA7 MOSI), CS PB14, mode 0, 4 MHz, giống driver của
 base cũ. Mỗi lần khởi động, port đọc JEDEC ID; không thấy chip (hoặc chip nhỏ hơn 1 MB) thì tắt
@@ -131,17 +132,33 @@ Thử trước trên máy tính: `python3 tools/ak_fw.py --sim build/host/ak_sim
 - **App nhận ảnh** (qua `fw_proto` trên console, hoặc kênh khác gọi `fw_update_*()`) và ghi vào
   STAGING. Trang flash được xóa dần khi ghi tới, nên không chặn task lâu. Xong thì verify toàn bộ:
   CRC, board, địa chỉ nạp, vector table. Hợp lệ thì đặt `boot_ctrl.cmd = UPDATE` rồi reset.
-- **Boot** đọc `boot_ctrl`, verify APP, rồi chọn một hành động. STAGING chỉ được đọc và kiểm khi
-  cần (đang có lệnh cài, hoặc APP hỏng), nên lần boot bình thường không phải đọc 116K qua SPI:
+- **Boot** đọc `boot_ctrl`, verify APP, rồi chọn một hành động. STAGING và BACKUP chỉ được đọc và
+  kiểm khi cần (đang có lệnh cài hay quay lui, hết lượt thử, hoặc APP hỏng), nên lần boot bình thường
+  không phải đọc 116K qua SPI:
 
 | Tình huống | Hành động |
 |---|---|
 | `cmd = LOADER` | ở lại loader, chờ ảnh qua UART |
-| `cmd = UPDATE`, STAGING hợp lệ, chưa quá 3 lần thử | **cài**: chép STAGING → APP |
-| APP hợp lệ | chạy app |
+| `cmd = UPDATE`, STAGING hợp lệ, chưa quá 3 lần thử | **cài**: chép APP → BACKUP, rồi STAGING → APP; app mới chạy **thử** |
+| `cmd = ROLLBACK`, hoặc ảnh thử đã khởi động 3 lần mà chưa xác nhận; BACKUP hợp lệ | **quay lui**: chép BACKUP → APP, xoá header STAGING |
+| APP hợp lệ | chạy app (ảnh thử: đếm thêm một lần khởi động) |
 | APP không có header, không có lần cài dở, boot build với `AK_BOOT_ALLOW_RAW_APP=ON` | chạy kèm cảnh báo |
 | APP hỏng, STAGING còn ảnh | **cứu**: cài lại từ STAGING |
+| APP hỏng, STAGING không dùng được, BACKUP còn ảnh | **cứu**: cài lại từ BACKUP |
 | còn lại | loader |
+
+- **Xác nhận và quay lui (bootloader 1.3.0):** trước khi cài, bootloader chép ảnh đang chạy sang
+  BACKUP (có kiểm CRC). Ảnh mới chạy ở trạng thái **thử** (`boot_ctrl.trial`); mỗi lần bootloader
+  khởi động nó là một lượt (`trial_boots`), ghi vào EEPROM **trước** khi nhảy nên khởi động mà treo
+  hay reset vì watchdog vẫn tính. App xác nhận bằng `boot_ctrl_confirm()`: app mẫu làm việc này sau
+  `APP_FW_CONFIRM_MS` (30 giây chạy bình thường: kernel, watchdog, console, heartbeat đều sống) từ
+  `task_system`; dự án đặt 0 và tự gọi sau khi kiểm thứ mình cần (Modbus trả lời, cảm biến đọc được).
+  Không xác nhận sau 3 lượt thì bootloader cài lại BACKUP và xoá header STAGING để ảnh bị loại không
+  quay lại qua đường "cứu". `fw` trong shell cho biết trạng thái, `fw confirm` xác nhận ngay,
+  `fw rollback` (hoặc `ak_fw.py rollback`, lệnh `0x0A`) chủ động quay về ảnh trước. Mất điện giữa
+  lúc sao lưu hay quay lui: cùng cách chép "header cuối cùng" và cùng bộ đếm 3 lần thử như cài.
+  Board không có BACKUP (staging trong flash trong, hoặc chip SPI nhỏ hơn 0xBD000): ảnh mới không
+  chạy thử, mọi lệnh quay lui bị bỏ qua có thông báo.
 
 - **An toàn khi mất điện:** trang header của APP bị xóa đầu tiên và chép cuối cùng. Vì vậy mất điện
   ở bất kỳ bước nào thì APP luôn ở trạng thái "không hợp lệ", và lần boot sau chép lại từ STAGING
@@ -204,8 +221,8 @@ log queue debug của bản gốc.
 | Hạng mục | Trạng thái |
 |---|---|
 | Unit test kernel (17 ca) — ASan + UBSan | ✅ pass |
-| Unit test fw/boot (14 ca; 11 ca chạy trên cả 2 kiểu staging: SPI NOR giả lập và flash trong), gồm 6.504 điểm cắt điện — ASan + UBSan | ✅ pass |
-| Đầu-cuối trên ak_sim bằng chính `ak_fw.py` + `mkimage.py` (13 bước) | ✅ pass |
+| Unit test fw/boot (18 ca; 15 ca chạy trên cả 2 kiểu staging: SPI NOR giả lập và flash trong), gồm hơn 20.000 điểm cắt điện cho cài (kèm sao lưu), cứu và quay lui — ASan + UBSan | ✅ pass |
+| Đầu-cuối trên ak_sim bằng chính `ak_fw.py` + `mkimage.py` (25 bước, gồm thử, xác nhận, quay lui theo lệnh và quay lui vì không xác nhận) | ✅ pass |
 | Build STM32 (boot + app) cả hai chế độ staging, `-Wall -Wextra -Werror`; ASSERT kích thước APP chặn được app quá lớn | ✅ |
 | Kiểm layout ảnh STM32 (header @ `0x08003000`, vector @ `0x08003100`, `.elf` == `.img`) | ✅ |
 | Ghi half-page: hàm nằm trong RAM, không gọi sang flash, tắt/bật ngắt đúng (đọc lại mã máy) | ✅ |
@@ -227,7 +244,7 @@ rút điện giữa lúc boot đang cài (log `installing...`) → cắm lại p
 - **Tốc độ ghi flash STM32L1:** đã chuyển sang half-page. Về lý thuyết nhanh khoảng 32 lần so với
   ghi từng word (một chu kỳ ghi cho 32 word), nhưng **chưa đo trên board**. Khi thử, xem thời gian
   `ak_fw.py flash` in ra và khoảng giữa log `installing...` với `install ok`.
-- Rollback (giữ ảnh cũ để quay lại nếu app mới không xác nhận chạy tốt) — hiện chỉ có cài lại từ STAGING.
+- Quay lui: chưa thử trên board thật (mới qua unit test cắt điện ở từng thao tác flash và giả lập đầu-cuối).
 - Ký số ảnh (hiện chỉ có CRC, đủ chống hỏng dữ liệu nhưng không chống giả mạo).
 - Port thứ hai (STM32 dòng mới với HAL/LL, hoặc ESP32/GD32) để kiểm lớp HAL.
 - Kênh OTA qua Modbus RS485: chỉ cần gọi `fw_update_*()` rồi post `FW_SIG_INSTALL` tới `task_fw`.

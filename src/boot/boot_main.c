@@ -2,9 +2,10 @@
  ******************************************************************************
  * @brief:  Bootloader main flow (chip independent).
  *
- *   load boot_ctrl -> verify APP, STAGING -> boot_decide()
- *     RUN      : jump to app
- *     INSTALL  : copy STAGING -> APP, update boot_ctrl, loop
+ *   load boot_ctrl -> verify APP, STAGING, BACKUP -> boot_decide()
+ *     RUN      : jump to app (an unconfirmed image: count the trial boot)
+ *     INSTALL  : copy APP -> BACKUP, STAGING -> APP, update boot_ctrl, loop
+ *     ROLLBACK : copy BACKUP -> APP (the image before the last install), loop
  *     LOADER   : receive an image on the console via fw_proto (tools/ak_fw.py)
  ******************************************************************************
 **/
@@ -21,8 +22,8 @@
 
 #ifndef BOOT_VER_MAJOR
 #define BOOT_VER_MAJOR		1
-#define BOOT_VER_MINOR		2
-#define BOOT_VER_PATCH		2
+#define BOOT_VER_MINOR		3
+#define BOOT_VER_PATCH		0
 #endif
 
 /* 0 (default): run CRC-checked images only. 1: also run an APP without
@@ -74,7 +75,8 @@ static void print_ver(const char* name, const fw_image_hdr_t* hdr, fw_err_t err)
 	}
 }
 
-/* Returns FW_PROTO_ACT_INSTALL (new image received + verified) or FW_PROTO_ACT_RUN. */
+/* Returns FW_PROTO_ACT_INSTALL (new image received + verified), FW_PROTO_ACT_RUN
+ * or FW_PROTO_ACT_ROLLBACK. */
 static fw_proto_action_t loader_loop(void) {
 	uint32_t last_blink = 0;
 	int c;
@@ -98,6 +100,10 @@ static fw_proto_action_t loader_loop(void) {
 			hal_console_flush();
 			return FW_PROTO_ACT_RUN;
 
+		case FW_PROTO_ACT_ROLLBACK:
+			hal_console_flush();
+			return FW_PROTO_ACT_ROLLBACK;
+
 		case FW_PROTO_ACT_RESET:
 			hal_console_flush();
 			hal_reset();
@@ -119,8 +125,8 @@ void boot_main(void) {
 	const flash_part_info_t* app = hal_flash_info(FLASH_PART_APP);
 	boot_ctrl_t ctrl;
 	boot_state_t st;
-	fw_image_hdr_t app_hdr, stg_hdr;
-	fw_err_t app_err, stg_err;
+	fw_image_hdr_t app_hdr, stg_hdr, bak_hdr;
+	fw_err_t app_err, stg_err, bak_err;
 	boot_act_t act;
 
 	xprintf("\n");
@@ -132,23 +138,35 @@ void boot_main(void) {
 	boot_ctrl_load(&ctrl);
 
 	for (;;) {
+		uint8_t trial_over = ctrl.trial && ctrl.trial_boots >= BOOT_MAX_TRIAL_BOOTS;
+
 		hal_wdt_kick();
 		app_err = fw_image_verify(FLASH_PART_APP, &app_hdr);
 
-		/* STAGING only matters for an update request or a broken app; skip
-		 * the full read otherwise (slow on SPI NOR, done on every boot). */
+		/* STAGING only matters for an update request or a broken app, BACKUP
+		 * for a rollback or a broken app: skip the full reads otherwise (slow
+		 * on SPI NOR, done on every boot). */
 		if (ctrl.cmd == BOOT_CMD_UPDATE || app_err != FW_OK) {
 			stg_err = fw_image_verify(FLASH_PART_STAGING, &stg_hdr);
 		}
 		else {
 			stg_err = FW_NOT_CHECKED;
 		}
+		if (ctrl.cmd == BOOT_CMD_ROLLBACK || trial_over || app_err != FW_OK) {
+			bak_err = fw_image_verify(FLASH_PART_BACKUP, &bak_hdr);
+		}
+		else {
+			bak_err = FW_NOT_CHECKED;
+		}
 
 		memset(&st, 0, sizeof(st));
 		st.cmd = ctrl.cmd;
 		st.install_attempts = ctrl.install_attempts;
+		st.trial = ctrl.trial;
+		st.trial_boots = ctrl.trial_boots;
 		st.app_ok = (app_err == FW_OK);
 		st.staging_ok = (stg_err == FW_OK);
+		st.backup_ok = (bak_err == FW_OK);
 		if (BOOT_ALLOW_RAW_APP && app_err == FW_ERR_MAGIC) {
 			uint32_t vec[2];
 			if (hal_flash_read(FLASH_PART_APP, FW_IMAGE_HDR_SIZE, vec, sizeof(vec)) == HAL_FLASH_OK) {
@@ -158,15 +176,26 @@ void boot_main(void) {
 
 		print_ver("app    ", &app_hdr, app_err);
 		print_ver("staging", &stg_hdr, stg_err);
+		print_ver("backup ", &bak_hdr, bak_err);
 
 		act = boot_decide(&st);
-		LOG_I(TAG, "cmd %d, attempts %d -> %s\n", ctrl.cmd, ctrl.install_attempts, boot_act_str(act));
+		LOG_I(TAG, "cmd %d, attempts %d, trial %d -> %s\n", ctrl.cmd, ctrl.install_attempts,
+			  ctrl.trial ? ctrl.trial_boots : 0, boot_act_str(act));
 
 		/* UPDATE requested but STAGING invalid / attempts exhausted: drop it */
 		if (ctrl.cmd == BOOT_CMD_UPDATE && act != BOOT_ACT_INSTALL) {
 			LOG_W(TAG, "update dropped (staging: %s)\n", fw_err_str(stg_err));
 			ctrl.cmd = BOOT_CMD_NONE;
 			ctrl.last_result = (uint8_t)(stg_err != FW_OK ? stg_err : FW_ERR_STATE);
+			boot_ctrl_save(&ctrl);
+		}
+		/* ROLLBACK requested, or trial over, but nothing valid to go back to:
+		 * keep what is there */
+		if ((ctrl.cmd == BOOT_CMD_ROLLBACK || trial_over) && act != BOOT_ACT_ROLLBACK) {
+			LOG_W(TAG, "no rollback (backup: %s)\n", fw_err_str(bak_err));
+			ctrl.cmd = (uint8_t)(ctrl.cmd == BOOT_CMD_ROLLBACK ? BOOT_CMD_NONE : ctrl.cmd);
+			ctrl.trial = 0;
+			ctrl.trial_boots = 0;
 			boot_ctrl_save(&ctrl);
 		}
 
@@ -180,6 +209,13 @@ void boot_main(void) {
 				ctrl.install_attempts = 0;
 				boot_ctrl_save(&ctrl);
 			}
+			/* an unconfirmed image: one more boot used up. The count is saved
+			 * BEFORE the jump, so a crash during the boot still counts. */
+			if (act == BOOT_ACT_RUN && ctrl.trial && ctrl.trial_boots < BOOT_MAX_TRIAL_BOOTS) {
+				ctrl.trial_boots++;
+				boot_ctrl_save(&ctrl);
+				LOG_W(TAG, "trial boot %d/%d\n", ctrl.trial_boots, BOOT_MAX_TRIAL_BOOTS);
+			}
 			LOG_I(TAG, "jump to 0x%08X\n\n", app->addr + FW_IMAGE_HDR_SIZE);
 			hal_console_flush();
 			hal_jump_to_app(app->addr + FW_IMAGE_HDR_SIZE);
@@ -187,6 +223,7 @@ void boot_main(void) {
 
 		case BOOT_ACT_INSTALL: {
 			fw_err_t err;
+			uint8_t have_backup = (bak_err == FW_OK);
 
 			/* persist BEFORE copying: after a power loss the next boot knows
 			 * an install is pending (cmd UPDATE) and counts the attempt. The
@@ -194,6 +231,19 @@ void boot_main(void) {
 			ctrl.cmd = BOOT_CMD_UPDATE;
 			ctrl.install_attempts++;
 			boot_ctrl_save(&ctrl);
+
+			/* keep the running image: the one a rollback returns to. A
+			 * half-copied APP (install cut by a power loss) cannot be kept;
+			 * the backup of the attempt before is still there then. */
+			if (app_err == FW_OK && hal_flash_info(FLASH_PART_BACKUP)->size) {
+				LOG_I(TAG, "backing up v%d.%d.%d...\n", app_hdr.version.major,
+					  app_hdr.version.minor, app_hdr.version.patch);
+				err = boot_copy_image(FLASH_PART_BACKUP, FLASH_PART_APP, &app_hdr);
+				have_backup = (err == FW_OK);
+				if (!have_backup) {
+					LOG_W(TAG, "backup failed: %s\n", fw_err_str(err));
+				}
+			}
 
 			LOG_I(TAG, "installing v%d.%d.%d (attempt %d)...\n", stg_hdr.version.major,
 				  stg_hdr.version.minor, stg_hdr.version.patch, ctrl.install_attempts);
@@ -206,10 +256,47 @@ void boot_main(void) {
 				ctrl.cmd = BOOT_CMD_NONE;
 				ctrl.install_attempts = 0;
 				ctrl.install_count++;
-				LOG_I(TAG, "install ok\n");
+				ctrl.trial = have_backup;		/* nothing to go back to: no trial */
+				ctrl.trial_boots = 0;
+				ctrl.rolled_back = 0;
+				LOG_I(TAG, "install ok%s\n", have_backup ? ", on trial" : "");
 			}
 			else {
 				LOG_E(TAG, "install failed: %s\n", fw_err_str(err));
+			}
+			boot_ctrl_save(&ctrl);
+		}
+			break;
+
+		case BOOT_ACT_ROLLBACK: {
+			fw_err_t err;
+
+			/* same bookkeeping as an install: resumable after a power loss,
+			 * bounded by the attempt counter */
+			ctrl.cmd = BOOT_CMD_ROLLBACK;
+			ctrl.install_attempts++;
+			boot_ctrl_save(&ctrl);
+
+			LOG_W(TAG, "rolling back to v%d.%d.%d (attempt %d)...\n", bak_hdr.version.major,
+				  bak_hdr.version.minor, bak_hdr.version.patch, ctrl.install_attempts);
+			hal_led_set(1);
+			err = boot_copy_image(FLASH_PART_APP, FLASH_PART_BACKUP, &bak_hdr);
+			hal_led_set(0);
+
+			ctrl.last_result = (uint8_t)err;
+			if (err == FW_OK) {
+				/* the rejected image must not come back through the
+				 * "APP corrupt: recover from STAGING" path */
+				hal_flash_erase(FLASH_PART_STAGING, 0, hal_flash_info(FLASH_PART_STAGING)->erase_size);
+				ctrl.cmd = BOOT_CMD_NONE;
+				ctrl.install_attempts = 0;
+				ctrl.trial = 0;
+				ctrl.trial_boots = 0;
+				ctrl.rolled_back = 1;
+				LOG_I(TAG, "rollback ok\n");
+			}
+			else {
+				LOG_E(TAG, "rollback failed: %s\n", fw_err_str(err));
 			}
 			boot_ctrl_save(&ctrl);
 		}
@@ -222,6 +309,10 @@ void boot_main(void) {
 			if (r == FW_PROTO_ACT_INSTALL) {
 				ctrl.cmd = BOOT_CMD_UPDATE;
 				ctrl.install_attempts = 0;	/* new image -> reset counter */
+			}
+			else if (r == FW_PROTO_ACT_ROLLBACK) {
+				ctrl.cmd = BOOT_CMD_ROLLBACK;
+				ctrl.install_attempts = 0;
 			}
 			else if (ctrl.cmd == BOOT_CMD_LOADER) {
 				ctrl.cmd = BOOT_CMD_NONE;

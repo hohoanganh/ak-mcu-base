@@ -16,7 +16,7 @@
   <img src="https://hits.sh/github.com/hohoanganh/ak-mcu-base.svg?style=flat-square&label=Repo%20Traffic&color=007ec6" alt="Repo Traffic">
 </p>
 
-Nền firmware bare-metal cho **STM32L151CBT6** (AK Base Kit): kernel AK hướng sự kiện không cần RTOS, bootloader,
+Nền firmware bare-metal cho **STM32L151CBT6** (AK Base Kit): kernel AK hướng sự kiện không cần RTOS, bootloader có quay lui,
 cập nhật firmware qua UART và RS485. Dựng lại từ
 [ak-base-kit-stm32l151](https://github.com/the-ak-foundation/ak-base-kit-stm32l151) của AK Foundation.
 

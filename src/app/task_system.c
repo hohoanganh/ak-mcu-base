@@ -21,6 +21,8 @@
 #include "hal.h"
 #include "ak_log.h"
 #include "crash_log.h"
+#include "boot_ctrl.h"
+#include "boot_core.h"
 
 #include "app.h"
 #include "task_list.h"
@@ -61,6 +63,24 @@ void task_system(ak_msg_t* msg) {
 		LOG_I(TAG, "watchdog %d ms, heartbeat %d ms\n", APP_WDT_TIMEOUT_MS, APP_HEARTBEAT_MS);
 		task_alive_take();
 		ping_tasks();
+		{
+			boot_ctrl_t ctrl;
+
+			boot_ctrl_load(&ctrl);
+			if (ctrl.trial) {
+				if (APP_FW_CONFIRM_MS) {
+					timer_set(TASK_SYSTEM_ID, SYSTEM_SIG_CONFIRM, APP_FW_CONFIRM_MS, TIMER_ONE_SHOT);
+				}
+				LOG_W(TAG, "image on trial (boot %d/%d): confirming in %d s, 'fw confirm' does it now\n",
+					  ctrl.trial_boots, BOOT_MAX_TRIAL_BOOTS, APP_FW_CONFIRM_MS / 1000);
+			}
+		}
+		break;
+
+	case SYSTEM_SIG_CONFIRM:
+		if (boot_ctrl_confirm() > 0) {
+			LOG_I(TAG, "image confirmed\n");
+		}
 		break;
 
 	case SYSTEM_SIG_HEARTBEAT:

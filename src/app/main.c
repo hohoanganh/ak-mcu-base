@@ -15,6 +15,7 @@
 #include "ak_log.h"
 #include "fw_image.h"
 #include "crash_log.h"
+#include "boot_ctrl.h"
 
 #include "app.h"
 #include "task_list.h"
@@ -55,6 +56,14 @@ void app_init(void) {
 	crash_kind = crash_log_capture();
 	if (crash_kind != CRASH_KIND_NONE) {
 		LOG_W("APP", "previous run ended in %s - see 'crash'\n", crash_kind_str(crash_kind));
+	}
+	{
+		boot_ctrl_t ctrl;
+
+		boot_ctrl_load(&ctrl);
+		if (ctrl.rolled_back) {
+			LOG_W("APP", "the last update was rolled back: this is the image before it\n");
+		}
 	}
 
 	task_init();

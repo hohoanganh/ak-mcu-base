@@ -17,14 +17,17 @@ Cỡ việc: S = vài giờ, M = một hai ngày, L = nhiều ngày.
 |---|---|---|---|
 | 1 | **Port chip thứ hai** (STM32G0 hoặc STM32C0) | M – L | Chứng minh lớp HAL đủ tổng quát; dùng base cho sản phẩm giá rẻ |
 | 2 | **Modbus TCP qua W5500** (nanoMODBUS đã có transport TCP) | M | Gateway RTU ↔ TCP, thiết bị Ethernet công nghiệp |
-| 3 | **Xác nhận ảnh và quay lui** (confirm + rollback) | M | OTA hiện trường không cần kỹ thuật viên; điều kiện cần để nói "cập nhật an toàn" |
-| 4 | **Ghi log vào flash SPI** (vòng tròn đơn giản, sau đó littlefs nếu cần) | S – M | Data logger, trạm thời tiết lưu 24 giờ, hộp đen sự cố |
+| 3 | ~~**Xác nhận ảnh và quay lui**~~ (đã làm) | M | OTA hiện trường không cần kỹ thuật viên; điều kiện cần để nói "cập nhật an toàn" |
+| 4 | ~~**Ghi log vào flash SPI**~~ (đã làm bước 1: vòng tròn) | S – M | Data logger, trạm thời tiết lưu 24 giờ, hộp đen sự cố |
 
 Chi tiết từng hướng ở các mục dưới.
 
 ## 2. Nền và cập nhật firmware
 
-### 2.1 Xác nhận ảnh và quay lui (confirm + rollback)
+### 2.1 Xác nhận ảnh và quay lui (confirm + rollback) — **đã làm** (bootloader 1.3.0, 12/10/2026)
+
+Làm theo cách (a): vùng BACKUP 116K trên flash SPI ở `0xA0000`. Xem mục "Xác nhận và quay lui" trong
+[ak-mcu-base.md](ak-mcu-base.md). Phần dưới giữ lại làm ghi chú thiết kế.
 
 - **Là gì:** theo mô hình của MCUboot: ảnh mới chạy ở trạng thái "thử"; app tự kiểm (Modbus trả lời, kernel chạy đủ
   N giây) rồi mới đánh dấu "ổn". Reset mà chưa đánh dấu thì bootloader quay về ảnh cũ. Bộ đếm anti-rollback chỉ tăng

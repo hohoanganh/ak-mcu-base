@@ -225,18 +225,19 @@ def bar(g, x, y, w, parts, title, right):
 
 def memory():
     g = Svg(600, "Bản đồ bộ nhớ", "Firmware đặt cái gì ở đâu trên STM32L151CB và flash SPI của kit",
-            "Flash trong 128K chia cho bootloader 12K và app 116K; flash SPI 1 MB có kho clip 512K và vùng chờ OTA 116K; "
-            "EEPROM giữ trạng thái cài đặt và nhật ký sự cố.")
+            "Flash trong 128K chia cho bootloader 12K và app 116K; flash SPI 1 MB có kho clip 512K, vùng chờ OTA 116K "
+            "và bản sao app cũ 116K để quay lui; EEPROM giữ trạng thái cài đặt và nhật ký sự cố.")
     x, w = 48, W - 96
     bar(g, x, 160, w, [(0.16, "BOOT", "12K · 0x08000000", "debug"), (0.84, "APP", "116K · 0x08003000 · 256 byte đầu là header (CRC32, tên board)", "console")],
         "Flash trong vi điều khiển", "128K · 0x08000000 – 0x0801FFFF")
-    bar(g, x, 310, w, [(0.5, "Kho clip của demo", "512K · 0x00000", "oled"), (0.2, "Vùng chờ OTA", "116K · 0x80000", "flash"),
-                       (0.3, "chưa dùng", "396K · 0x9D000", None)],
+    bar(g, x, 310, w, [(0.44, "Kho clip của demo", "512K · 0x00000 · log thời tiết và chương trình khối ở cuối", "oled"),
+                       (0.2, "Vùng chờ OTA", "116K · 0x80000", "flash"), (0.2, "App cũ (quay lui)", "116K · 0xA0000", "flash"),
+                       (0.16, "chưa dùng", "268K · 0xBD000", None)],
         "Flash SPI W25Q80 trên bo", "1 MB · 0x00000 – 0xFFFFF")
-    bar(g, x, 460, w, [(0.26, "Trạng thái cài đặt", "2 ô × 32 byte", "button"), (0.4, "Nhật ký sự cố", "8 bản ghi × 20 byte", "out"),
+    bar(g, x, 460, w, [(0.26, "Trạng thái cài đặt", "2 ô × 32 byte (lệnh, lần thử, đang thử)", "button"), (0.4, "Nhật ký sự cố", "8 bản ghi × 20 byte", "out"),
                        (0.34, "chưa dùng", "", None)],
         "EEPROM trong vi điều khiển", "firmware dùng 224 byte đầu của 4K")
-    g.text(x, 572, "Chiều rộng các ô không theo tỉ lệ. App chỉ được ghi vùng chờ OTA; chỉ bootloader được ghi vùng APP.", 15, MUTED)
+    g.text(x, 572, "Chiều rộng các ô không theo tỉ lệ. App chỉ được ghi vùng chờ OTA; chỉ bootloader được ghi APP và app cũ.", 15, MUTED)
     g.save(os.path.join(DOC_DIR, "diagram-memory.svg"))
 
 
