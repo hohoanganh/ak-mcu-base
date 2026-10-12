@@ -114,6 +114,7 @@ File `.img` và `.bin` của mọi bản: [Releases](https://github.com/hohoanga
 | Nhật ký sự cố, giám sát task, đo stack, tạo dự án mới, CI | [docs/tien-ich.md](docs/tien-ich.md) |
 | Modbus RTU trên RS485: slave, master, OTA | [docs/modbus.md](docs/modbus.md) |
 | Port sang chip khác | [docs/porting.md](docs/porting.md) |
+| Hướng phát triển tiếp: rollback, ký số, Modbus TCP, log flash, chip thứ hai | [docs/huong-phat-trien.md](docs/huong-phat-trien.md) · [tối ưu nền](docs/huong-toi-uu-tiep.md) |
 | Biết bản nào sửa lỗi gì | [CHANGELOG.md](CHANGELOG.md) |
 | Cho AI assistant tra tài liệu kernel AK | [docs/ak-mcp-docs-server.md](docs/ak-mcp-docs-server.md) — repo có sẵn [.mcp.json](.mcp.json) |
 
