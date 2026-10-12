@@ -13,7 +13,10 @@
 #include "fw_image.h"
 #include "fw_update.h"
 #include "fw_proto.h"
+#include "fw_sign.h"
 #include "flog.h"
+#include "sha256.h"
+#include "p256-m.h"
 #include "port_host.h"
 #include "tiny_test.h"
 
@@ -82,6 +85,39 @@ static void setup(uint8_t erased) {
 	host_jump_handler = 0;
 	hal_init();
 	fw_update_abort();
+	fw_image_sign_require(0);	/* most tests use unsigned images */
+}
+
+/* p256-m needs randomness to sign (test images only; verify never calls it) */
+int p256_generate_random(uint8_t* output, unsigned output_size) {
+	static uint32_t x = 0x12345678;
+
+	while (output_size--) {
+		x = x * 1103515245UL + 12345UL;
+		*output++ = (uint8_t)(x >> 16);
+	}
+	return 0;
+}
+
+/* private half of src/services/fw/fw_pubkey.c (tools/keys/dev_priv.pem) */
+static const uint8_t dev_priv[32] = {
+	0x00, 0xbb, 0xd7, 0xbd, 0xdf, 0x70, 0xca, 0xf5, 0xff, 0xac, 0xe5, 0x0b, 0xb9, 0xf1, 0x36, 0xf2,
+	0x86, 0x50, 0x35, 0x5a, 0x77, 0xd4, 0xff, 0xbe, 0x57, 0x20, 0xb5, 0x6a, 0x5a, 0x7e, 0x86, 0x5c,
+};
+
+/* Sign an image in memory like tools/mkimage.py --sign-key does. */
+static void sign_image(uint8_t* img, uint32_t total, const uint8_t* priv) {
+	fw_image_hdr_t* h = (fw_image_hdr_t*)img;
+	uint8_t hash[SHA256_LEN];
+	sha256_t s;
+
+	h->sig_type = FW_SIGN_ECDSA_P256;
+	sha256_init(&s);
+	sha256_update(&s, img, FW_SIGN_HDR_LEN);
+	sha256_update(&s, img + FW_IMAGE_HDR_SIZE, total - FW_IMAGE_HDR_SIZE);
+	sha256_final(&s, hash);
+	CHECK_EQ(p256_ecdsa_sign(h->sig, priv, hash, sizeof(hash)), P256_SUCCESS);
+	rehdr(img);
 }
 
 static uint8_t part_version(flash_part_t part, fw_err_t* err) {
@@ -1191,8 +1227,141 @@ static void test_flog_power_cut_everywhere(void) {
 	CHECK(torn_total > 0);		/* the cuts really land inside writes */
 }
 
+/*----------------------------------------------------------------------------
+ * signed images
+ *--------------------------------------------------------------------------*/
+static void test_sha256(void) {
+	static const uint8_t abc[] = { 0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41, 0x41, 0x40, 0xde,
+		0x5d, 0xae, 0x22, 0x23, 0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c, 0xb4, 0x10, 0xff, 0x61,
+		0xf2, 0x00, 0x15, 0xad };
+	static const uint8_t empty[] = { 0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4,
+		0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99,
+		0x1b, 0x78, 0x52, 0xb8, 0x55 };
+	/* "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" */
+	static const uint8_t two_blocks[] = { 0x24, 0x8d, 0x6a, 0x61, 0xd2, 0x06, 0x38, 0xb8, 0xe5, 0xc0,
+		0x26, 0x93, 0x0c, 0x3e, 0x60, 0x39, 0xa3, 0x3c, 0xe4, 0x59, 0x64, 0xff, 0x21, 0x67, 0xf6, 0xec,
+		0xed, 0xd4, 0x19, 0xdb, 0x06, 0xc1 };
+	uint8_t out[SHA256_LEN];
+	sha256_t s;
+	const char* msg = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+
+	sha256("abc", 3, out);
+	CHECK(memcmp(out, abc, 32) == 0);
+	sha256("", 0, out);
+	CHECK(memcmp(out, empty, 32) == 0);
+	sha256(msg, 56, out);
+	CHECK(memcmp(out, two_blocks, 32) == 0);
+	/* streamed in odd pieces: same result */
+	sha256_init(&s);
+	sha256_update(&s, msg, 7);
+	sha256_update(&s, msg + 7, 30);
+	sha256_update(&s, msg + 37, 19);
+	sha256_final(&s, out);
+	CHECK(memcmp(out, two_blocks, 32) == 0);
+	/* a million 'a': 1 MB through the streaming interface */
+	{
+		static const uint8_t million[] = { 0xcd, 0xc7, 0x6e, 0x5c, 0x99, 0x14, 0xfb, 0x92, 0x81, 0xa1,
+			0xc7, 0xe2, 0x84, 0xd7, 0x3e, 0x67, 0xf1, 0x80, 0x9a, 0x48, 0xa4, 0x97, 0x20, 0x0e, 0x04, 0x6d,
+			0x39, 0xcc, 0xc7, 0x11, 0x2c, 0xd0 };
+		uint8_t a[1000];
+
+		memset(a, 'a', sizeof(a));
+		sha256_init(&s);
+		for (int i = 0; i < 1000; i++) {
+			sha256_update(&s, a, sizeof(a));
+		}
+		sha256_final(&s, out);
+		CHECK(memcmp(out, million, 32) == 0);
+	}
+}
+
+/* With the signature required: unsigned, tampered and foreign-key images are
+ * refused, a properly signed one is installed and runs. */
+static void test_image_signature(void) {
+	uint32_t n;
+	fw_err_t e;
+	uint8_t other_priv[32], other_pub[64];
+
+	setup(0xFF);
+	fw_image_sign_require(1);
+
+	/* unsigned: refused at the header, before the binary is read */
+	n = make_image(img_buf, 3000, 1, 0, 0, HOST_BOARD_NAME, 1);
+	CHECK_EQ(upload(img_buf, n, 128), FW_ERR_SIG);
+	CHECK_EQ(fw_update_state(), FW_UPDATE_IDLE);
+
+	/* signed with the dev key: accepted */
+	sign_image(img_buf, n, dev_priv);
+	CHECK_EQ(upload(img_buf, n, 128), FW_OK);
+	CHECK_EQ(part_version(FLASH_PART_STAGING, &e), 1);
+
+	/* a changed byte of the binary with the CRC fixed up: the signature catches it */
+	{
+		fw_image_hdr_t* h = (fw_image_hdr_t*)img_buf;
+		img_buf[FW_IMAGE_HDR_SIZE + 1234] ^= 0x01;
+		h->img_crc32 = crc32_update(CRC32_INIT, img_buf + FW_IMAGE_HDR_SIZE, h->img_size);
+		rehdr(img_buf);
+		CHECK_EQ(upload(img_buf, n, 128), FW_ERR_SIG);
+		img_buf[FW_IMAGE_HDR_SIZE + 1234] ^= 0x01;
+		h->img_crc32 = crc32_update(CRC32_INIT, img_buf + FW_IMAGE_HDR_SIZE, h->img_size);
+		rehdr(img_buf);
+		CHECK_EQ(upload(img_buf, n, 128), FW_OK);
+		/* a changed signed header field (version) too */
+		h->version.build = 99;
+		rehdr(img_buf);
+		CHECK_EQ(upload(img_buf, n, 128), FW_ERR_SIG);
+		h->version.build = 1;
+		rehdr(img_buf);
+		/* a changed signature byte */
+		h->sig[10] ^= 0x80;
+		rehdr(img_buf);
+		CHECK_EQ(upload(img_buf, n, 128), FW_ERR_SIG);
+		h->sig[10] ^= 0x80;
+		rehdr(img_buf);
+	}
+
+	/* signed with another key: refused */
+	CHECK_EQ(p256_gen_keypair(other_priv, other_pub), P256_SUCCESS);
+	n = make_image(img_buf, 3000, 2, 0, 0, HOST_BOARD_NAME, 2);
+	sign_image(img_buf, n, other_priv);
+	CHECK_EQ(upload(img_buf, n, 128), FW_ERR_SIG);
+
+	/* boot: a signed app runs, a signed update is installed, an unsigned
+	 * update is dropped and the signed app keeps running */
+	setup(0xFF);
+	fw_image_sign_require(1);
+	n = make_image(img_buf, 4000, 1, 0, 0, HOST_BOARD_NAME, 1);
+	sign_image(img_buf, n, dev_priv);
+	put_part(FLASH_PART_APP, img_buf, n);
+	CHECK_EQ(run_boot(0), BOOT_JUMPED);
+	n = make_image(img_buf, 5000, 2, 0, 0, HOST_BOARD_NAME, 2);
+	sign_image(img_buf, n, dev_priv);
+	put_part(FLASH_PART_STAGING, img_buf, n);
+	boot_ctrl_set_cmd(BOOT_CMD_UPDATE);
+	CHECK_EQ(run_boot(0), BOOT_JUMPED);
+	CHECK_EQ(part_version(FLASH_PART_APP, &e), 2);
+	n = make_image(img_buf, 5000, 3, 0, 0, HOST_BOARD_NAME, 3);
+	put_part(FLASH_PART_STAGING, img_buf, n);
+	boot_ctrl_set_cmd(BOOT_CMD_UPDATE);
+	CHECK_EQ(run_boot(0), BOOT_JUMPED);
+	CHECK_EQ(part_version(FLASH_PART_APP, &e), 2);
+	CHECK_EQ(part_version(FLASH_PART_STAGING, &e), 0);
+	CHECK_EQ(e, FW_ERR_SIG);
+
+	/* an unsigned APP (flashed over SWD) does not run either: loader */
+	setup(0xFF);
+	fw_image_sign_require(1);
+	n = make_image(img_buf, 4000, 1, 0, 0, HOST_BOARD_NAME, 1);
+	put_part(FLASH_PART_APP, img_buf, n);
+	inject_frame(FW_PROTO_CMD_RESET, 1, 0, 0);
+	CHECK_EQ(run_boot(0), BOOT_RESET);
+	fw_image_sign_require(0);
+}
+
 TT_MAIN_BEGIN("test_fw")
 	RUN_TEST(test_crc);
+	RUN_TEST(test_sha256);
+	RUN_TEST(test_image_signature);
 	RUN_TEST(test_flog_ring);
 	RUN_TEST(test_flog_power_cut_everywhere);
 	RUN_TEST(test_boot_decide);

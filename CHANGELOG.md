@@ -30,6 +30,19 @@ Rà lại toàn bộ mã để gọn và nhẹ hơn.
   theo lệnh, reset 3 lần không xác nhận → quay lui). Bootloader 8,2 → 9,7 KB (ngân sách CI 10 KB). **Chưa chạy trên
   kit thật.**
 
+### Ký số ảnh (ECDSA P-256), biến thể build `AK_IMAGE_SIGN`
+
+- Header ảnh có `sig_type` (offset 44) và chữ ký `r||s` (offset 48) trên SHA-256(48 byte đầu header ‖ nhị phân).
+  Bootloader và app xây với `FW_IMAGE_SIGN=1` từ chối ảnh không ký / sai khoá (`bad signature`, mã lỗi 14). Xác
+  minh bằng `third_party/p256-m` (Apache-2.0) và `common/sha256.c` mới. Bootloader biến thể này 16K (`PORT_IMAGE_SIGN`,
+  APP từ `0x08004000`), linker lấy kích thước boot qua `--defsym __boot_size`.
+- Công cụ: `tools/ak_sign.py` (keygen, pubkey-c, verify), `mkimage.py … --sign-key`, `mkimage.py info --pub`; CMake
+  `-DAK_IMAGE_SIGN=ON` (`make stm32-sign`), PlatformIO `image_sign = 1`. Khoá phát triển trong `tools/keys/`, khoá
+  công khai trong `services/fw/fw_pubkey.c`.
+- Test: SHA-256 (ba vector chuẩn + 1 MB stream); ảnh không ký, sửa 1 byte có vá CRC, sửa trường header, sửa chữ ký,
+  ký bằng khoá khác đều bị từ chối; ảnh ký đúng cài được qua bootloader; APP không ký không chạy. CI build thêm biến
+  thể ký (ngân sách bootloader 14 336 B; hiện 13 224 B). **Chưa chạy trên kit; chưa đo thời gian verify trên M3.**
+
 ### Log bản ghi trên flash (`services/sys/flog.c`)
 
 - Vòng ghi bản ghi cố định trên flash xoá theo sector: header `[magic][seq][~seq]` mỗi sector, CRC16 từng bản ghi,

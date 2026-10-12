@@ -31,7 +31,7 @@ MAX_CHUNK = 128
 ERRORS = {
     0: "ok", 1: "bad arg", 2: "bad state", 3: "too big", 4: "flash error", 5: "no image",
     6: "header crc", 7: "wrong board", 8: "wrong load addr", 9: "image crc", 10: "bad offset",
-    11: "unknown cmd", 12: "bad size", 13: "bad vector table",
+    11: "unknown cmd", 12: "bad size", 13: "bad vector table", 14: "bad signature",
 }
 ROLES = {0: "bootloader", 1: "app"}
 

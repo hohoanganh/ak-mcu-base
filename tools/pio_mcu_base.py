@@ -9,12 +9,21 @@ import os
 
 proj = env.subst("$PROJECT_DIR")
 
-staging_external = env.GetProjectConfig().get("common", "staging_external", "1").strip() == "1"
-app_part_size = "0x1D000" if staging_external else "0xE800"
+cfg = env.GetProjectConfig()
+staging_external = cfg.get("common", "staging_external", "1").strip() == "1"
+image_sign = cfg.get("common", "image_sign", "0").strip() == "1"
+sign_key = cfg.get("common", "sign_key", "tools/keys/dev_priv.pem").strip()
+# signed images: 16K bootloader, APP 4K smaller (port_cfg.h)
+boot_size = "0x4000" if image_sign else "0x3000"
+if staging_external:
+    app_part_size = "0x1C000" if image_sign else "0x1D000"
+else:
+    app_part_size = "0xE000" if image_sign else "0xE800"
 
 env.Append(LINKFLAGS=[
     "-mcpu=cortex-m3", "-mthumb", "-mfloat-abi=soft", "-Os", "-flto",
     "-Wl,--defsym=__app_part_size=" + app_part_size,
+    "-Wl,--defsym=__boot_size=" + boot_size,
     "-nostartfiles", "--specs=nano.specs",
     "-Wl,--gc-sections", "-Wl,--print-memory-usage",
     "-L" + os.path.join(proj, "src", "port", "stm32l151"),
@@ -32,6 +41,11 @@ env.BuildSources(os.path.join("$BUILD_DIR", "spl"), spl_src, src_filter=[
     "+<stm32l1xx_spi.c>",
 ])
 
+# ECDSA verify (third_party/p256-m), only with signed images
+if image_sign:
+    env.BuildSources(os.path.join("$BUILD_DIR", "p256m"), os.path.join(proj, "third_party", "p256-m"),
+                     src_filter=["+<p256-m.c>"])
+
 if env.subst("$PIOENV") != "boot":
     def patch_image(source, target, env):
         elf = target[0].get_abspath()
@@ -40,7 +54,8 @@ if env.subst("$PIOENV") != "boot":
         img = os.path.join(build, "app.img")
         objcopy = env.subst("$OBJCOPY")
         env.Execute('"%s" -O binary "%s" "%s"' % (objcopy, elf, raw))
-        env.Execute('"$PYTHONEXE" "%s" patch "%s" -o "%s" --elf "%s" --objcopy "%s"' % (
-            os.path.join(proj, "tools", "mkimage.py"), raw, img, elf, objcopy))
+        sign = ' --sign-key "%s"' % os.path.join(proj, sign_key) if image_sign else ""
+        env.Execute('"$PYTHONEXE" "%s" patch "%s" -o "%s" --elf "%s" --objcopy "%s"%s' % (
+            os.path.join(proj, "tools", "mkimage.py"), raw, img, elf, objcopy, sign))
 
     env.AddPostAction("$BUILD_DIR/${PROGNAME}.elf", patch_image)

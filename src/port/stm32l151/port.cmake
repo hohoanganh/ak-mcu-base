@@ -23,7 +23,22 @@ elseif(AK_STAGING STREQUAL "internal")
 else()
 	message(FATAL_ERROR "Unknown AK_STAGING: ${AK_STAGING}")
 endif()
-message(STATUS "STM32L151 staging: ${AK_STAGING} (APP partition ${APP_PART_SIZE})")
+if(AK_IMAGE_SIGN)
+	# 16K bootloader: APP moves to 0x08004000 and shrinks by 4K
+	set(BOOT_SIZE 0x4000)
+	if(AK_STAGING STREQUAL "external")
+		set(APP_PART_SIZE 0x1C000)
+	else()
+		set(APP_PART_SIZE 0xE000)
+	endif()
+	set(SIGN_DEFS PORT_IMAGE_SIGN=1 FW_IMAGE_SIGN=1)
+	set(SIGN_ARGS --sign-key ${AK_SIGN_KEY})
+else()
+	set(BOOT_SIZE 0x3000)
+	set(SIGN_DEFS "")
+	set(SIGN_ARGS "")
+endif()
+message(STATUS "STM32L151 staging: ${AK_STAGING}, signed images: ${AK_IMAGE_SIGN} (BOOT ${BOOT_SIZE}, APP partition ${APP_PART_SIZE})")
 
 set(SPL_DIR ${STM32L1_LIB_DIR}/STM32L1xx_StdPeriph_Driver)
 set(SPL_SRC
@@ -65,6 +80,16 @@ target_include_directories(spl PUBLIC ${PORT_INC})
 target_compile_definitions(spl PUBLIC ${MCU_DEFS})
 target_compile_options(spl PRIVATE ${MCU_FLAGS} -Os -g -ffunction-sections -fdata-sections)
 
+# p256-m (ECDSA verify): vendor code, built like the SPL; only linked when signing
+if(AK_IMAGE_SIGN)
+	add_library(p256m STATIC ${P256M_SRC})
+	target_include_directories(p256m PUBLIC ${P256M_INC})
+	target_compile_options(p256m PRIVATE ${MCU_FLAGS} -Os -g -ffunction-sections -fdata-sections)
+	set(SIGN_LIBS p256m)
+else()
+	set(SIGN_LIBS "")
+endif()
+
 # nanoMODBUS: vendor code, built like the SPL (no warning set), role from AK_MODBUS
 add_library(nanomodbus STATIC ${ROOT}/third_party/nanomodbus/nanomodbus.c)
 target_include_directories(nanomodbus PUBLIC ${ROOT}/third_party/nanomodbus)
@@ -76,13 +101,14 @@ function(ak_firmware name ldscript)
 	add_executable(${name} ${FW_SOURCES})
 	set_target_properties(${name} PROPERTIES SUFFIX ".elf")
 	target_include_directories(${name} PRIVATE ${FW_INCS} ${BASE_INC} ${PORT_INC})
-	target_compile_definitions(${name} PRIVATE ${MCU_DEFS} ${VERSION_DEFS} ${STAGING_DEFS} ${BOARD_DEFS} ${FW_DEFS})
+	target_compile_definitions(${name} PRIVATE ${MCU_DEFS} ${VERSION_DEFS} ${STAGING_DEFS} ${SIGN_DEFS} ${BOARD_DEFS} ${FW_DEFS})
 	target_compile_options(${name} PRIVATE ${MCU_FLAGS} -Os -g -ffunction-sections -fdata-sections ${MCU_WARN} -Werror)
 	target_link_options(${name} PRIVATE ${MCU_FLAGS}
 		-T${PORT_DIR}/${ldscript} -L${PORT_DIR} -Wl,--defsym=__app_part_size=${APP_PART_SIZE}
+		-Wl,--defsym=__boot_size=${BOOT_SIZE}
 		-nostartfiles --specs=nano.specs
 		-Wl,--gc-sections -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/${name}.map -Wl,--print-memory-usage)
-	target_link_libraries(${name} PRIVATE spl c gcc)
+	target_link_libraries(${name} PRIVATE spl ${SIGN_LIBS} c gcc)
 	set_target_properties(${name} PROPERTIES LINK_DEPENDS "${PORT_DIR}/${ldscript};${PORT_DIR}/sections.ld")
 endfunction()
 
@@ -110,5 +136,5 @@ target_link_libraries(app PRIVATE nanomodbus)
 add_custom_command(TARGET app POST_BUILD
 	COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:app> ${CMAKE_CURRENT_BINARY_DIR}/app.bin
 	COMMAND ${Python3_EXECUTABLE} ${ROOT}/tools/mkimage.py patch ${CMAKE_CURRENT_BINARY_DIR}/app.bin
-		-o ${CMAKE_CURRENT_BINARY_DIR}/app.img --elf $<TARGET_FILE:app> --objcopy ${CMAKE_OBJCOPY}
+		-o ${CMAKE_CURRENT_BINARY_DIR}/app.img --elf $<TARGET_FILE:app> --objcopy ${CMAKE_OBJCOPY} ${SIGN_ARGS}
 	COMMENT "app.img (patched header)")

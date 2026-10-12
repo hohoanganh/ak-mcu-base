@@ -165,6 +165,17 @@ Thử trước trên máy tính: `python3 tools/ak_fw.py --sim build/host/ak_sim
   (vẫn còn nguyên). Test cắt điện ở **từng** thao tác erase/write (hơn 3.200 điểm cắt): không lần
   nào chạy nhầm ảnh chép dở.
 - **Chống nạp nhầm:** header có tên board (`ak-l151`); ảnh của board khác bị từ chối ngay ở `END`.
+- **Ký số ảnh (tuỳ chọn, `-DAK_IMAGE_SIGN=ON` / `image_sign = 1`):** header có `sig_type` (offset 44) và chữ ký
+  ECDSA P-256 `r||s` 64 byte (offset 48) trên SHA-256 của 48 byte đầu header (magic … tên board, sig_type) nối
+  với phần nhị phân; `hdr_crc32` tính sau khi ký nên phủ cả chữ ký. Bootloader **và** app từ chối ảnh không ký
+  hoặc ký bằng khoá khác (`bad signature`, mã 14): không ký thì bị từ chối ngay ở header, không cần đọc ảnh; ký
+  sai được phát hiện sau CRC và vector table. Khoá công khai nằm trong `services/fw/fw_pubkey.c` (sinh bằng
+  `tools/ak_sign.py pubkey-c`); khoá trong repo là **khoá phát triển**, sản phẩm tự tạo cặp khoá
+  (`tools/ak_sign.py keygen`) và giữ khoá riêng ngoài repo. Ký: `mkimage.py … --sign-key priv.pem` (CMake và
+  PlatformIO tự làm khi bật). Xác minh bằng `third_party/p256-m` (Apache-2.0) + `common/sha256.c`:
+  bootloader biến thể này **16K** (`PORT_IMAGE_SIGN`: APP từ `0x08004000`, 112K; staging trong: 56K), 13,2 KB
+  đã dùng; app thêm 3,5 KB. Thời gian verify trên Cortex-M3 32 MHz **chưa đo** (ước 1 – 2 s, chạy trong handler
+  `END` của app và lúc boot; watchdog app 8 s). Chưa có bộ đếm chống hạ cấp phiên bản.
 - **Header nằm sẵn trong `.elf`** (section `.fw_header`). Sau khi link, `mkimage.py patch` điền
   CRC vào cả `.img` lẫn `.elf`, nên nạp `.elf` bằng SWD/debugger cũng ra ảnh hợp lệ.
 - Nhảy sang app bằng cách **reset rồi nhảy ngay trong `reset_handler`**, trước khi khởi tạo ngoại vi,
@@ -245,6 +256,6 @@ rút điện giữa lúc boot đang cài (log `installing...`) → cắm lại p
   ghi từng word (một chu kỳ ghi cho 32 word), nhưng **chưa đo trên board**. Khi thử, xem thời gian
   `ak_fw.py flash` in ra và khoảng giữa log `installing...` với `install ok`.
 - Quay lui: chưa thử trên board thật (mới qua unit test cắt điện ở từng thao tác flash và giả lập đầu-cuối).
-- Ký số ảnh (hiện chỉ có CRC, đủ chống hỏng dữ liệu nhưng không chống giả mạo).
+- Ký số ảnh: chưa thử trên board, chưa đo thời gian verify; chưa có chống hạ cấp phiên bản.
 - Port thứ hai (STM32 dòng mới với HAL/LL, hoặc ESP32/GD32) để kiểm lớp HAL.
 - Kênh OTA qua Modbus RS485: chỉ cần gọi `fw_update_*()` rồi post `FW_SIG_INSTALL` tới `task_fw`.

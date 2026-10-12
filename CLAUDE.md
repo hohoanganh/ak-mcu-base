@@ -33,7 +33,7 @@ src/            mã nguồn firmware
   port/         stm32l151 (chip) · host (máy tính, ak_sim) · web (WebAssembly)
 tests/          test_kernel, test_fw, test_modbus, test_demo (C) · test_ak_fw.py, test_sim_ota.py
 tools/          ak_fw.py, ak_mb.py, mkimage.py, new_project.py, ak_screen.py, tool sinh sơ đồ
-third_party/    nanomodbus, stm32l1 (SPL + CMSIS). Mã của bên khác: không sửa
+third_party/    nanomodbus, p256-m (ECDSA), stm32l1 (SPL + CMSIS). Mã của bên khác: không sửa
 docs/           tài liệu, và trang web GitHub Pages (index.html, play/, kit/)
 legacy/         base cũ
 ```
@@ -51,7 +51,7 @@ make sim                       # bộ giả lập: bootloader + app, gõ help
 pio run -e boot -e app -e app_mbmaster -e demo     # .pio/build/<env>/app.img, boot: firmware.bin
 pio run -e kit_tools                               # demo + lệnh spi (bắt SPI trên J6) và rf (nRF24)
 pio run -e remote                                  # kit 2.1 (64K): tay điều khiển thử nghiệm, OLED + 3 nút + nRF24 (src/remote)
-make stm32 stm32-internal                          # cùng mã, build bằng CMake (CI dùng cách này)
+make stm32 stm32-internal stm32-sign               # cùng mã, build bằng CMake (CI dùng cách này); -sign: ảnh ký số
 
 # bản chạy trên trình duyệt, ghi vào docs/play/ (cần Emscripten)
 python src/port/web/build.py
@@ -95,6 +95,8 @@ Thêm lệnh shell: một dòng trong `shell_cmds[]` của `src/app/task_console
   sector cuối trừ một, chương trình khối ở sector cuối.
 - Ảnh mới cài xong chạy **thử** (`boot_ctrl.trial`): app tự xác nhận sau `APP_FW_CONFIRM_MS` (30 s) hoặc `fw confirm`;
   không xác nhận sau 3 lần khởi động thì bootloader cài lại ảnh cũ từ BACKUP. `fw rollback` quay lui chủ động.
+- Biến thể ký số (`AK_IMAGE_SIGN=ON` / `image_sign = 1`): bootloader 16K, APP từ `0x08004000`; ảnh phải ký bằng
+  `mkimage.py --sign-key`; khoá công khai ở `src/services/fw/fw_pubkey.c`, khoá trong `tools/keys/` chỉ để phát triển.
 - Bootloader chỉ chạy ảnh có CRC đúng: nạp `app.img`, không nạp `.bin` trần. **App và bootloader lấy cùng một bản
   phát hành** (bootloader 1.3.0 đổi bố cục `boot_ctrl`: bootloader cũ không đọc được trạng thái app mới ghi).
 - Chân của AK Base Kit 3.0 nằm trong `src/port/stm32l151/port_cfg.h` và `kit.c`, đã đối chiếu schematic

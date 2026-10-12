@@ -3,13 +3,14 @@
 #   make sim      build and run the simulator (bootloader + app)
 #   make stm32    build boot.elf/.bin, app.elf/.bin, app.img for STM32L151
 #                 (OTA staging on external SPI flash, APP 116K)
+#   make stm32-sign       same, images must carry an ECDSA P-256 signature (BOOT 16K)
 #   make stm32-internal   same, staging in internal flash (APP 58K)
 #   make clean
 
 BUILD_HOST  := build/host
 BUILD_STM32 := build/stm32l151
 
-.PHONY: all host test sim stm32 stm32-internal clean
+.PHONY: all host test sim stm32 stm32-sign stm32-internal clean
 
 all: test stm32
 
@@ -26,6 +27,10 @@ sim: host
 stm32:
 	cmake -S . -B $(BUILD_STM32) -DAK_PORT=stm32l151 -DAK_STAGING=external -DCMAKE_TOOLCHAIN_FILE=src/port/stm32l151/arm-none-eabi.cmake
 	cmake --build $(BUILD_STM32) -j
+
+stm32-sign:
+	cmake -S . -B $(BUILD_STM32)-sign -DAK_PORT=stm32l151 -DAK_STAGING=external -DAK_IMAGE_SIGN=ON -DCMAKE_TOOLCHAIN_FILE=src/port/stm32l151/arm-none-eabi.cmake
+	cmake --build $(BUILD_STM32)-sign -j
 
 stm32-internal:
 	cmake -S . -B $(BUILD_STM32)-internal -DAK_PORT=stm32l151 -DAK_STAGING=internal -DCMAKE_TOOLCHAIN_FILE=src/port/stm32l151/arm-none-eabi.cmake

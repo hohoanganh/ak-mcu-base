@@ -41,7 +41,10 @@ Làm theo cách (a): vùng BACKUP 116K trên flash SPI ở `0xA0000`. Xem mục 
   thảo luận Nordic về chế độ một ô không quay lui được: [devzone](https://devzone.nordicsemi.com/f/nordic-q-a/127927/mcuboot-firmware-loader-ble_mcumgr-handling-of-two-slot-application/565567) ·
   bộ đếm bảo mật chỉ tăng sau xác nhận: [mcuboot commit](https://review.trustedfirmware.org/plugins/gitiles/mirror/mcuboot/+/0eaf6668189d9001ca5b94dba4e3d8051e7bbe83).
 
-### 2.2 Ký số ảnh (ECDSA P-256) và Cyber Resilience Act
+### 2.2 Ký số ảnh (ECDSA P-256) và Cyber Resilience Act — **đã làm** (12/10/2026, biến thể `AK_IMAGE_SIGN`)
+
+p256-m + SHA-256 trong bootloader 16K (13,2 KB dùng) và app; khoá phát triển trong repo, `tools/ak_sign.py`
+tạo khoá thật. Xem "Ký số ảnh" trong [ak-mcu-base.md](ak-mcu-base.md). Phần dưới là ghi chú thiết kế.
 
 - **Vì sao bây giờ:** CRA của EU (Regulation 2024/2847) áp dụng nghĩa vụ báo cáo từ **11/09/2026** và áp dụng đầy đủ
   từ **11/12/2027**; sản phẩm thiết kế năm 2025 bán năm 2028 vẫn thuộc phạm vi. Quy định trung lập về công nghệ nhưng

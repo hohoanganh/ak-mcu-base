@@ -53,6 +53,7 @@ set(COMMON_SRC
 	${SRC}/common/xprintf.c
 	${SRC}/common/crc.c
 	${SRC}/common/ak_log.c
+	${SRC}/common/sha256.c
 )
 
 set(FW_SRC
@@ -60,12 +61,20 @@ set(FW_SRC
 	${SRC}/services/fw/fw_update.c
 	${SRC}/services/fw/fw_proto.c
 	${SRC}/services/fw/boot_ctrl.c
+	${SRC}/services/fw/fw_pubkey.c
 )
 
 set(SYS_SRC
 	${SRC}/services/sys/crash_log.c
 	${SRC}/services/sys/flog.c
 )
+
+# Signed images: bootloader and app refuse images not signed with the key in
+# src/services/fw/fw_pubkey.c (see fw_sign.h). AK_SIGN_KEY signs app.img.
+option(AK_IMAGE_SIGN "Require ECDSA P-256 signed images" OFF)
+set(AK_SIGN_KEY "${ROOT}/tools/keys/dev_priv.pem" CACHE FILEPATH "Private key (PEM) that signs app.img")
+set(P256M_SRC ${ROOT}/third_party/p256-m/p256-m.c)
+set(P256M_INC ${ROOT}/third_party/p256-m)
 
 # Modbus on RS485: slave | master | none (role of the sample app)
 set(AK_MODBUS "slave" CACHE STRING "Modbus role of the app: slave | master | none")

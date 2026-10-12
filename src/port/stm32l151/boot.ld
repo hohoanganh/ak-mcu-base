@@ -1,8 +1,10 @@
-/* Bootloader, STM32L151CB: 12K @ 0x08000000. Keep in sync with port_cfg.h. */
+/* Bootloader, STM32L151CB: __boot_size (12K, 16K with signed images) @
+ * 0x08000000, from the build system (--defsym __boot_size=...). Keep in sync
+ * with port_cfg.h. */
 ENTRY(reset_handler)
 
 MEMORY {
-	FLASH (rx)	: ORIGIN = 0x08000000, LENGTH = 12K
+	FLASH (rx)	: ORIGIN = 0x08000000, LENGTH = __boot_size
 	RAM (rwx)	: ORIGIN = 0x20000000, LENGTH = 16K
 }
 

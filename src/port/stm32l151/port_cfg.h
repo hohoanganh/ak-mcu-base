@@ -29,23 +29,46 @@
 
 #define PORT_FLASH_PAGE			(256UL)
 #define PORT_BOOT_ADDR			(0x08000000UL)
-#define PORT_BOOT_SIZE			(0x3000UL)
-#define PORT_APP_ADDR			(0x08003000UL)
 
 #ifndef PORT_STAGING_EXTERNAL
 #define PORT_STAGING_EXTERNAL	(1)
 #endif
 
+/* Signed images (fw_sign.h): the bootloader carries P-256 + SHA-256 and
+ * needs 16K, so APP starts at 0x08004000 in that variant. The linker scripts
+ * take the same split through --defsym __boot_size. */
+#ifndef PORT_IMAGE_SIGN
+#define PORT_IMAGE_SIGN			(0)
+#endif
+
+#if PORT_IMAGE_SIGN
+#define PORT_BOOT_SIZE			(0x4000UL)
+#define PORT_APP_ADDR			(0x08004000UL)
+#if PORT_STAGING_EXTERNAL
+#define PORT_APP_SIZE			(0x1C000UL)		/* 112K */
+#else
+#define PORT_APP_SIZE			(0xE000UL)		/* 56K */
+#define PORT_STAGING_ADDR		(0x08012000UL)
+#define PORT_STAGING_SIZE		(0xE000UL)
+#endif
+#else
+#define PORT_BOOT_SIZE			(0x3000UL)
+#define PORT_APP_ADDR			(0x08003000UL)
 #if PORT_STAGING_EXTERNAL
 #define PORT_APP_SIZE			(0x1D000UL)		/* 116K: rest of internal flash */
+#else
+#define PORT_APP_SIZE			(0xE800UL)
+#define PORT_STAGING_ADDR		(0x08011800UL)
+#define PORT_STAGING_SIZE		(0xE800UL)
+#endif
+#endif
+
+#if PORT_STAGING_EXTERNAL
 #define PORT_STAGING_ADDR		(0x00080000UL)	/* SPI NOR offset (same as ak-base-kit) */
 #define PORT_STAGING_SIZE		(0x1D000UL)
 #define PORT_BACKUP_ADDR		(0x000A0000UL)	/* SPI NOR offset, above STAGING */
 #define PORT_BACKUP_SIZE		(0x1D000UL)
 #else
-#define PORT_APP_SIZE			(0xE800UL)
-#define PORT_STAGING_ADDR		(0x08011800UL)
-#define PORT_STAGING_SIZE		(0xE800UL)
 #define PORT_BACKUP_ADDR		(0UL)			/* no room in internal flash: no rollback */
 #define PORT_BACKUP_SIZE		(0UL)
 #endif
