@@ -103,6 +103,14 @@
 #endif
 #define PORT_NOR_SPI_PRESCALER	SPI_BaudRatePrescaler_8	/* 32 MHz / 8 = 4 MHz, as ak-base-kit */
 
+/* W5500 Ethernet module on J6 (Modbus TCP gateway build): SPI1 shared with
+ * the NOR, chip select on J6 pin 4 = PA4 (the pin the nRF24 uses as CSN). */
+#ifndef PORT_W5500_CS_PIN
+#define PORT_W5500_CS_PORT		GPIOA
+#define PORT_W5500_CS_PIN		GPIO_Pin_4
+#define PORT_W5500_CS_CLK		RCC_AHBPeriph_GPIOA
+#endif
+
 /* RS485: USART2 PA2 TX, PA3 RX; direction pin PA1, high = transmit */
 #define PORT_RS485_DIR_PORT		GPIOA
 #define PORT_RS485_DIR_PIN		GPIO_Pin_1

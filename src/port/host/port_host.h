@@ -94,6 +94,15 @@ extern void host_rs485_inject(const uint8_t* data, uint32_t len);
 extern uint32_t host_rs485_take_tx(uint8_t* out, uint32_t max);
 extern uint32_t host_rs485_baud(void);
 
+/* Emulated Ethernet chip (hal_tcp.h): present or not, a client that
+ * connects / disconnects, its bytes in and the firmware's bytes out. */
+extern void host_tcp_set_present(uint8_t present);		/* default 1 */
+extern uint16_t host_tcp_port(void);					/* 0 = not listening */
+extern int host_tcp_connect(void);						/* 0 = ok, -1 = not listening / busy */
+extern void host_tcp_disconnect(void);
+extern void host_tcp_inject(const uint8_t* data, uint32_t len);
+extern uint32_t host_tcp_take_tx(uint8_t* out, uint32_t max);
+
 /* Periodic service: feeds elapsed ms to hal_tick_hook(). */
 extern void host_service(void);
 

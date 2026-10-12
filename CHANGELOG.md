@@ -30,6 +30,16 @@ Rà lại toàn bộ mã để gọn và nhẹ hơn.
   theo lệnh, reset 3 lần không xác nhận → quay lui). Bootloader 8,2 → 9,7 KB (ngân sách CI 10 KB). **Chưa chạy trên
   kit thật.**
 
+### Gateway Modbus TCP ↔ RTU qua W5500 (`AK_MODBUS=gateway`)
+
+- HAL mới `hal/hal_tcp.h` (một socket server, đọc không chặn); driver `port/stm32l151/w5500.c` cho mô-đun W5500 trên
+  J6 (SPI1 dùng chung với NOR, CS PA4); port host giả lập bằng hàng đợi RAM. Dịch vụ `services/modbus/mb_gateway.c`:
+  server nanoMODBUS TCP chuyển FC 03/04/06/16 sang `mb_master` trên RS485 theo unit id của MBAP; slave im lặng →
+  exception 4. Vai trò app mới `APP_MODBUS_GATEWAY` (`pio run -e app_gateway`, `make stm32-gateway`), cấu hình IP tĩnh
+  `APP_NET_*` trong `app.h`, shell `mb` in trạng thái. Chi tiết: `docs/modbus.md`.
+- Test: client TCP giả trong `test_modbus` (55 kiểm tra: đọc/ghi, exception, lệnh không hỗ trợ, slave im, unit khác,
+  client rớt giữa khung, khung cắt, không có chip). App gateway 25,1 KB flash. **Chưa thử với W5500 thật.**
+
 ### Ký số ảnh (ECDSA P-256), biến thể build `AK_IMAGE_SIGN`
 
 - Header ảnh có `sig_type` (offset 44) và chữ ký `r||s` (offset 48) trên SHA-256(48 byte đầu header ‖ nhị phân).

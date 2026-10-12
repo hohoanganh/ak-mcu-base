@@ -76,19 +76,23 @@ set(AK_SIGN_KEY "${ROOT}/tools/keys/dev_priv.pem" CACHE FILEPATH "Private key (P
 set(P256M_SRC ${ROOT}/third_party/p256-m/p256-m.c)
 set(P256M_INC ${ROOT}/third_party/p256-m)
 
-# Modbus on RS485: slave | master | none (role of the sample app)
-set(AK_MODBUS "slave" CACHE STRING "Modbus role of the app: slave | master | none")
+# Modbus on RS485: slave | master | gateway | none (role of the sample app);
+# gateway = Modbus TCP server on the Ethernet chip (hal_tcp) forwarding to RS485
+set(AK_MODBUS "slave" CACHE STRING "Modbus role of the app: slave | master | gateway | none")
 set(MB_SRC
 	${SRC}/services/modbus/mb_port.c
 	${SRC}/services/modbus/mb_slave.c
 	${SRC}/services/modbus/mb_ota.c
 	${SRC}/services/modbus/mb_master.c
+	${SRC}/services/modbus/mb_gateway.c
 )
 set(MB_INC ${SRC}/services/modbus ${ROOT}/third_party/nanomodbus)
 if(AK_MODBUS STREQUAL "slave")
 	set(MB_DEFS APP_MODBUS_SLAVE NMBS_CLIENT_DISABLED NMBS_STRERROR_DISABLED)
 elseif(AK_MODBUS STREQUAL "master")
 	set(MB_DEFS APP_MODBUS_MASTER NMBS_SERVER_DISABLED NMBS_STRERROR_DISABLED)
+elseif(AK_MODBUS STREQUAL "gateway")
+	set(MB_DEFS APP_MODBUS_GATEWAY NMBS_STRERROR_DISABLED)
 elseif(AK_MODBUS STREQUAL "none")
 	set(MB_DEFS "")
 else()

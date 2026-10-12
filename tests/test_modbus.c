@@ -13,7 +13,9 @@
 #include "mb_port.h"
 #include "mb_slave.h"
 #include "mb_master.h"
+#include "mb_gateway.h"
 #include "mb_ota.h"
+#include "hal_tcp.h"
 #include "port_host.h"
 #include "tiny_test.h"
 
@@ -386,6 +388,7 @@ static void setup_master(void) {
 
 	host_reset_state(0xFF);
 	host_use_virtual_time(1);
+	far_regs[0] = 11; far_regs[1] = 22; far_regs[2] = 33; far_regs[3] = 44;
 	peer_conf(&conf);
 	nmbs_callbacks_create(&cb);
 	cb.read_holding_registers = far_read;
@@ -427,6 +430,216 @@ static void test_master(void) {
 	peer_is_server = 0;
 }
 
+/*----------------------------------------------------------------------------
+ * gateway under test: a Modbus TCP client in the test, the RTU slave of the
+ * master tests (unit 5) on the other side
+ *--------------------------------------------------------------------------*/
+static uint16_t far_in[2] = { 0x1234, 0x5678 };
+
+static nmbs_error far_read_input(uint16_t address, uint16_t quantity, uint16_t* out, uint8_t unit_id, void* arg) {
+	(void)unit_id;
+	(void)arg;
+	if ((uint32_t)address + quantity > 2) {
+		return NMBS_EXCEPTION_ILLEGAL_DATA_ADDRESS;
+	}
+	memcpy(out, &far_in[address], (size_t)quantity * 2);
+	return NMBS_ERROR_NONE;
+}
+
+static nmbs_error far_write_multi(uint16_t address, uint16_t quantity, const uint16_t* regs, uint8_t unit_id, void* arg) {
+	(void)unit_id;
+	(void)arg;
+	if ((uint32_t)address + quantity > 4) {
+		return NMBS_EXCEPTION_ILLEGAL_DATA_ADDRESS;
+	}
+	memcpy(&far_regs[address], regs, (size_t)quantity * 2);
+	return NMBS_ERROR_NONE;
+}
+
+static void setup_gateway(void) {
+	nmbs_platform_conf conf;
+	nmbs_callbacks cb;
+	hal_net_cfg_t net = { { 2, 0, 0, 0, 0, 1 }, { 192, 168, 1, 80 }, { 255, 255, 255, 0 }, { 192, 168, 1, 1 } };
+
+	host_reset_state(0xFF);
+	host_use_virtual_time(1);
+	far_regs[0] = 11; far_regs[1] = 22; far_regs[2] = 33; far_regs[3] = 44;
+	peer_conf(&conf);
+	nmbs_callbacks_create(&cb);
+	cb.read_holding_registers = far_read;
+	cb.read_input_registers = far_read_input;
+	cb.write_single_register = far_write;
+	cb.write_multiple_registers = far_write_multi;
+	nmbs_server_create(&peer, 5, &conf, &cb);
+	nmbs_set_read_timeout(&peer, 0);
+	nmbs_set_byte_timeout(&peer, 0);
+	peer_is_server = 1;
+	peer_silent = 0;
+	host_tcp_set_present(1);
+	CHECK_EQ(hal_tcp_init(&net), 0);
+	CHECK_EQ(mb_master_init(19200, 50), MB_OK);
+	CHECK_EQ(mb_gateway_init(502), 0);
+	CHECK_EQ(host_tcp_port(), 502);
+}
+
+/* one Modbus TCP request through the gateway; returns the response length */
+static uint32_t tcp_request(uint16_t tid, uint8_t unit, const uint8_t* pdu, uint16_t pdu_len, uint8_t* resp, uint32_t max) {
+	uint8_t frame[7 + 256];
+
+	frame[0] = (uint8_t)(tid >> 8);
+	frame[1] = (uint8_t)tid;
+	frame[2] = frame[3] = 0;							/* protocol id */
+	frame[4] = (uint8_t)((pdu_len + 1) >> 8);
+	frame[5] = (uint8_t)(pdu_len + 1);
+	frame[6] = unit;
+	memcpy(&frame[7], pdu, pdu_len);
+	host_tcp_inject(frame, 7U + pdu_len);
+	mb_gateway_poll();
+	return host_tcp_take_tx(resp, max);
+}
+
+static void test_gateway(void) {
+	uint8_t resp[64];
+	uint32_t n;
+
+	setup_gateway();
+
+	/* no client yet: poll does nothing, nothing goes out */
+	mb_gateway_poll();
+	CHECK_EQ(host_tcp_take_tx(resp, sizeof(resp)), 0);
+	CHECK_EQ(host_tcp_connect(), 0);
+
+	/* FC 3: four holding registers of unit 5 */
+	{
+		const uint8_t pdu[] = { 0x03, 0x00, 0x00, 0x00, 0x04 };
+		n = tcp_request(0x1234, 5, pdu, sizeof(pdu), resp, sizeof(resp));
+		CHECK_EQ(n, 7 + 2 + 8);
+		CHECK_EQ(resp[0], 0x12);
+		CHECK_EQ(resp[1], 0x34);						/* transaction id echoed */
+		CHECK_EQ(resp[5], 11);							/* MBAP length */
+		CHECK_EQ(resp[6], 5);							/* unit id echoed */
+		CHECK_EQ(resp[7], 0x03);
+		CHECK_EQ(resp[8], 8);
+		CHECK_EQ((resp[9] << 8) | resp[10], 11);
+		CHECK_EQ((resp[15] << 8) | resp[16], 44);
+	}
+	/* FC 4: input registers */
+	{
+		const uint8_t pdu[] = { 0x04, 0x00, 0x01, 0x00, 0x01 };
+		n = tcp_request(2, 5, pdu, sizeof(pdu), resp, sizeof(resp));
+		CHECK_EQ(n, 7 + 2 + 2);
+		CHECK_EQ((resp[9] << 8) | resp[10], 0x5678);
+	}
+	/* FC 6: write single, echoed, lands in the slave */
+	{
+		const uint8_t pdu[] = { 0x06, 0x00, 0x02, 0x00, 0x63 };
+		n = tcp_request(3, 5, pdu, sizeof(pdu), resp, sizeof(resp));
+		CHECK_EQ(n, 7 + 5);
+		CHECK_EQ(resp[7], 0x06);
+		CHECK_EQ(resp[11], 0x63);
+		CHECK_EQ(far_regs[2], 99);
+	}
+	/* FC 16: write multiple */
+	{
+		const uint8_t pdu[] = { 0x10, 0x00, 0x00, 0x00, 0x02, 0x04, 0x00, 0x07, 0x00, 0x08 };
+		n = tcp_request(4, 5, pdu, sizeof(pdu), resp, sizeof(resp));
+		CHECK_EQ(n, 7 + 5);
+		CHECK_EQ(resp[7], 0x10);
+		CHECK_EQ(far_regs[0], 7);
+		CHECK_EQ(far_regs[1], 8);
+	}
+	CHECK_EQ(mb_gateway_request_count(), 4);
+	CHECK_EQ(mb_gateway_error_count(), 0);
+
+	/* the slave's exception comes back as a Modbus TCP exception */
+	{
+		const uint8_t pdu[] = { 0x03, 0x00, 0x03, 0x00, 0x02 };
+		n = tcp_request(5, 5, pdu, sizeof(pdu), resp, sizeof(resp));
+		CHECK_EQ(n, 7 + 2);
+		CHECK_EQ(resp[7], 0x83);
+		CHECK_EQ(resp[8], 2);
+	}
+	/* a function the gateway does not forward: exception 1 */
+	{
+		const uint8_t pdu[] = { 0x01, 0x00, 0x00, 0x00, 0x08 };
+		n = tcp_request(6, 5, pdu, sizeof(pdu), resp, sizeof(resp));
+		CHECK_EQ(n, 7 + 2);
+		CHECK_EQ(resp[7], 0x81);
+		CHECK_EQ(resp[8], 1);
+	}
+	/* nobody answers on RS485: exception 4, after the master's timeout */
+	{
+		const uint8_t pdu[] = { 0x03, 0x00, 0x00, 0x00, 0x01 };
+		uint32_t t0 = hal_millis();
+		peer_silent = 1;
+		n = tcp_request(7, 5, pdu, sizeof(pdu), resp, sizeof(resp));
+		peer_silent = 0;
+		CHECK_EQ(n, 7 + 2);
+		CHECK_EQ(resp[7], 0x83);
+		CHECK_EQ(resp[8], 4);
+		CHECK(hal_millis() - t0 >= 50 && hal_millis() - t0 < 100);
+		/* the slave wakes up and answers the stale request: the gateway's
+		 * master must not take that for the answer to its next one */
+		nmbs_server_poll(&peer);
+	}
+	/* a request for another unit goes to that unit: unit 6 does not exist here */
+	{
+		const uint8_t pdu[] = { 0x03, 0x00, 0x00, 0x00, 0x01 };
+		n = tcp_request(8, 6, pdu, sizeof(pdu), resp, sizeof(resp));
+		CHECK_EQ(n, 7 + 2);
+		CHECK_EQ(resp[6], 6);
+		CHECK_EQ(resp[8], 4);
+	}
+	CHECK_EQ(mb_gateway_error_count(), 3);
+
+	/* the client goes away mid-frame: the gateway drops the socket and takes
+	 * the next client */
+	{
+		const uint8_t half[] = { 0x00, 0x09, 0x00, 0x00 };
+		const uint8_t pdu[] = { 0x03, 0x00, 0x00, 0x00, 0x01 };
+		host_tcp_inject(half, sizeof(half));
+		host_tcp_disconnect();
+		mb_gateway_poll();
+		CHECK_EQ(hal_tcp_connected(), 0);
+		CHECK_EQ(host_tcp_connect(), 0);
+		n = tcp_request(9, 5, pdu, sizeof(pdu), resp, sizeof(resp));
+		CHECK_EQ(n, 7 + 2 + 2);
+		CHECK_EQ((resp[9] << 8) | resp[10], 7);
+	}
+	/* a torn frame (gap longer than the byte timeout) is dropped, the next
+	 * complete one is answered */
+	{
+		const uint8_t head[] = { 0x00, 0x0A, 0x00, 0x00, 0x00, 0x06 };
+		const uint8_t pdu[] = { 0x04, 0x00, 0x00, 0x00, 0x01 };
+		host_tcp_inject(head, sizeof(head));
+		mb_gateway_poll();
+		CHECK_EQ(host_tcp_take_tx(resp, sizeof(resp)), 0);
+		n = tcp_request(11, 5, pdu, sizeof(pdu), resp, sizeof(resp));
+		CHECK_EQ(n, 7 + 2 + 2);
+		CHECK_EQ((resp[9] << 8) | resp[10], 0x1234);
+	}
+	peer_is_server = 0;
+}
+
+/* No Ethernet chip: hal_tcp_init() fails, the gateway stays off, the master
+ * still works. */
+static void test_gateway_no_chip(void) {
+	hal_net_cfg_t net = { { 2, 0, 0, 0, 0, 1 }, { 192, 168, 1, 80 }, { 255, 255, 255, 0 }, { 192, 168, 1, 1 } };
+	uint16_t r[1];
+
+	setup_master();
+	host_tcp_set_present(0);
+	CHECK_EQ(hal_tcp_init(&net), -1);
+	CHECK_EQ(mb_gateway_init(502), -1);
+	mb_gateway_poll();
+	CHECK_EQ(host_tcp_port(), 0);
+	CHECK_EQ(host_tcp_connect(), -1);
+	CHECK_EQ(mb_master_read_holding(5, 1, 1, r), MB_OK);
+	CHECK_EQ(r[0], 22);
+	host_tcp_set_present(1);
+	peer_is_server = 0;
+}
+
 TT_MAIN_BEGIN("test_modbus")
 	RUN_TEST(test_slave_read);
 	RUN_TEST(test_slave_write);
@@ -436,4 +649,6 @@ TT_MAIN_BEGIN("test_modbus")
 	RUN_TEST(test_ota_bad_image);
 	RUN_TEST(test_ota_broadcast_blocked);
 	RUN_TEST(test_master);
+	RUN_TEST(test_gateway);
+	RUN_TEST(test_gateway_no_chip);
 TT_MAIN_END()

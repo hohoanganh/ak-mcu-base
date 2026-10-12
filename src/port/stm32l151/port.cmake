@@ -40,6 +40,13 @@ else()
 endif()
 message(STATUS "STM32L151 staging: ${AK_STAGING}, signed images: ${AK_IMAGE_SIGN} (BOOT ${BOOT_SIZE}, APP partition ${APP_PART_SIZE})")
 
+# the Ethernet chip driver only goes into the gateway build
+if(AK_MODBUS STREQUAL "gateway")
+	set(GW_SRC ${PORT_DIR}/w5500.c)
+else()
+	set(GW_SRC "")
+endif()
+
 set(SPL_DIR ${STM32L1_LIB_DIR}/STM32L1xx_StdPeriph_Driver)
 set(SPL_SRC
 	${SPL_DIR}/src/misc.c
@@ -127,7 +134,7 @@ ak_firmware(app app.ld
 		${PORT_DIR}/startup.c ${PORT_DIR}/port_stm32l151.c ${PORT_DIR}/system_stm32l1xx.c
 		${PORT_DIR}/fw_header.c ${STAGING_SRC}
 		${KERNEL_SRC} ${COMMON_SRC} ${FW_SRC} ${SYS_SRC} ${APP_SRC}
-		${MB_SRC} ${PORT_DIR}/rs485.c
+		${MB_SRC} ${PORT_DIR}/rs485.c ${GW_SRC}
 	INCS ${SRC}/app ${MB_INC}
 )
 target_link_libraries(app PRIVATE nanomodbus)

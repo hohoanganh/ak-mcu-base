@@ -10,6 +10,7 @@
 #include "ak_port.h"
 #include "hal.h"
 #include "hal_rs485.h"
+#include "hal_tcp.h"
 #include "port_host.h"
 
 /*----------------------------------------------------------------------------
@@ -70,6 +71,8 @@ static void host_xputc(uint8_t c) {
 	hal_console_putc(c);
 }
 
+static void tcp_reset_state(void);
+
 void host_reset_state(uint8_t erased_val) {
 	memcpy(parts_rt, layout_external ? parts_external : parts_internal, sizeof(parts_rt));
 	for (int i = 0; i < FLASH_PART_NUM; i++) {
@@ -86,6 +89,7 @@ void host_reset_state(uint8_t erased_val) {
 	power_cut_jmp = 0;
 	rx_head = rx_tail = 0;
 	tx_len = 0;
+	tcp_reset_state();
 	crit_nest = 0;
 	virtual_ms = 0;
 	last_service_ms = 0;
@@ -290,6 +294,113 @@ uint32_t host_rs485_take_tx(uint8_t* out, uint32_t max) {
 
 uint32_t host_rs485_baud(void) {
 	return rs_baud;
+}
+
+/*----------------------------------------------------------------------------
+ * TCP (in-memory queues, like the RS485 port)
+ *--------------------------------------------------------------------------*/
+static uint8_t tcp_present = 1;
+static uint8_t tcp_inited, tcp_connected;
+static uint16_t tcp_port;
+static uint8_t tcp_rx[2048];
+static uint32_t tcp_rx_head, tcp_rx_tail;
+static uint8_t tcp_tx[2048];
+static uint32_t tcp_tx_len;
+
+void host_tcp_set_present(uint8_t present) {
+	tcp_present = present;
+}
+
+static void tcp_reset_state(void) {
+	tcp_inited = tcp_connected = 0;
+	tcp_port = 0;
+	tcp_rx_head = tcp_rx_tail = 0;
+	tcp_tx_len = 0;
+}
+
+int hal_tcp_init(const hal_net_cfg_t* cfg) {
+	(void)cfg;
+	tcp_inited = tcp_present;
+	tcp_connected = 0;
+	tcp_port = 0;
+	return tcp_present ? 0 : -1;
+}
+
+uint8_t hal_tcp_link_up(void) {
+	return tcp_inited;
+}
+
+int hal_tcp_listen(uint16_t port) {
+	if (!tcp_inited) {
+		return -1;
+	}
+	tcp_port = port;
+	return 0;
+}
+
+uint8_t hal_tcp_connected(void) {
+	return tcp_connected;
+}
+
+int hal_tcp_read(uint8_t* buf, uint32_t max) {
+	uint32_t n = 0;
+
+	if (!tcp_connected) {
+		return -1;
+	}
+	while (n < max && tcp_rx_tail != tcp_rx_head) {
+		buf[n++] = tcp_rx[tcp_rx_tail++ % sizeof(tcp_rx)];
+	}
+	return (int)n;
+}
+
+int hal_tcp_write(const uint8_t* data, uint32_t len) {
+	if (!tcp_connected) {
+		return -1;
+	}
+	for (uint32_t i = 0; i < len && tcp_tx_len < sizeof(tcp_tx); i++) {
+		tcp_tx[tcp_tx_len++] = data[i];
+	}
+	return (int)len;
+}
+
+void hal_tcp_close(void) {
+	tcp_connected = 0;
+	tcp_rx_head = tcp_rx_tail = 0;
+	tcp_tx_len = 0;
+}
+
+uint16_t host_tcp_port(void) {
+	return tcp_port;
+}
+
+int host_tcp_connect(void) {
+	if (!tcp_port || tcp_connected) {
+		return -1;
+	}
+	tcp_connected = 1;
+	tcp_rx_head = tcp_rx_tail = 0;
+	tcp_tx_len = 0;
+	return 0;
+}
+
+void host_tcp_disconnect(void) {
+	tcp_connected = 0;
+}
+
+void host_tcp_inject(const uint8_t* data, uint32_t len) {
+	while (len--) {
+		tcp_rx[tcp_rx_head++ % sizeof(tcp_rx)] = *data++;
+	}
+}
+
+uint32_t host_tcp_take_tx(uint8_t* out, uint32_t max) {
+	uint32_t n = tcp_tx_len < max ? tcp_tx_len : max;
+
+	memcpy(out, tcp_tx, n);
+	memmove(tcp_tx, tcp_tx + n, tcp_tx_len - n);
+	tcp_tx_len -= n;
+	return n;
 }
 
 void hal_reset(void) {

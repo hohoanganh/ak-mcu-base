@@ -37,7 +37,7 @@ task_t app_task_table[] = {
 
 task_polling_t app_task_polling_table[] = {
 	{TASK_POLL_CONSOLE_ID,	AK_ENABLE,		task_poll_console	},
-#if defined(APP_MODBUS_SLAVE)
+#if defined(APP_MODBUS_SLAVE) || defined(APP_MODBUS_GATEWAY)
 	{TASK_POLL_MODBUS_ID,	AK_ENABLE,		task_poll_modbus	},
 #else
 	{TASK_POLL_MODBUS_ID,	AK_DISABLE,		task_poll_modbus	},

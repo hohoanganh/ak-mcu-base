@@ -255,8 +255,8 @@ static const shell_cmd_t shell_cmds[] = {
 	{ "crash",	"crash log (crash clear)",		cmd_crash	},
 #if defined(APP_MODBUS_SLAVE)
 	{ "mb",		"modbus slave status",			cmd_mb		},
-#elif defined(APP_MODBUS_MASTER)
-	{ "mb",		"mb read / mb write",			cmd_mb		},
+#elif defined(APP_MODBUS_MASTER) || defined(APP_MODBUS_GATEWAY)
+	{ "mb",		"mb read / mb write (gateway: mb = status)",	cmd_mb		},
 #endif
 #if defined(APP_KIT_DEMO)
 	{ "ui",		"demo: ui 1|2|3|back|auto|open <name>|dump|stream",	cmd_ui	},

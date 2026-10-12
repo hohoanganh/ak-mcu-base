@@ -47,7 +47,7 @@ jobs:
         run: |
           arm-none-eabi-gcc --version | head -1
           pip install cryptography
-          make stm32 stm32-internal stm32-sign
+          make stm32 stm32-internal stm32-sign stm32-gateway
       - name: Size budget
         run: |
           cd build

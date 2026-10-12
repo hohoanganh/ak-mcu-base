@@ -24,9 +24,9 @@ khi việc được giao là về base chính, và không lấy mã từ `legacy
 ```
 src/            mã nguồn firmware
   kernel/       task, message, timer, fsm, tsm. Sửa ở đây phải có test trước
-  hal/          giao diện phần cứng mà mọi port phải có (hal.h, hal_flash.h, hal_rs485.h)
+  hal/          giao diện phần cứng mà mọi port phải có (hal.h, hal_flash.h, hal_rs485.h, hal_tcp.h)
   common/       xprintf, CRC, log
-  services/     fw (ảnh, OTA, boot_ctrl) · sys (nhật ký sự cố) · modbus (nanoMODBUS)
+  services/     fw (ảnh, OTA, boot_ctrl) · sys (nhật ký sự cố, flog) · modbus (nanoMODBUS: slave, master, gateway TCP)
   boot/         bootloader, không phụ thuộc chip
   app/          app mẫu: task_system, task_console, task_fw, task_modbus  ← dự án viết task ở đây
   demo/         demo trên AK Base Kit: task_ui, scr_*.c, gfx, music, video
@@ -48,7 +48,7 @@ make test                      # hoặc: cmake -S . -B build/host && cmake --bui
 make sim                       # bộ giả lập: bootloader + app, gõ help
 
 # firmware
-pio run -e boot -e app -e app_mbmaster -e demo     # .pio/build/<env>/app.img, boot: firmware.bin
+pio run -e boot -e app -e app_mbmaster -e app_gateway -e demo   # .pio/build/<env>/app.img, boot: firmware.bin
 pio run -e kit_tools                               # demo + lệnh spi (bắt SPI trên J6) và rf (nRF24)
 pio run -e remote                                  # kit 2.1 (64K): tay điều khiển thử nghiệm, OLED + 3 nút + nRF24 (src/remote)
 make stm32 stm32-internal stm32-sign               # cùng mã, build bằng CMake (CI dùng cách này); -sign: ảnh ký số

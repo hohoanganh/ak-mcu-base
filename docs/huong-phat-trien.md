@@ -16,7 +16,7 @@ Cỡ việc: S = vài giờ, M = một hai ngày, L = nhiều ngày.
 | # | Hướng | Cỡ | Mở ra ứng dụng gì |
 |---|---|---|---|
 | 1 | **Port chip thứ hai** (STM32G0 hoặc STM32C0) | M – L | Chứng minh lớp HAL đủ tổng quát; dùng base cho sản phẩm giá rẻ |
-| 2 | **Modbus TCP qua W5500** (nanoMODBUS đã có transport TCP) | M | Gateway RTU ↔ TCP, thiết bị Ethernet công nghiệp |
+| 2 | ~~**Modbus TCP qua W5500**~~ (đã làm) | M | Gateway RTU ↔ TCP, thiết bị Ethernet công nghiệp |
 | 3 | ~~**Xác nhận ảnh và quay lui**~~ (đã làm) | M | OTA hiện trường không cần kỹ thuật viên; điều kiện cần để nói "cập nhật an toàn" |
 | 4 | ~~**Ghi log vào flash SPI**~~ (đã làm bước 1: vòng tròn) | S – M | Data logger, trạm thời tiết lưu 24 giờ, hộp đen sự cố |
 
@@ -88,7 +88,10 @@ tạo khoá thật. Xem "Ký số ảnh" trong [ak-mcu-base.md](ak-mcu-base.md).
 
 ## 3. Kết nối và ứng dụng
 
-### 3.1 Modbus TCP qua W5500 — gateway RTU ↔ TCP
+### 3.1 Modbus TCP qua W5500 — gateway RTU ↔ TCP — **đã làm** (12/10/2026, `AK_MODBUS=gateway`)
+
+`hal/hal_tcp.h`, `port/stm32l151/w5500.c`, `services/modbus/mb_gateway.c`; xem [modbus.md](modbus.md). Chưa thử với
+mô-đun thật. Phần dưới là ghi chú thiết kế.
 
 - **Vì sao hợp:** nanoMODBUS đã có `NMBS_TRANSPORT_TCP`; transport chỉ là hai hàm `read`/`write` có timeout (base
   đang cài cho RS485 ở `services/modbus/mb_port.c`). W5500 xử lý TCP/IP, ARP, ICMP trong phần cứng, 8 socket, 32 KB
