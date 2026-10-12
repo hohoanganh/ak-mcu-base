@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AK Base Kit — lập trình kéo thả</title>
+<meta name="description" content="Kéo thả các khối để lập trình AK Base Kit: đèn, còi, nút bấm, màn hình OLED, cảm biến. Chạy ngay trên kit giả lập trong trang, hoặc gửi sang kit thật qua USB.">
+<meta property="og:title" content="AK Base Kit — lập trình kéo thả">
+<meta property="og:description" content="Nối các khối lại, bấm Chạy: chương trình chạy ngay trên firmware thật trong trình duyệt, không cần biên dịch.">
+<meta property="og:image" content="https://hohoanganh.github.io/ak-mcu-base/play/social.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="page.css">
+<style>
+  .wrap.wide { max-width: 1480px; }
+  .blocks { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 24px; padding: 22px 0 20px; align-items: start; }
+  @media (max-width: 1100px) { .blocks { grid-template-columns: 1fr; } }
+  #blockly { height: min(78vh, 760px); min-height: 480px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 14px 0 0; }
+  .bar button, .bar select {
+    font: 600 14px var(--mono); color: var(--text); background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 14px; cursor: pointer;
+  }
+  .bar select { font-weight: 500; max-width: 100%; }
+  .bar button:hover:not(:disabled), .bar select:hover { border-color: var(--accent); color: var(--accent); }
+  .bar button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .bar button.go { background: var(--accent); border-color: var(--accent); color: #0b0f14; }
+  .bar button.go:hover:not(:disabled) { color: #0b0f14; filter: brightness(1.08); }
+  .bar button:focus-visible, .bar select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .status { margin: 12px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--line);
+    border-radius: 4px; background: var(--surface); font-size: 15px; color: var(--muted); min-height: 46px; }
+  .status.ok { border-left-color: var(--accent); color: var(--text); }
+  .status.warn { border-left-color: #e0b33c; color: var(--text); }
+  .status.bad { border-left-color: #ff6b5e; color: var(--text); }
+  #about { color: var(--muted); font-size: 15px; margin: 10px 0 0; min-height: 3.2em; }
+  details { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+  summary { cursor: pointer; font: 600 14px var(--mono); color: var(--muted); }
+  #hex { margin: 8px 0 0; padding: 10px 12px; background: #05080b; border: 1px solid var(--line); border-radius: var(--radius);
+    font: 14px/1.5 var(--mono); color: #c7d3df; white-space: pre-wrap; max-height: 180px; overflow-y: auto; }
+  #size { font: 14px var(--mono); color: var(--muted); }
+  /* Blockly paints its toolbox and widgets in light colours by default */
+  .blocklyToolboxDiv { border-right: 1px solid var(--line); }
+  .blocklyTreeLabel { font: 14px var(--sans); }
+  .blocklyTreeRow { height: 30px; line-height: 30px; margin-bottom: 2px; }
+  .blocklyWidgetDiv .blocklyMenu, .blocklyDropDownDiv { font-family: var(--sans); }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap wide">
+    <a class="brand" href="../">ak-<span>mcu</span>-base</a>
+    <div class="links">
+      <a href="./">Kit trên trình duyệt</a>
+      <a href="pong.html">Pong hai kit</a>
+      <a href="https://github.com/hohoanganh/ak-mcu-base/blob/main/docs/demo-kit.md#lập-trình-kéo-thả">Tài liệu</a>
+      <a href="https://github.com/hohoanganh/ak-mcu-base">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<div class="wrap wide">
+  <header>
+    <h1>Lập trình AK Base Kit bằng cách kéo thả</h1>
+    <p>Kéo các khối từ bên trái, nối chúng dưới khối <strong>khi bắt đầu</strong>, rồi bấm <strong>Chạy</strong>.
+    Chương trình chạy ngay trên kit bên cạnh, và đó là <strong>chính firmware của kit</strong> đang chạy trong trình duyệt,
+    nên gửi sang kit thật thì nó chạy y như vậy.</p>
+  </header>
+
+  <div class="blocks">
+    <section aria-label="Các khối">
+      <div id="blockly"></div>
+    </section>
+
+    <aside aria-label="Kit và điều khiển">
+      <div id="kit"></div>
+
+      <div class="bar">
+        <button type="button" class="go" id="run">▶ Chạy</button>
+        <button type="button" id="stop">■ Dừng</button>
+        <span id="size"></span>
+      </div>
+      <p class="status" id="status" role="status">Đang khởi động kit…</p>
+
+      <div class="bar">
+        <select id="examples" aria-label="Mở một chương trình ví dụ">
+          <option value="">Ví dụ…</option>
+        </select>
+        <button type="button" id="clear">Trang trắng</button>
+      </div>
+      <p id="about"></p>
+
+      <div class="bar">
+        <button type="button" id="usb">Gửi sang kit thật (USB)</button>
+      </div>
+      <p class="hint" id="usb-note">Kit thật phải đang chạy bản demo có màn hình <b>Blocks</b>, cắm qua cổng USB.
+      Chương trình được lưu vào flash của kit: tắt nguồn bật lại, mở <b>Blocks</b> là nó chạy tiếp.</p>
+
+      <details>
+        <summary>Mã mà kit nhận được</summary>
+        <pre id="hex"></pre>
+        <p class="hint">Mỗi khối thành vài byte cho một máy ảo nhỏ trong firmware. Không có bước biên dịch hay nạp
+        firmware nào: kit chỉ nhận dãy byte này rồi chạy.</p>
+      </details>
+    </aside>
+  </div>
+
+  <ul class="notes">
+    <li><b>Màn hình</b> rộng 128 điểm, cao 64 điểm. x = 0 là mép trái, y = 0 là mép trên. Chữ cỡ nhỏ cao 8 điểm, mỗi ký tự rộng 6 điểm.</li>
+    <li><b>Nút bấm:</b> dùng chuột bấm B1, B2, B3 trên kit, hoặc phím 1, 2, 3. Giữ B3 lâu là thoát về menu của kit.</li>
+    <li><b>Lặp mãi</b> nên có một khối <b>chờ</b> bên trong, để màn hình kịp vẽ và nút kịp được đọc.</li>
+    <li><b>Số</b> là số nguyên. Chia cho 0 ra 0, chương trình không dừng.</li>
+    <li>Chương trình của bạn được lưu trong trình duyệt này; mở lại trang là thấy.</li>
+  </ul>
+</div>
+
+<footer>
+  <div class="wrap wide">Khối vẽ bằng <a href="https://developers.google.com/blockly">Blockly</a> (Apache 2.0), đặt sẵn trong
+  <code>vendor/blockly</code>: trang chạy được cả khi không có mạng. Mã nguồn: <code>src/port/web/blocks*.js</code>,
+  máy ảo trong firmware: <code>src/demo/blk_vm.c</code>.</div>
+</footer>
+
+<script src="vendor/blockly/blockly_compressed.js"></script>
+<script src="vendor/blockly/blocks_compressed.js"></script>
+<script src="vendor/blockly/msg/vi.js"></script>
+<script src="ak-kit.js"></script>
+<script src="kit-ui.js"></script>
+<script src="blocks-compiler.js"></script>
+<script src="blocks-examples.js"></script>
+<script src="blocks.js"></script>
+</body>
+</html>

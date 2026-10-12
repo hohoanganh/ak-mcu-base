@@ -222,6 +222,7 @@ static const shell_cmd_t shell_cmds[] = {
 	{ "ui",		"demo: ui 1|2|3|back|auto|open <name>|dump|stream",	cmd_ui	},
 	{ "th",		"temperature, humidity (th csv)",	cmd_th		},
 	{ "plot",	"plot <number>: point on the Scope screen",	cmd_plot	},
+	{ "blk",	"block program: blk | blk run | blk stop",	cmd_blk	},
 	{ "i2c",	"scan I2C1, or: i2c <addr> <reg> [n] (hex)",	cmd_i2c	},
 #if defined(APP_KIT_SPI_SNIFF)
 	{ "spi",	"SPI sniffer on J6: spi start [mode] | spi | spi dump [from] | spi stop",	cmd_spi	},

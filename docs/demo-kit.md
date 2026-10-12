@@ -205,6 +205,54 @@ python tools/ak_video.py upload --port COMx clip.akv
 `spin_clip.py` dựng ảnh thành một tấm có bề dày quay quanh trục đứng: mặt trước trắng, cạnh bên tô dither để thấy chiều sâu
 trên màn hình 1 bit. Các tham số `--turn`, `--hold`, `--tilt`, `--thickness`, `--size` chỉnh tốc độ và dáng quay.
 
+## Lập trình kéo thả
+
+**[Mở trang kéo thả](https://hohoanganh.github.io/ak-mcu-base/play/blocks.html)**: kéo các khối, nối chúng dưới khối "khi bắt đầu", bấm Chạy. Chương trình chạy ngay
+trên kit trong trang (chính firmware này, biên dịch sang WebAssembly), và gửi được sang kit thật qua USB.
+
+![Trang kéo thả: các khối bên trái, kit bên phải đang chạy chương trình bóng nảy](blocks-editor.jpg)
+
+Không có bước biên dịch hay nạp firmware. Trang dịch các khối thành một dãy byte (chương trình bóng nảy trong ảnh là
+115 byte), và firmware có một máy ảo nhỏ chạy dãy byte đó:
+
+```
+khối trên trang  ──blocks-compiler.js──>  bytecode  ──USB / trong trang──>  blk_vm.c chạy trên màn hình "Blocks"
+```
+
+| Nhóm khối | Có gì |
+|---|---|
+| Điều khiển | khi bắt đầu, lặp mãi, lặp n lần, nếu / nếu không, lặp trong khi, chờ |
+| Kit | đèn LED, còi, nút đang giữ, nút vừa bấm, nhiệt độ, độ ẩm, giờ / phút / giây |
+| Màn hình | xoá, viết chữ, viết số, điểm, đường thẳng, hình chữ nhật (viền, tô đặc, xoá vùng) |
+| Logic, Toán, Biến | so sánh, và / hoặc / không, cộng trừ nhân chia, chia lấy dư, số ngẫu nhiên, tối đa 16 biến |
+
+Bảy ví dụ có sẵn trong trang (menu "Ví dụ", hoặc mở thẳng bằng `blocks.html?ex=<tên>`): `blink` nháy LED, `button`
+nút bấm với đèn và còi, `counter` đếm số lần bấm, `thermo` nhiệt kế, `clock` đồng hồ, `ball` bóng nảy, `countdown`
+đếm ngược.
+
+**Trên kit thật:** nạp bản demo (`pio run -e demo`), cắm USB, mở trang bằng Chrome hoặc Edge trên máy tính, bấm "Gửi
+sang kit thật (USB)" và chọn cổng COM. Kit mở màn hình **Blocks** và chạy luôn. Chương trình được ghi vào sector cuối
+của kho media trên flash SPI: tắt nguồn bật lại, vào **Blocks** trong menu là nó chạy tiếp. Lệnh shell: `blk` (đang
+làm gì), `blk run`, `blk stop`.
+
+Cách nó ăn khớp với kernel AK, là lý do có mục này trong một source base:
+
+- **Máy ảo không giữ CPU.** Mỗi khung hình 50 ms `blk_run()` chạy tối đa 400 lệnh rồi trả về; khối "chờ" chỉ ghi lại
+  thời điểm thức dậy. Một vòng "lặp mãi" không có khối chờ vẫn không làm treo kit, watchdog không bị đói.
+- **Chương trình sai không làm sập firmware.** Tràn stack, lệnh lạ, nhảy ra ngoài chương trình đều dừng máy ảo và hiện
+  "error n at byte k" ở dòng cuối màn hình; chia cho 0 ra 0. Test cho chạy mọi giá trị byte làm lệnh dưới ASan.
+- **Cùng một đường nạp với firmware:** ba lệnh mở rộng của giao thức console (`0x48` bắt đầu, `0x49` dữ liệu, `0x4A`
+  kết thúc kèm CRC-16), đi chung UART với shell.
+
+Giới hạn: số là số nguyên 32 bit, hằng số trong khối từ −32768 đến 32767; chương trình tối đa 768 byte; chữ trên màn
+hình không dấu, tối đa 21 ký tự mỗi khối; chưa có hàm tự định nghĩa và danh sách. Sector cuối của kho media nay thuộc
+về chương trình khối: clip video dài tới sát 512 KB sẽ đè lên nó.
+
+Mã nguồn: `demo/blk_vm.[ch]` (máy ảo, bảng lệnh ở đầu file `.h`), `demo/scr_blocks.c` (màn hình, nhận chương trình),
+`port/web/blocks*.js` và `blocks.html` (trang), `tests/test_blocks.js` (test bộ dịch dưới Node, và sinh
+`tests/blk_fixtures.h` để test C chạy bảy ví dụ trong máy ảo thật). Blockly (Apache 2.0) nằm sẵn trong
+`port/web/vendor/blockly`.
+
 ## Kit làm dụng cụ đo trên bàn: I2C, SPI, nRF24
 
 Ba lệnh shell biến kit thành dụng cụ soi một mạch khác. Chúng sinh ra khi dò giao thức của một thiết bị không có tài

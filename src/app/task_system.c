@@ -29,6 +29,8 @@
 
 static uint8_t missed[AK_TASK_EOT_ID];
 
+uint8_t app_led_held;
+
 static void ping_tasks(void) {
 	for (uint8_t id = 0; id < AK_TASK_EOT_ID; id++) {
 		if (id != TASK_SYSTEM_ID) {
@@ -75,7 +77,9 @@ void task_system(ak_msg_t* msg) {
 		/* Kick from a task, not an ISR: a task hogging the CPU delays the
 		 * heartbeat and the watchdog resets the chip. */
 		hal_wdt_kick();
-		hal_led_toggle();
+		if (!app_led_held) {
+			hal_led_toggle();
+		}
 		ping_tasks();
 		break;
 

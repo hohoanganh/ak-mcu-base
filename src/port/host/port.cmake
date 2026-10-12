@@ -51,7 +51,7 @@ add_executable(test_demo
 	${SRC}/demo/scr_clock.c ${SRC}/demo/scr_snake.c ${SRC}/demo/scr_flappy.c ${SRC}/demo/scr_system.c
 	${SRC}/demo/scr_dino.c ${SRC}/demo/scr_cube.c ${SRC}/demo/scr_music.c ${SRC}/demo/music.c
 	${SRC}/demo/scr_maze.c ${SRC}/demo/scr_video.c ${SRC}/demo/video.c ${SRC}/demo/scr_weather.c
-	${SRC}/demo/scr_tetris.c ${SRC}/demo/scr_breakout.c ${SRC}/demo/scr_invaders.c ${SRC}/demo/scr_saver.c ${SRC}/demo/scr_pong.c ${SRC}/demo/scr_plot.c
+	${SRC}/demo/scr_tetris.c ${SRC}/demo/scr_breakout.c ${SRC}/demo/scr_invaders.c ${SRC}/demo/scr_saver.c ${SRC}/demo/scr_blocks.c ${SRC}/demo/blk_vm.c ${SRC}/demo/scr_pong.c ${SRC}/demo/scr_plot.c
 	${KERNEL_SRC} ${COMMON_SRC} ${SYS_SRC}
 	${HOST_DIR}/port_host.c
 )
@@ -73,6 +73,12 @@ target_compile_options(ak_sim PRIVATE ${HOST_WARN} -g)
 
 # --- end-to-end: tools/ak_fw.py flashes ak_sim over pipes ---
 find_package(Python3 COMPONENTS Interpreter)
+# --- block compiler (JavaScript): its own checks, and tests/blk_fixtures.h up to date ---
+find_program(NODE_EXECUTABLE NAMES node nodejs)
+if(NODE_EXECUTABLE)
+	add_test(NAME blocks_js COMMAND ${NODE_EXECUTABLE} ${ROOT}/tests/test_blocks.js)
+endif()
+
 if(Python3_FOUND)
 	# frame reader of tools/ak_fw.py against log text around the frames
 	add_test(NAME ak_fw

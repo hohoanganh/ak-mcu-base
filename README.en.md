@@ -71,7 +71,8 @@ The connectors, pin by pin, from the schematic (*chân* = pin, *cầu hàn* = so
 | **Update** | Over the UART console or Modbus RTU on RS485; images carry a CRC32 and the board name |
 | **Crash log** | HardFault, fatal error, watchdog and stalled task are written to EEPROM and reported at the next start |
 | **Modbus RTU** | Slave and master on top of nanoMODBUS (MIT) |
-| **Demo** | 16 screens on a 128×64 OLED with three buttons: seven games, 3D, video from SPI flash, a weather station, a scope |
+| **Demo** | 17 screens on a 128×64 OLED with three buttons: seven games, 3D, video from SPI flash, a weather station, a scope |
+| **Block programming** | [Drag blocks, press Run](https://hohoanganh.github.io/ak-mcu-base/play/blocks.html): a small bytecode machine in the firmware runs the program at once, in the browser or on a real kit over USB; nothing is compiled or flashed |
 | **Tests** | Kernel, bootloader, update and every demo screen run on a PC under ASan; CI on every push |
 
 ## Where things are

@@ -84,9 +84,12 @@ def main():
     ]
     print("emcc: %d source files" % len(files))
     subprocess.check_call(cmd)
-    pages = ("index.html", "pong.html", "kit-ui.js", "page.css", "social.png")
+    pages = ("index.html", "pong.html", "blocks.html", "kit-ui.js", "blocks.js", "blocks-compiler.js",
+             "blocks-examples.js", "page.css", "social.png")
     for name in pages:
         shutil.copyfile(os.path.join(HERE, name), os.path.join(a.out, name))
+    # Blockly (Apache 2.0), kept in the repository so that the page works offline
+    shutil.copytree(os.path.join(HERE, "vendor"), os.path.join(a.out, "vendor"), dirs_exist_ok=True)
     for name in pages + ("ak-kit.js",):
         print("%-11s %7d bytes" % (name, os.path.getsize(os.path.join(a.out, name))))
 

@@ -25,7 +25,8 @@ cập nhật firmware qua UART và RS485. Dựng lại từ
 
 | Muốn… | Vào đây |
 |---|---|
-| **Xem nó chạy** | [Một kit, đủ 16 màn hình](https://hohoanganh.github.io/ak-mcu-base/play/) · [hai kit chơi Pong với nhau](https://hohoanganh.github.io/ak-mcu-base/play/pong.html) |
+| **Xem nó chạy** | [Một kit, đủ 17 màn hình](https://hohoanganh.github.io/ak-mcu-base/play/) · [hai kit chơi Pong với nhau](https://hohoanganh.github.io/ak-mcu-base/play/pong.html) |
+| **Lập trình bằng kéo thả** | [Nối các khối lại, bấm Chạy](https://hohoanganh.github.io/ak-mcu-base/play/blocks.html): chạy ngay trên kit trong trang, gửi được sang kit thật qua USB |
 | **Biết demo có gì** | [Từng màn hình, kèm ảnh động](docs/demo-kit.md) |
 | **Bắt đầu dự án mới** | `python tools/new_project.py <thư-mục> --board <tên-board>` · [hướng dẫn](docs/tien-ich.md) |
 | **Tải firmware** | [Releases](https://github.com/hohoanganh/ak-mcu-base/releases) |
@@ -109,7 +110,7 @@ File `.img` và `.bin` của mọi bản: [Releases](https://github.com/hohoanga
 | Việc | Đọc |
 |---|---|
 | Kiến trúc, bản đồ flash, bootloader và OTA, đã kiểm gì | [docs/ak-mcu-base.md](docs/ak-mcu-base.md) |
-| Demo trên kit: 16 màn hình, phần cứng, cách viết màn hình mới | [docs/demo-kit.md](docs/demo-kit.md) |
+| Demo trên kit: 17 màn hình, lập trình kéo thả, phần cứng, cách viết màn hình mới | [docs/demo-kit.md](docs/demo-kit.md) |
 | Nhật ký sự cố, giám sát task, đo stack, tạo dự án mới, CI | [docs/tien-ich.md](docs/tien-ich.md) |
 | Modbus RTU trên RS485: slave, master, OTA | [docs/modbus.md](docs/modbus.md) |
 | Port sang chip khác | [docs/porting.md](docs/porting.md) |

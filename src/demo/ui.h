@@ -74,6 +74,7 @@ extern const ui_screen_t scr_invaders;
 extern const ui_screen_t scr_saver;
 extern const ui_screen_t scr_pong;
 extern const ui_screen_t scr_plot;
+extern const ui_screen_t scr_blocks;
 extern const ui_screen_t scr_system;
 
 /* menu (scr_menu.c): returns the chosen screen on B3, else 0 */
@@ -89,6 +90,10 @@ extern uint8_t ui_open(const char* text);
 
 /* helpers for the screens */
 extern void ui_beep(uint16_t freq_hz, uint16_t ms);		/* silent while a song plays */
+/* The status LED for a screen: from the first call the heartbeat leaves the LED
+ * alone, until ui_led_release() gives it back. */
+extern void ui_led(uint8_t on);
+extern void ui_led_release(void);
 /* play an RTTTL song on the buzzer without blocking (music.h) / stop it */
 extern void ui_music_play(const char* rtttl);
 extern void ui_music_stop(void);
@@ -151,6 +156,8 @@ extern uint16_t ui_last_frame_ms;
  * "ui dump" = the screen as text once,
  * "ui stream" = the screen as text whenever it changes (on / off) */
 extern void cmd_ui(const char* args);
+/* shell: "blk" = state of the block program, "blk run" / "blk stop" */
+extern void cmd_blk(const char* args);
 /* shell: "plot <number>" = one more point on the scope screen */
 extern void cmd_plot(const char* args);
 /* shell: "th" = temperature, humidity and the graph of the weather screen as CSV */

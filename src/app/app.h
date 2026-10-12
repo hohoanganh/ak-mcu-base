@@ -64,6 +64,10 @@ enum {
  * On MCU both match (header is linked into the .elf). */
 extern const fw_version_t* app_version(void);
 
+/* 1: something else drives the status LED (a demo screen): the heartbeat of
+ * task_system does not toggle it. */
+extern uint8_t app_led_held;
+
 extern int app_main(void);
 
 /* task_modbus.c */

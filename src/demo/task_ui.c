@@ -16,6 +16,9 @@
 #include "video.h"
 #include "weather.h"
 #include "plot.h"
+#include "blk_vm.h"
+#include "blocks.h"
+#include "app.h"
 #include "fw_types.h"
 #include "hal_rs485.h"
 #include "task_list.h"
@@ -56,6 +59,18 @@ int ui_link_getc(void) {
 
 void ui_link_write(const uint8_t* data, uint8_t len) {
 	hal_rs485_write(data, len);
+}
+
+/*----------------------------------------------------------------------------
+ * status LED for a screen (the heartbeat stops toggling it meanwhile)
+ *--------------------------------------------------------------------------*/
+void ui_led(uint8_t on) {
+	app_led_held = 1;
+	hal_led_set(on);
+}
+
+void ui_led_release(void) {
+	app_led_held = 0;
 }
 
 /*----------------------------------------------------------------------------
@@ -418,6 +433,11 @@ void cmd_spi(const char* args) {
  *   40 INFO   -                 size(4) sector(4)
  *   41 ERASE  offset(4)         -          one sector
  *   42 WRITE  offset(4) data    -          checked by reading back
+ *
+ * block program (docs/play/blocks.html, see blocks.h)
+ *   48 BEGIN  length(2)         max(2)     the running program stops
+ *   49 DATA   offset(2) data    -
+ *   4A END    crc16(2)          -          checked, kept, started on the Blocks screen
  *--------------------------------------------------------------------------*/
 static uint32_t get_u32(const uint8_t* p) {
 	return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
@@ -473,9 +493,57 @@ uint8_t ui_proto_ext(uint8_t cmd, const uint8_t* req, uint16_t len, uint8_t* res
 		return FW_OK;
 	}
 
+	case 0x48:
+		resp[0] = (uint8_t)BLK_MAX_SIZE;
+		resp[1] = (uint8_t)(BLK_MAX_SIZE >> 8);
+		*resp_len = 2;
+		if (len != 2) {
+			return FW_ERR_ARG;
+		}
+		return blocks_begin((uint16_t)(req[0] | (req[1] << 8))) ? FW_OK : FW_ERR_SIZE;
+
+	case 0x49:
+		if (len <= 2) {
+			return FW_ERR_ARG;
+		}
+		return blocks_data((uint16_t)(req[0] | (req[1] << 8)), req + 2, (uint16_t)(len - 2)) ? FW_OK : FW_ERR_OFFSET;
+
+	case 0x4A:
+		if (len != 2) {
+			return FW_ERR_ARG;
+		}
+		if (blocks_end((uint16_t)(req[0] | (req[1] << 8))) != BLK_OK) {
+			return FW_ERR_IMG_CRC;
+		}
+		open_screen(&scr_blocks);			/* starts it */
+		return FW_OK;
+
 	default:
 		return FW_ERR_CMD;
 	}
+}
+
+/* "blk": what the block program is doing. "blk run": start it again.
+ * "blk stop": stop it. */
+void cmd_blk(const char* args) {
+	static const char* const names[] = { "no program", "running", "waiting", "ended", "error" };
+	uint16_t len;
+
+	if (args[0] == 'r') {
+		if (!ui_open("blocks")) {
+			xprintf("no Blocks screen\n");
+		}
+		return;
+	}
+	if (args[0] == 's') {
+		blk_stop();
+	}
+	(void)blk_image(&len);
+	xprintf("%s, %d of %d bytes, at byte %d", names[blk_state()], len, BLK_MAX_SIZE, blk_pc());
+	if (blk_state() == BLK_ERROR) {
+		xprintf(", error %d", blk_error());
+	}
+	xprintf("\n");
 }
 
 /*----------------------------------------------------------------------------

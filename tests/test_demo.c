@@ -20,6 +20,8 @@
 #include "video.h"
 #include "weather.h"
 #include "plot.h"
+#include "blk_vm.h"
+#include "blocks.h"
 #include "crc.h"
 #include "port_host.h"
 #include "tiny_test.h"
@@ -225,6 +227,16 @@ uint8_t kit_store_write(uint32_t off, const void* data, uint32_t len) {
 		store[off + i] &= ((const uint8_t*)data)[i];
 	}
 	return 1;
+}
+
+static int blocks_led, blocks_led_released;
+
+void ui_led(uint8_t on) {
+	blocks_led = on;
+}
+
+void ui_led_release(void) {
+	blocks_led_released++;
 }
 
 void ui_beep(uint16_t freq_hz, uint16_t ms) {
@@ -1484,6 +1496,510 @@ static void test_screen_stream(void) {
 	CHECK(seen != 0 && (seen & (seen - 1)) == 0);
 }
 
+/*----------------------------------------------------------------------------
+ * block programs: the machine (blk_vm.c) with a recorder instead of the kit,
+ * then the Blocks screen with the real drawing code
+ *--------------------------------------------------------------------------*/
+static char blk_out[8192];			/* every text the program printed, each followed by '|' */
+static int blk_leds, blk_led_state, blk_beeps_n, blk_cls_n, blk_pixels, blk_lines, blk_rects, blk_fills, blk_erases;
+static uint16_t blk_beep_hz, blk_beep_ms;
+static int blk_last[5];
+static uint32_t blk_rand_next;
+
+static void rec_led(uint8_t on) { blk_leds++; blk_led_state = on; }
+static void rec_beep(uint16_t hz, uint16_t ms) { blk_beeps_n++; blk_beep_hz = hz; blk_beep_ms = ms; }
+static uint8_t rec_buttons(void) { return held_buttons; }
+static void rec_cls(void) { blk_cls_n++; }
+static void rec_text(int x, int y, const char* s, uint8_t size) {
+	blk_last[0] = x; blk_last[1] = y; blk_last[2] = size;
+	if (strlen(blk_out) + strlen(s) + 2 < sizeof(blk_out)) {
+		strcat(blk_out, s);
+		strcat(blk_out, "|");
+	}
+}
+static void rec_pixel(int x, int y, uint8_t on) { blk_pixels++; blk_last[0] = x; blk_last[1] = y; blk_last[2] = on; }
+static void rec_line(int x0, int y0, int x1, int y1) { blk_lines++; blk_last[0] = x0; blk_last[1] = y0; blk_last[2] = x1; blk_last[3] = y1; }
+static void rec_rect(int x, int y, int w, int h, uint8_t how) {
+	if (how == 2) { blk_erases++; } else if (how) { blk_fills++; } else { blk_rects++; }
+	blk_last[0] = x; blk_last[1] = y; blk_last[2] = w; blk_last[3] = h;
+}
+static int rec_temp(void) { return 27; }
+static int rec_humi(void) { return 61; }
+static uint32_t rec_rand(void) { return blk_rand_next++; }
+static int rec_time(uint8_t what) { return what == 0 ? 9 : what == 1 ? 41 : 7; }
+
+static const blk_io_t rec_io = {
+	rec_led, rec_beep, rec_buttons, rec_cls, rec_text, rec_pixel, rec_line, rec_rect,
+	rec_temp, rec_humi, rec_rand, rec_time,
+};
+
+/* opcodes, as in blk_vm.h */
+#define B_END		0x00
+#define B_P8(v)		0x01, (uint8_t)(v)
+#define B_P16(v)	0x02, (uint8_t)((v) & 0xFF), (uint8_t)(((v) >> 8) & 0xFF)
+#define B_LOAD(n)	0x03, (n)
+#define B_STORE(n)	0x04, (n)
+#define B_ADD		0x05
+#define B_SUB		0x06
+#define B_MUL		0x07
+#define B_DIV		0x08
+#define B_MOD		0x09
+#define B_NEG		0x0A
+#define B_EQ		0x0B
+#define B_NE		0x0C
+#define B_LT		0x0D
+#define B_LE		0x0E
+#define B_GT		0x0F
+#define B_GE		0x10
+#define B_AND		0x11
+#define B_OR		0x12
+#define B_NOT		0x13
+#define B_JMP(d)	0x14, (uint8_t)((d) & 0xFF), (uint8_t)(((d) >> 8) & 0xFF)
+#define B_JZ(d)		0x15, (uint8_t)((d) & 0xFF), (uint8_t)(((d) >> 8) & 0xFF)
+#define B_WAIT		0x16
+#define B_MIN		0x17
+#define B_LED		0x18
+#define B_BEEP		0x19
+#define B_BTN(n)	0x1A, (n)
+#define B_HIT(n)	0x1B, (n)
+#define B_CLS		0x1C
+#define B_NUM		0x1E
+#define B_PIXEL		0x1F
+#define B_LINE		0x20
+#define B_RECT		0x21
+#define B_FILL		0x22
+#define B_TEMP		0x23
+#define B_HUMI		0x24
+#define B_RAND		0x25
+#define B_TIME(k)	0x26, (k)
+#define B_MAX		0x27
+#define B_ABS		0x28
+#define B_ERASE		0x29
+/* print the value on top of the stack at 0,0 size 1 */
+#define B_PRINT		B_P8(0), B_P8(0), B_P8(1), B_NUM
+#define B_HEAD		'B', 'K', BLK_VERSION, BLK_VARS
+
+static void blk_reset(void) {
+	blk_out[0] = 0;
+	blk_leds = blk_led_state = blk_beeps_n = blk_cls_n = blk_pixels = blk_lines = blk_rects = blk_fills = blk_erases = 0;
+	blk_rand_next = 0;
+	held_buttons = 0;
+}
+
+/* loads, starts and runs once; returns the state */
+static uint8_t blk_go(const uint8_t* img, uint16_t len) {
+	blk_reset();
+	CHECK_EQ(blk_load(img, len), BLK_OK);
+	blk_start(&rec_io, now_ms);
+	blk_run(now_ms);
+	return blk_state();
+}
+
+#define BLK_GO(...)		blk_go((const uint8_t[]){ B_HEAD, __VA_ARGS__ }, sizeof((const uint8_t[]){ B_HEAD, __VA_ARGS__ }))
+
+static void test_blk_image(void) {
+	static const uint8_t ok[] = { B_HEAD, B_END };
+	uint8_t big[BLK_MAX_SIZE + 1];
+	uint16_t len;
+
+	CHECK_EQ(blk_load(ok, sizeof(ok)), BLK_OK);
+	CHECK(blk_image(&len) != 0);
+	CHECK_EQ(len, sizeof(ok));
+
+	/* not a program: refused, and the old one is gone too */
+	CHECK_EQ(blk_load((const uint8_t*)"XK\x01\x10\x00", 5), BLK_ERR_IMAGE);
+	CHECK(blk_image(&len) == 0);
+	CHECK_EQ(blk_state(), BLK_EMPTY);
+	CHECK_EQ(blk_load((const uint8_t*)"BK\x02\x10\x00", 5), BLK_ERR_IMAGE);		/* version from the future */
+	CHECK_EQ(blk_load((const uint8_t*)"BK\x01\x11\x00", 5), BLK_ERR_IMAGE);		/* more variables than there are */
+	CHECK_EQ(blk_load(ok, BLK_HEADER), BLK_ERR_IMAGE);							/* header only */
+	memset(big, 0, sizeof(big));
+	memcpy(big, ok, BLK_HEADER);
+	CHECK_EQ(blk_load(big, sizeof(big)), BLK_ERR_IMAGE);
+	CHECK_EQ(blk_load(big, BLK_MAX_SIZE), BLK_OK);
+
+	/* nothing loaded: starting it is harmless */
+	(void)blk_buffer();
+	blk_start(&rec_io, now_ms);
+	blk_run(now_ms);
+	CHECK_EQ(blk_state(), BLK_EMPTY);
+}
+
+static void test_blk_arithmetic(void) {
+	CHECK_EQ(BLK_GO(B_P8(7), B_P8(5), B_SUB, B_PRINT, B_END), BLK_ENDED);
+	CHECK(strcmp(blk_out, "2|") == 0);
+	BLK_GO(B_P8(5), B_P8(7), B_SUB, B_PRINT, B_END);
+	CHECK(strcmp(blk_out, "-2|") == 0);
+	BLK_GO(B_P16(1000), B_P16(-30), B_MUL, B_PRINT, B_END);
+	CHECK(strcmp(blk_out, "-30000|") == 0);
+	BLK_GO(B_P16(30000), B_P16(30000), B_MUL, B_PRINT, B_END);			/* beyond 16 bit: values are 32 bit */
+	CHECK(strcmp(blk_out, "900000000|") == 0);
+	BLK_GO(B_P8(17), B_P8(5), B_DIV, B_PRINT, B_P8(17), B_P8(5), B_MOD, B_PRINT, B_END);
+	CHECK(strcmp(blk_out, "3|2|") == 0);
+	BLK_GO(B_P8(-17), B_P8(5), B_DIV, B_PRINT, B_P8(9), B_NEG, B_PRINT, B_P8(-9), B_ABS, B_PRINT, B_END);
+	CHECK(strcmp(blk_out, "-3|-9|9|") == 0);
+	/* dividing by zero does not stop the program: the result is 0 */
+	CHECK_EQ(BLK_GO(B_P8(8), B_P8(0), B_DIV, B_PRINT, B_P8(8), B_P8(0), B_MOD, B_PRINT, B_END), BLK_ENDED);
+	CHECK(strcmp(blk_out, "0|0|") == 0);
+	BLK_GO(B_P8(3), B_P8(9), B_MIN, B_PRINT, B_P8(3), B_P8(9), B_MAX, B_PRINT, B_END);
+	CHECK(strcmp(blk_out, "3|9|") == 0);
+	/* the largest numbers wrap, they do not crash (run under UBSan) */
+	BLK_GO(B_P16(32767), B_P16(32767), B_MUL, B_P16(32767), B_MUL, B_P16(32767), B_MUL, B_P8(0), B_P8(1), B_SUB, B_DIV,
+		   B_STORE(0), B_END);
+	CHECK_EQ(blk_state(), BLK_ENDED);
+}
+
+static void test_blk_compare_logic(void) {
+	BLK_GO(B_P8(2), B_P8(3), B_LT, B_PRINT, B_P8(3), B_P8(3), B_LT, B_PRINT, B_P8(3), B_P8(3), B_LE, B_PRINT,
+		   B_P8(4), B_P8(3), B_GT, B_PRINT, B_P8(2), B_P8(3), B_GE, B_PRINT, B_P8(3), B_P8(3), B_EQ, B_PRINT,
+		   B_P8(3), B_P8(3), B_NE, B_PRINT, B_END);
+	CHECK(strcmp(blk_out, "1|0|1|1|0|1|0|") == 0);
+	BLK_GO(B_P8(1), B_P8(0), B_AND, B_PRINT, B_P8(1), B_P8(0), B_OR, B_PRINT, B_P8(5), B_NOT, B_PRINT,
+		   B_P8(0), B_NOT, B_PRINT, B_P8(7), B_P8(-2), B_AND, B_PRINT, B_END);
+	CHECK(strcmp(blk_out, "0|1|0|1|1|") == 0);
+}
+
+static void test_blk_variables_and_loops(void) {
+	/* i = 0; while (i < 5) { print i; i = i + 1 } */
+	CHECK_EQ(BLK_GO(B_P8(0), B_STORE(3),
+					/* top: */ B_LOAD(3), B_P8(5), B_LT, B_JZ(19),
+					B_LOAD(3), B_PRINT,
+					B_LOAD(3), B_P8(1), B_ADD, B_STORE(3),
+					B_JMP(-27),
+					B_END), BLK_ENDED);
+	CHECK(strcmp(blk_out, "0|1|2|3|4|") == 0);
+
+	/* variables start at 0, and again at every start */
+	BLK_GO(B_LOAD(0), B_PRINT, B_P8(9), B_STORE(0), B_LOAD(15), B_PRINT, B_END);
+	CHECK(strcmp(blk_out, "0|0|") == 0);
+	blk_out[0] = 0;
+	blk_start(&rec_io, now_ms);
+	blk_run(now_ms);
+	CHECK(strcmp(blk_out, "0|0|") == 0);
+}
+
+static void test_blk_wait_and_share(void) {
+	/* print 1, wait 120 ms, print 2 */
+	CHECK_EQ(BLK_GO(B_P8(1), B_PRINT, B_P8(120), B_WAIT, B_P8(2), B_PRINT, B_END), BLK_WAITING);
+	CHECK(strcmp(blk_out, "1|") == 0);
+	now_ms += 100;
+	blk_run(now_ms);
+	CHECK_EQ(blk_state(), BLK_WAITING);
+	CHECK(strcmp(blk_out, "1|") == 0);
+	now_ms += 20;
+	blk_run(now_ms);
+	CHECK_EQ(blk_state(), BLK_ENDED);
+	CHECK(strcmp(blk_out, "1|2|") == 0);
+
+	/* a negative wait is no wait; a loop without any wait gives the CPU back */
+	CHECK_EQ(BLK_GO(B_P8(-5), B_WAIT, B_END), BLK_WAITING);
+	blk_run(now_ms);
+	CHECK_EQ(blk_state(), BLK_ENDED);
+
+	CHECK_EQ(BLK_GO(B_LOAD(0), B_P8(1), B_ADD, B_STORE(0), B_JMP(-10)), BLK_RUNNING);
+	blk_run(now_ms);
+	CHECK_EQ(blk_state(), BLK_RUNNING);			/* still going, one share per call */
+	blk_stop();
+	CHECK_EQ(blk_state(), BLK_ENDED);
+	blk_run(now_ms);
+	CHECK_EQ(blk_state(), BLK_ENDED);
+}
+
+static void test_blk_kit(void) {
+	/* LED, beep */
+	BLK_GO(B_P8(1), B_LED, B_P16(1000), B_P8(50), B_BEEP, B_P8(0), B_P8(50), B_BEEP, B_END);
+	CHECK_EQ(blk_leds, 1);
+	CHECK_EQ(blk_led_state, 1);
+	CHECK_EQ(blk_beeps_n, 1);					/* 0 Hz is silence, not a call */
+	CHECK_EQ(blk_beep_hz, 1000);
+	CHECK_EQ(blk_beep_ms, 50);
+
+	/* buttons: "held now" follows the pin, "was pressed" is given once */
+	blk_reset();
+	held_buttons = KIT_BTN_2;
+	CHECK_EQ(blk_load((const uint8_t[]){ B_HEAD, B_BTN(1), B_PRINT, B_BTN(2), B_PRINT, B_HIT(3), B_PRINT, B_HIT(3), B_PRINT, B_END },
+					  BLK_HEADER + 4 * 9 + 1), BLK_OK);
+	blk_start(&rec_io, now_ms);
+	blk_key(KIT_BTN_3);
+	blk_run(now_ms);
+	CHECK(strcmp(blk_out, "0|1|1|0|") == 0);
+
+	/* drawing: arguments arrive in the order written */
+	BLK_GO(B_CLS, B_P8(3), B_P8(4), B_P8(1), B_PIXEL, B_END);
+	CHECK_EQ(blk_cls_n, 1);
+	CHECK_EQ(blk_pixels, 1);
+	CHECK(blk_last[0] == 3 && blk_last[1] == 4 && blk_last[2] == 1);
+	BLK_GO(B_P8(1), B_P8(2), B_P8(30), B_P8(40), B_LINE, B_END);
+	CHECK(blk_lines == 1 && blk_last[0] == 1 && blk_last[1] == 2 && blk_last[2] == 30 && blk_last[3] == 40);
+	BLK_GO(B_P8(5), B_P8(6), B_P8(20), B_P8(10), B_RECT, B_P8(5), B_P8(6), B_P8(20), B_P8(10), B_FILL,
+		   B_P8(5), B_P8(6), B_P8(20), B_P8(10), B_ERASE, B_END);
+	CHECK(blk_rects == 1 && blk_fills == 1 && blk_erases == 1 && blk_last[2] == 20 && blk_last[3] == 10);
+
+	/* text: x, y, size; a size outside 1..4 is clamped; too long is cut */
+	BLK_GO(B_P8(10), B_P8(20), B_P8(2), 0x1D, 2, 'H', 'i', B_END);
+	CHECK(strcmp(blk_out, "Hi|") == 0);
+	CHECK(blk_last[0] == 10 && blk_last[1] == 20 && blk_last[2] == 2);
+	BLK_GO(B_P8(0), B_P8(0), B_P8(99), 0x1D, 30, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5',
+		   '6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', B_P8(7), B_PRINT, B_END);
+	CHECK(strcmp(blk_out, "123456789012345678901|7|") == 0);	/* 21 characters, and the program goes on behind the text */
+
+	/* sensors, clock, random */
+	BLK_GO(B_TEMP, B_PRINT, B_HUMI, B_PRINT, B_TIME(0), B_PRINT, B_TIME(1), B_PRINT, B_TIME(2), B_PRINT, B_END);
+	CHECK(strcmp(blk_out, "27|61|9|41|7|") == 0);
+	BLK_GO(B_P8(3), B_P8(5), B_RAND, B_PRINT, B_P8(3), B_P8(5), B_RAND, B_PRINT, B_P8(3), B_P8(5), B_RAND, B_PRINT,
+		   B_P8(3), B_P8(5), B_RAND, B_PRINT, B_P8(5), B_P8(3), B_RAND, B_PRINT, B_P8(4), B_P8(4), B_RAND, B_PRINT, B_END);
+	CHECK(strcmp(blk_out, "3|4|5|3|4|4|") == 0);
+
+	/* seconds since the program started */
+	CHECK_EQ(BLK_GO(B_P16(2500), B_WAIT, B_TIME(3), B_PRINT, B_END), BLK_WAITING);
+	now_ms += 2500;
+	blk_run(now_ms);
+	CHECK(strcmp(blk_out, "2|") == 0);
+}
+
+static void test_blk_errors(void) {
+	/* each stops the program and says where; none may read or write outside */
+	CHECK_EQ(BLK_GO(B_P8(1), B_ADD, B_END), BLK_ERROR);
+	CHECK_EQ(blk_error(), BLK_ERR_STACK);
+	CHECK_EQ(blk_pc(), BLK_HEADER + 2);
+
+	CHECK_EQ(BLK_GO(B_P8(1), B_P8(1), B_P8(1), B_P8(1), B_P8(1), B_P8(1), B_P8(1), B_P8(1), B_P8(1), B_P8(1), B_P8(1), B_P8(1),
+					B_P8(1), B_P8(1), B_P8(1), B_P8(1), B_P8(1), B_END), BLK_ERROR);
+	CHECK_EQ(blk_error(), BLK_ERR_STACK);
+	CHECK_EQ(blk_pc(), BLK_HEADER + 32);
+
+	CHECK_EQ(BLK_GO(B_CLS, 0xEE, B_END), BLK_ERROR);
+	CHECK_EQ(blk_error(), BLK_ERR_OPCODE);
+	CHECK_EQ(blk_pc(), BLK_HEADER + 1);
+
+	CHECK_EQ(BLK_GO(B_JMP(200), B_END), BLK_ERROR);
+	CHECK_EQ(blk_error(), BLK_ERR_RANGE);
+	CHECK_EQ(BLK_GO(B_JMP(-200), B_END), BLK_ERROR);
+	CHECK_EQ(blk_error(), BLK_ERR_RANGE);
+	CHECK_EQ(BLK_GO(B_JMP(-4), B_END), BLK_ERROR);			/* into the header */
+	CHECK_EQ(BLK_GO(B_P8(1), B_STORE(BLK_VARS), B_END), BLK_ERROR);
+	CHECK_EQ(blk_error(), BLK_ERR_RANGE);
+	CHECK_EQ(BLK_GO(B_LOAD(200), B_END), BLK_ERROR);
+
+	/* cut off in the middle of an instruction */
+	CHECK_EQ(BLK_GO(B_CLS, 0x02, 0x10), BLK_ERROR);			/* PUSH16 with one byte */
+	CHECK_EQ(blk_error(), BLK_ERR_RANGE);
+	CHECK_EQ(BLK_GO(B_P8(0), B_P8(0), B_P8(1), 0x1D, 9, 'a', 'b'), BLK_ERROR);		/* text shorter than it says */
+	CHECK_EQ(blk_error(), BLK_ERR_RANGE);
+	CHECK(blk_out[0] == 0);
+	CHECK_EQ(BLK_GO(B_CLS, 0x14), BLK_ERROR);
+	CHECK_EQ(BLK_GO(B_CLS, 0x1A), BLK_ERROR);
+
+	/* running off the end without END is an end, not an error */
+	CHECK_EQ(BLK_GO(B_CLS), BLK_ENDED);
+
+	/* every byte value as an opcode, with a full and with an empty stack: no crash */
+	for (int op = 0; op < 256; op++) {
+		uint8_t img[BLK_HEADER + 40];
+		uint16_t n = BLK_HEADER;
+
+		memcpy(img, (const uint8_t[]){ B_HEAD }, BLK_HEADER);
+		for (int k = 0; k < 6; k++) {
+			img[n++] = 0x01;
+			img[n++] = (uint8_t)(k * 37 + op);
+		}
+		img[n++] = (uint8_t)op;
+		img[n++] = 3; img[n++] = 0; img[n++] = 'x'; img[n++] = 'y'; img[n++] = 'z';
+		blk_reset();
+		CHECK_EQ(blk_load(img, n), BLK_OK);
+		blk_start(&rec_io, now_ms);
+		blk_run(now_ms);
+		blk_run(now_ms + 5000000UL);
+		CHECK(blk_state() != BLK_EMPTY);
+
+		img[BLK_HEADER] = (uint8_t)op;
+		blk_load(img, (uint16_t)(BLK_HEADER + 3));
+		blk_start(&rec_io, now_ms);
+		blk_run(now_ms);
+	}
+}
+
+#include "blk_fixtures.h"
+
+/* The example programs of the block editor, as the page compiles them
+ * (tests/blk_fixtures.h, kept by tests/test_blocks.js), in the real machine:
+ * ten seconds each, with a finger on the buttons now and then. */
+static void test_blk_examples(void) {
+	for (uint32_t i = 0; i < sizeof(blk_fixtures) / sizeof(blk_fixtures[0]); i++) {
+		const char* id = blk_fixtures[i].id;
+		int waits = 0;
+
+		/* the page and the firmware agree on the checksum */
+		CHECK_EQ(crc16_update(CRC16_INIT, blk_fixtures[i].img, blk_fixtures[i].len), blk_fixtures[i].crc);
+
+		blk_reset();
+		CHECK_EQ(blk_load(blk_fixtures[i].img, blk_fixtures[i].len), BLK_OK);
+		blk_start(&rec_io, now_ms);
+		for (int f = 0; f < 200; f++) {
+			now_ms += UI_FRAME_MS;
+			held_buttons = (f >= 40 && f < 80) ? KIT_BTN_1 : 0;
+			if (f == 40 || f == 60 || f == 100) {
+				blk_key(KIT_BTN_1);
+			}
+			if (f == 120) {
+				blk_key(KIT_BTN_2);
+			}
+			blk_run(now_ms);
+			waits += (blk_state() == BLK_WAITING);
+			if (blk_state() == BLK_ERROR) {
+				printf("    example %s: error %d at byte %d\n", id, blk_error(), blk_pc());
+				break;
+			}
+		}
+		CHECK(blk_state() != BLK_ERROR);
+		CHECK(waits >= 90);							/* it sleeps between its steps: the kit stays responsive */
+
+		if (strcmp(id, "blink") == 0) {
+			CHECK(blk_leds >= 18 && blk_leds <= 21);	/* 10 s at 0.5 s per change */
+		}
+		else if (strcmp(id, "button") == 0) {
+			CHECK(blk_leds > 100);						/* follows B1 every 20 ms */
+			CHECK_EQ(blk_beeps_n, 1);					/* B2 was pressed once */
+		}
+		else if (strcmp(id, "counter") == 0) {
+			CHECK_EQ(blk_beeps_n, 3);
+			CHECK(strstr(blk_out, "So lan bam B1|3|") != 0);			/* three presses counted... */
+			CHECK(strcmp(blk_out + strlen(blk_out) - 25, "So lan bam B1|0|B2: ve 0|") == 0);	/* ...then B2 put it back to 0 */
+		}
+		else if (strcmp(id, "thermo") == 0) {
+			CHECK(strstr(blk_out, "27|") != 0 && strstr(blk_out, "61|") != 0);
+			CHECK(blk_lines >= 9);
+		}
+		else if (strcmp(id, "clock") == 0) {
+			CHECK(strstr(blk_out, "9|:|41|7|") != 0);
+		}
+		else if (strcmp(id, "ball") == 0) {
+			CHECK(blk_fills > 150);						/* a new position about every 50 ms */
+			CHECK(blk_beeps_n >= 4);					/* it reached the walls */
+		}
+		else if (strcmp(id, "countdown") == 0) {
+			CHECK_EQ(blk_state(), BLK_ENDED);
+			CHECK_EQ(blk_beeps_n, 6);
+			CHECK(strstr(blk_out, "5|4|3|2|1|HET GIO!|") != 0);
+		}
+	}
+}
+
+static uint8_t blk_shot[KIT_LCD_PAGES][KIT_LCD_W];
+
+static void test_blocks_screen(void) {
+	/* what the editor sends for: clear, "HELLO" at 4,4 size 2, a frame, LED on,
+	 * then count the presses of B1 in the middle of the screen */
+	static const uint8_t prog[] = {
+		B_HEAD,
+		B_CLS,
+		B_P8(4), B_P8(4), B_P8(2), 0x1D, 5, 'H', 'E', 'L', 'L', 'O',
+		B_P8(0), B_P8(24), B_P8(127), B_P8(40), B_RECT,
+		B_P8(1), B_LED,
+		/* loop: */ B_HIT(1), B_JZ(7), B_LOAD(0), B_P8(1), B_ADD, B_STORE(0),
+		B_P8(40), B_P8(34), B_P8(40), B_P8(16), B_ERASE,			/* wipe the old number */
+		B_LOAD(0), B_P8(50), B_P8(36), B_P8(2), B_NUM,
+		B_P8(50), B_WAIT,
+		B_JMP(-36),
+	};
+	uint16_t crc = crc16_update(CRC16_INIT, prog, sizeof(prog));
+	uint16_t len;
+	int lit;
+
+	blocks_led = blocks_led_released = 0;
+	memset(store, 0xFF, sizeof(store));
+	(void)blk_buffer();
+
+	/* no program anywhere: the screen says so */
+	scr_blocks.enter();
+	frames(&scr_blocks, 2);
+	snapshot("52_blocks_empty");
+	CHECK_EQ(blk_state(), BLK_EMPTY);
+	CHECK(lit_pixels() > 300);
+
+	/* a program arrives in pieces */
+	CHECK_EQ(blocks_begin(0), 0);
+	CHECK_EQ(blocks_begin(BLK_MAX_SIZE + 1), 0);
+	CHECK_EQ(blocks_data(0, prog, 4), 0);					/* nothing announced */
+	CHECK_EQ(blocks_end(crc), BLK_ERR_IMAGE);
+	CHECK_EQ(blocks_begin(sizeof(prog)), 1);
+	CHECK_EQ(blocks_data(0, prog, 20), 1);
+	CHECK_EQ(blocks_data((uint16_t)(sizeof(prog) - 3), prog, 4), 0);	/* past the end */
+	CHECK_EQ(blocks_data(20, prog + 20, (uint16_t)(sizeof(prog) - 20)), 1);
+	CHECK_EQ(blocks_end((uint16_t)(crc ^ 1)), BLK_ERR_IMAGE);			/* damaged on the way */
+	CHECK(blk_image(&len) == 0);
+	CHECK_EQ(blocks_begin(sizeof(prog)), 1);
+	CHECK_EQ(blocks_data(0, prog, sizeof(prog)), 1);
+	CHECK_EQ(blocks_end(crc), BLK_OK);
+	CHECK(blk_image(&len) != 0);
+	CHECK_EQ(len, sizeof(prog));
+
+	scr_blocks.enter();
+	frames(&scr_blocks, 3);
+	CHECK_EQ(blk_state(), BLK_WAITING);
+	CHECK_EQ(blocks_led, 1);
+	snapshot("53_blocks_hello");
+	lit = lit_pixels();
+	memcpy(blk_shot, panel, sizeof(panel));
+	CHECK(lit > 400);
+	CHECK(gfx_get(0, 24) && gfx_get(126, 24) && gfx_get(0, 63));		/* the frame */
+
+	/* three presses of B1: the number on screen changes */
+	for (int i = 0; i < 3; i++) {
+		scr_blocks.key(KIT_BTN_1);
+		frames(&scr_blocks, 3);
+	}
+	scr_blocks.key(KIT_BTN_2);							/* not the button the program asks about */
+	frames(&scr_blocks, 3);
+	snapshot("54_blocks_count");
+	CHECK(memcmp(blk_shot, panel, sizeof(panel)) != 0);
+	CHECK_EQ(blk_state(), BLK_WAITING);
+
+	/* leaving stops it and gives the LED back to the heartbeat */
+	scr_blocks.leave();
+	CHECK_EQ(blocks_led_released, 1);
+	CHECK_EQ(blk_state(), BLK_ENDED);
+
+	/* power cycle: RAM is empty, the copy in the store comes back and runs */
+	(void)blk_buffer();
+	CHECK(blk_image(&len) == 0);
+	scr_blocks.enter();
+	frames(&scr_blocks, 3);
+	CHECK(blk_image(&len) != 0);
+	CHECK_EQ(len, sizeof(prog));
+	CHECK_EQ(blk_state(), BLK_WAITING);
+	CHECK(memcmp(blk_shot, panel, sizeof(panel)) == 0);		/* the same picture: counts from 0 again */
+
+	/* a damaged copy is not run */
+	scr_blocks.leave();
+	(void)blk_buffer();
+	store[sizeof(store) - KIT_STORE_SECTOR + 8 + 9] ^= 0xFF;
+	scr_blocks.enter();
+	frames(&scr_blocks, 2);
+	CHECK_EQ(blk_state(), BLK_EMPTY);
+
+	/* a program that fails shows where, over its own picture */
+	{
+		static const uint8_t bad[] = { B_HEAD, B_CLS, B_P8(0), B_P8(0), B_P8(60), B_P8(40), B_FILL, B_ADD, B_END };
+
+		CHECK_EQ(blocks_begin(sizeof(bad)), 1);
+		CHECK_EQ(blocks_data(0, bad, sizeof(bad)), 1);
+		CHECK_EQ(blocks_end(crc16_update(CRC16_INIT, bad, sizeof(bad))), BLK_OK);
+		scr_blocks.enter();
+		frames(&scr_blocks, 2);
+		snapshot("55_blocks_error");
+		CHECK_EQ(blk_state(), BLK_ERROR);
+		CHECK_EQ(blk_error(), BLK_ERR_STACK);
+		CHECK(gfx_get(10, 10));							/* its picture is still there */
+	}
+	scr_blocks.leave();
+	(void)blk_buffer();
+	memset(store, 0xFF, sizeof(store));
+	menu_find("blocks");
+	CHECK(menu_key(KIT_BTN_3) == &scr_blocks);
+	menu_find("clock");
+}
+
 static void test_plot(void) {
 	int a;
 
@@ -1607,6 +2123,15 @@ int main(int argc, char** argv) {
 	RUN_TEST(test_saver);
 	RUN_TEST(test_pong);
 	RUN_TEST(test_plot);
+	RUN_TEST(test_blk_image);
+	RUN_TEST(test_blk_arithmetic);
+	RUN_TEST(test_blk_compare_logic);
+	RUN_TEST(test_blk_variables_and_loops);
+	RUN_TEST(test_blk_wait_and_share);
+	RUN_TEST(test_blk_kit);
+	RUN_TEST(test_blk_errors);
+	RUN_TEST(test_blk_examples);
+	RUN_TEST(test_blocks_screen);
 	RUN_TEST(test_menu_find);
 	RUN_TEST(test_screen_dump);
 	RUN_TEST(test_screen_stream);

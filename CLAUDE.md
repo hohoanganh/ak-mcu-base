@@ -104,6 +104,9 @@ Thêm lệnh shell: một dòng trong `shell_cmds[]` của `src/app/task_console
 - Ngân sách một khung là 50 ms; mỗi trang OLED tốn khoảng 5,5 ms. Vẽ thẳng vào `gfx_fb()` theo byte khi phủ nhiều điểm.
 - Màn hình mới: một `ui_screen_t {name, enter, key, frame, leave}` trong `src/demo/scr_*.c`, thêm vào menu, thêm vào
   `test_demo` (test dựng ảnh màn hình trên máy tính: **xem ảnh đó trước khi nạp**).
+- Lập trình kéo thả: trang `src/port/web/blocks*.js` dịch khối thành bytecode, máy ảo `src/demo/blk_vm.c` chạy nó
+  (bảng lệnh ở đầu `blk_vm.h`). Thêm một khối = thêm lệnh ở **ba** chỗ: `blk_vm.c`, `blocks-compiler.js`, định nghĩa
+  khối trong `blocks.js`; rồi `node tests/test_blocks.js --write` để sinh lại `tests/blk_fixtures.h`.
 - Xem màn hình kit từ xa: `python tools/ak_screen.py --port COMx shot x.png`; mở thẳng một màn hình: lệnh `ui open <tên>`.
 - Console TX của app đi qua ring + ngắt; dòng lệnh dồn nhanh hơn tốc độ xử lý thì bị bỏ, không FATAL.
 

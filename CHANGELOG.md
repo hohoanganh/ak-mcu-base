@@ -9,6 +9,13 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 
 ## ak-mcu-base — sau v1.3.7, chưa phát hành
 
+- **Lập trình kéo thả** (`docs/play/blocks.html`): kéo các khối (đèn, còi, nút, màn hình, cảm biến, biến, vòng lặp),
+  bấm Chạy, chương trình chạy ngay trên kit trong trang hoặc gửi sang kit thật qua USB (Web Serial). Trang dịch khối
+  thành bytecode; firmware có máy ảo `demo/blk_vm.c` và màn hình mới **Blocks** (màn hình thứ 17) chạy nó, mỗi khung
+  tối đa 400 lệnh nên không giữ CPU. Chương trình được lưu ở sector cuối của kho media. Lệnh shell `blk`; ba lệnh mở
+  rộng `0x48`–`0x4A` của giao thức console. Bảy ví dụ. Bản demo tốn thêm 0,9 KB RAM (768 byte là bộ đệm chương trình).
+- Đã kiểm lập trình kéo thả: test C 1200 phép kiểm (máy ảo, lỗi, bảy ví dụ chạy trong máy ảo thật), test bộ dịch 98
+  phép kiểm dưới Node, trang chạy trên trình duyệt với kit giả lập. **Chưa chạy trên kit thật**, kể cả đường gửi qua USB.
 - **Mô hình 3D của AK Base Kit 3.0** (`docs/kit/ak-base-kit-3i0-3d.html`): trang tự chứa, xoay được, nhấn vào linh kiện
   thì hiện thông tin; kèm hai ảnh dựng mặt trên và mặt dưới. Gắn vào hai README, tài liệu demo, trang web và trang chạy thử.
 - **Kit làm dụng cụ đo trên bàn** (`src/demo`, `src/port/stm32l151`): lệnh `i2c` quét và đọc cổng I2C1, có trong mọi bản

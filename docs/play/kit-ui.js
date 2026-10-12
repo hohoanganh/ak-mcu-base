@@ -13,6 +13,7 @@
  *          send(line)            a shell command to the console of the kit
  *          onConsole(text)       what the kit prints
  *          onRs485(bytes) / rs485In(bytes)   the RS485 wires
+ *          runBlocks(bytes)      run a block program (see blocks.html)
  *          loadClip(bytes), testFatal(), module (the WebAssembly instance)
  *
  * A page may hold several kits; each one is its own firmware.
@@ -132,6 +133,12 @@ var AkKitUI = (function () {
         m._web_console_in(Math.min(bytes.length, 4096));
       },
       rs485In: function (bytes) { pendingRx.push(bytes); },
+      /* a block program (bytecode from blocks-compiler.js): load it and open the
+       * Blocks screen. Returns 0, or the error code of the firmware. */
+      runBlocks: function (bytes) {
+        m.HEAPU8.set(bytes.subarray(0, 4096), io);
+        return m._web_blk_load(bytes.length);
+      },
       loadClip: function (data) {
         if (data.length < 16 || String.fromCharCode(data[0], data[1], data[2], data[3]) !== "AKV1") { return "không phải file .akv"; }
         if (data.length > m._web_store_size()) { return "clip lớn hơn kho " + m._web_store_size() + " byte"; }
