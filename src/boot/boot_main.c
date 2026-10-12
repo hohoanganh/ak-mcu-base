@@ -22,7 +22,7 @@
 #ifndef BOOT_VER_MAJOR
 #define BOOT_VER_MAJOR		1
 #define BOOT_VER_MINOR		2
-#define BOOT_VER_PATCH		1
+#define BOOT_VER_PATCH		2
 #endif
 
 /* 0 (default): run CRC-checked images only. 1: also run an APP without

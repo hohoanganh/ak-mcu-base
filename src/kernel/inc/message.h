@@ -74,21 +74,13 @@ typedef struct ak_msg_t {
 	/* message management */
 	struct ak_msg_t*	next;
 
-	/* task header */
+	/* task header. The old base also carried five if_* fields (external
+	 * task routing) here; nothing in this base reads them and they doubled
+	 * the header to 16 bytes, so they are gone: a message header is 8 bytes. */
 	uint8_t				src_task_id;
 	uint8_t				des_task_id;
 	uint8_t				ref_count;
 	uint8_t				sig;
-
-	/*******************************
-	 * public for user application.
-	 ******************************/
-	/* external task header */
-	uint8_t				if_src_task_id;
-	uint8_t				if_des_task_id;
-	uint8_t				if_src_type;
-	uint8_t				if_des_type;
-	uint8_t				if_sig;
 } ak_msg_t;
 
 /******************/

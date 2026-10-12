@@ -24,6 +24,21 @@ const char* fw_err_str(fw_err_t err) {
 	}
 }
 
+/* strncmp(a, b, FW_IMAGE_BOARD_LEN) == 0, without pulling newlib's strcmp
+ * (440 B) into the bootloader: gcc turns that strncmp into strcmp because
+ * the board name is a literal shorter than the limit. */
+static uint8_t board_match(const char* a, const char* b) {
+	for (uint8_t i = 0; i < FW_IMAGE_BOARD_LEN; i++) {
+		if (a[i] != b[i]) {
+			return 0;
+		}
+		if (a[i] == 0) {
+			break;
+		}
+	}
+	return 1;
+}
+
 fw_err_t fw_image_check_hdr(const fw_image_hdr_t* hdr, uint32_t part_size) {
 	if (hdr->magic != FW_IMAGE_MAGIC) {
 		return FW_ERR_MAGIC;
@@ -42,7 +57,7 @@ fw_err_t fw_image_check_hdr(const fw_image_hdr_t* hdr, uint32_t part_size) {
 		return FW_ERR_SIZE;
 	}
 
-	if (strncmp(hdr->board, hal_board_name(), FW_IMAGE_BOARD_LEN) != 0) {
+	if (!board_match(hdr->board, hal_board_name())) {
 		return FW_ERR_BOARD;
 	}
 
@@ -55,7 +70,8 @@ fw_err_t fw_image_check_hdr(const fw_image_hdr_t* hdr, uint32_t part_size) {
 }
 
 fw_err_t fw_image_verify(flash_part_t part, fw_image_hdr_t* hdr_out) {
-	fw_image_hdr_t hdr;
+	fw_image_hdr_t local;
+	fw_image_hdr_t* hdr = hdr_out ? hdr_out : &local;	/* read straight into the caller's copy */
 	uint8_t buf[64];
 	uint32_t vec[2];
 	uint32_t crc = CRC32_INIT;
@@ -67,17 +83,17 @@ fw_err_t fw_image_verify(flash_part_t part, fw_image_hdr_t* hdr_out) {
 		return FW_ERR_ARG;
 	}
 
-	if (hal_flash_read(part, 0, &hdr, sizeof(hdr)) != HAL_FLASH_OK) {
+	if (hal_flash_read(part, 0, hdr, sizeof(*hdr)) != HAL_FLASH_OK) {
 		return FW_ERR_FLASH;
 	}
 
-	err = fw_image_check_hdr(&hdr, info->size);
+	err = fw_image_check_hdr(hdr, info->size);
 	if (err != FW_OK) {
 		return err;
 	}
 
-	for (off = 0; off < hdr.img_size; off += n) {
-		n = hdr.img_size - off;
+	for (off = 0; off < hdr->img_size; off += n) {
+		n = hdr->img_size - off;
 		if (n > sizeof(buf)) {
 			n = sizeof(buf);
 		}
@@ -87,7 +103,7 @@ fw_err_t fw_image_verify(flash_part_t part, fw_image_hdr_t* hdr_out) {
 		crc = crc32_update(crc, buf, n);
 	}
 
-	if (crc != hdr.img_crc32) {
+	if (crc != hdr->img_crc32) {
 		return FW_ERR_IMG_CRC;
 	}
 
@@ -98,10 +114,6 @@ fw_err_t fw_image_verify(flash_part_t part, fw_image_hdr_t* hdr_out) {
 	}
 	if (!hal_vector_ok(vec[0], vec[1])) {
 		return FW_ERR_VECTOR;
-	}
-
-	if (hdr_out) {
-		memcpy(hdr_out, &hdr, sizeof(hdr));
 	}
 
 	return FW_OK;

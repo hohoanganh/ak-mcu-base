@@ -7,6 +7,39 @@ console lúc khởi động).
 Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 [docs/tinh-nang-moi-v1.2-v1.3.md](legacy/docs/tinh-nang-moi-v1.2-v1.3.md).
 
+## Chưa phát hành
+
+Bootloader **1.2.2**. Rà lại toàn bộ mã để gọn và nhẹ hơn; không đổi giao thức, không đổi bản đồ flash.
+
+Số đo (arm-none-eabi-gcc 13.2, `-Os -flto`), trước → sau:
+
+| Bản | Flash | RAM tĩnh (`.bss`) |
+|---|---|---|
+| boot | 8 700 → 8 224 B (−476) | không đổi |
+| app | 21 104 → 21 064 B | 3 320 → 2 936 B (−384) |
+| demo | 56 988 → 56 748 B (−240) | 8 184 → 7 800 B (−384) |
+
+- **Kernel:** bỏ năm trường `if_*` trong `ak_msg_t` (base này không đọc chúng): header message từ 16 còn 8 byte, ba
+  pool message nhỏ đi 384 B. `timer_set()` gọi lại trên timer đang chạy giờ nhận cả duty và loại mới (trước chỉ dời
+  hạn: timer chu kỳ đặt lại thành một lần vẫn lặp mãi). Test `test_timer_rearm_changes_type`.
+- **`xprintf`:** `%05d` của −5 in `-0005` thay vì `000-5`. Test `test_xprintf_numbers`.
+- **Log:** phần đầu `[ms] I TAG: ` in bằng một hàm `ak_log_hdr()` (`common/ak_log.c`, file mới) thay vì một lời gọi
+  `xprintf` bốn tham số ở từng chỗ ghi log.
+- **Ảnh firmware:** `fw_image_verify()` và `fw_update_finish()` đọc thẳng vào header của người gọi, bớt hai bản 256 B
+  trên stack khi COMMIT (đỉnh stack −512 B). So tên board bằng vòng lặp nhỏ thay cho `strncmp` (gcc đổi nó thành
+  `strcmp` của newlib, 440 B, trong bootloader). Vì mã bootloader đổi: **bootloader 1.2.2**.
+- **Nhật ký sự cố:** `crash_log_count()` tìm bản ghi mới nhất một lần rồi đếm, thay vì gọi `crash_log_read(n)` n lần
+  (mỗi lần quét cả 8 ô và tính CRC16). `task_poll_modbus` chỉ cập nhật thanh ghi số sự cố mỗi giây một lần thay vì mỗi
+  vòng lặp kernel.
+- **Demo:** `gfx_fill()` và `gfx_invert()` làm theo byte mỗi cột và trang thay vì từng điểm (`ui_title` đảo 128 × 9 điểm
+  gần như mọi khung); hộp GAME OVER của năm trò dùng chung `ui_game_over()`. Test `test_gfx_rect_ops` so với định
+  nghĩa từng điểm trên 400 hình chữ nhật ngẫu nhiên; 16 cảnh ghi bằng `test_demo record` giống bản cũ từng byte.
+  `test_demo` (ASan) chạy nhanh gấp đôi.
+- **PlatformIO:** thêm `-Wshadow -Wundef -Wdouble-promotion -Werror` như bản build CMake; demo, kit_tools và remote
+  biên dịch sạch với bộ cờ này.
+- Kiểm: `make test` 7/7 trên máy tính; boot, app, demo, kit_tools, remote build sạch với arm-none-eabi-gcc 13.2; bản
+  web dựng lại (`docs/play/`). **Chưa chạy trên kit thật.**
+
 ## ak-mcu-base v1.3.8 — 12/10/2026
 
 App **1.3.8**, bootloader **1.2.1** (không đổi). Bản đầu tiên phát hành từ cấu trúc repo mới (`src/`).

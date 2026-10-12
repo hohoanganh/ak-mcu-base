@@ -114,6 +114,7 @@ File `.img` và `.bin` của mọi bản: [Releases](https://github.com/hohoanga
 | Nhật ký sự cố, giám sát task, đo stack, tạo dự án mới, CI | [docs/tien-ich.md](docs/tien-ich.md) |
 | Modbus RTU trên RS485: slave, master, OTA | [docs/modbus.md](docs/modbus.md) |
 | Port sang chip khác | [docs/porting.md](docs/porting.md) |
+| Hướng phát triển tiếp: rollback, ký số, Modbus TCP, log flash, chip thứ hai | [docs/huong-phat-trien.md](docs/huong-phat-trien.md) · [tối ưu nền](docs/huong-toi-uu-tiep.md) |
 | Biết bản nào sửa lỗi gì | [CHANGELOG.md](CHANGELOG.md) |
 | Cho AI assistant tra tài liệu kernel AK | [docs/ak-mcp-docs-server.md](docs/ak-mcp-docs-server.md) — repo có sẵn [.mcp.json](.mcp.json) |
 
@@ -150,7 +151,7 @@ Trong tài liệu và chú thích mã, đường dẫn kiểu `port/stm32l151`, 
 
 | | Base này (gốc repo) | [`legacy/`](legacy/README.md) — base cũ |
 |---|---|---|
-| Phiên bản | **v1.3.8**, bootloader 1.2.1 | **v1.3.0**, bootloader 0.0.3 |
+| Phiên bản | **v1.3.8**, bootloader 1.2.2 | **v1.3.0**, bootloader 0.0.3 |
 | Dùng khi | Dự án mới: OTA an toàn khi mất điện, có unit test, dễ chuyển sang chip khác | Dự án đang chạy trên nó; cần driver có sẵn (EEPROM ngoài, nRF24, lớp Arduino…) |
 | Mức hoàn thiện | Kernel, bootloader, OTA, Modbus RTU, nhật ký sự cố, demo trên kit; driver khác tự viết thêm | Đầy đủ, đã dùng cho sản phẩm |
 | Build | PlatformIO hoặc CMake | PlatformIO (`cd legacy`) |

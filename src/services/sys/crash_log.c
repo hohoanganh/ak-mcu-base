@@ -85,9 +85,16 @@ uint8_t crash_log_read(uint8_t n, crash_rec_t* out) {
 
 uint8_t crash_log_count(void) {
 	crash_rec_t r;
+	uint8_t seq;
+	uint8_t slot;
 	uint8_t n = 0;
 
-	while (n < CRASH_LOG_SLOTS && crash_log_read(n, &r)) {
+	/* same walk as crash_log_read(n) for n = 0, 1, ... but the newest slot is
+	 * located once, not once per record (8x fewer CRCs with a full log) */
+	slot = newest_slot(&seq);
+	while (slot != NO_SLOT && n < CRASH_LOG_SLOTS &&
+		   slot_read((uint8_t)((slot + CRASH_LOG_SLOTS - n) % CRASH_LOG_SLOTS), &r) &&
+		   r.seq == (uint8_t)(seq - n)) {
 		n++;
 	}
 	return n;

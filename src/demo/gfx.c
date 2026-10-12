@@ -57,12 +57,42 @@ uint8_t gfx_get(int x, int y) {
 	return (fb[y >> 3][x] >> (y & 7)) & 1U;
 }
 
-void gfx_fill(int x, int y, int w, int h, uint8_t on) {
-	for (int j = y; j < y + h; j++) {
-		for (int i = x; i < x + w; i++) {
-			gfx_pixel(i, j, on);
+/* Rectangle [x, x+w) x [y, y+h) clipped to the screen, one byte operation
+ * per column and page instead of one per pixel: op 0 clears, 1 sets, 2
+ * inverts. ui_title() inverts 128 x 9 on nearly every frame. */
+static void gfx_rect_op(int x, int y, int w, int h, uint8_t op) {
+	int x1 = x + w;
+	int y1 = y + h;
+
+	if (x < 0) x = 0;
+	if (y < 0) y = 0;
+	if (x1 > GFX_W) x1 = GFX_W;
+	if (y1 > GFX_H) y1 = GFX_H;
+	if (x >= x1 || y >= y1) {
+		return;
+	}
+	for (int p = y >> 3; p <= (y1 - 1) >> 3; p++) {
+		int top = y - p * 8;				/* rows of this page inside the rectangle */
+		int bot = y1 - p * 8;
+		uint8_t mask = 0xFF;
+		uint8_t* row = fb[p];
+
+		if (top > 0) mask &= (uint8_t)(0xFF << top);
+		if (bot < 8) mask &= (uint8_t)(0xFF >> (8 - bot));
+		if (op == 0) {
+			for (int i = x; i < x1; i++) row[i] &= (uint8_t)~mask;
+		}
+		else if (op == 1) {
+			for (int i = x; i < x1; i++) row[i] |= mask;
+		}
+		else {
+			for (int i = x; i < x1; i++) row[i] ^= mask;
 		}
 	}
+}
+
+void gfx_fill(int x, int y, int w, int h, uint8_t on) {
+	gfx_rect_op(x, y, w, h, on ? 1 : 0);
 }
 
 void gfx_hline(int x, int y, int w, uint8_t on) {
@@ -81,11 +111,7 @@ void gfx_rect(int x, int y, int w, int h, uint8_t on) {
 }
 
 void gfx_invert(int x, int y, int w, int h) {
-	for (int j = y; j < y + h; j++) {
-		for (int i = x; i < x + w; i++) {
-			gfx_pixel(i, j, !gfx_get(i, j));
-		}
-	}
+	gfx_rect_op(x, y, w, h, 2);
 }
 
 void gfx_line(int x0, int y0, int x1, int y1, uint8_t on) {

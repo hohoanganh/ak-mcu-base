@@ -110,15 +110,16 @@ fw_err_t fw_update_write(uint32_t offset, const uint8_t* data, uint32_t len) {
 }
 
 fw_err_t fw_update_finish(fw_image_hdr_t* hdr_out) {
-	fw_image_hdr_t hdr;
+	fw_image_hdr_t local;
+	fw_image_hdr_t* hdr = hdr_out ? hdr_out : &local;	/* one header on the stack, not three */
 	fw_err_t err;
 
 	if (state != FW_UPDATE_RECEIVING || written != total) {
 		return FW_ERR_STATE;
 	}
 
-	err = fw_image_verify(FLASH_PART_STAGING, &hdr);
-	if (err == FW_OK && FW_IMAGE_HDR_SIZE + hdr.img_size != total) {
+	err = fw_image_verify(FLASH_PART_STAGING, hdr);
+	if (err == FW_OK && FW_IMAGE_HDR_SIZE + hdr->img_size != total) {
 		err = FW_ERR_SIZE;
 	}
 
@@ -128,8 +129,5 @@ fw_err_t fw_update_finish(fw_image_hdr_t* hdr_out) {
 	}
 
 	state = FW_UPDATE_READY;
-	if (hdr_out) {
-		memcpy(hdr_out, &hdr, sizeof(hdr));
-	}
 	return FW_OK;
 }

@@ -85,7 +85,14 @@ void xprintf(const char *fmt, ...) {
 						num /= base;
 						if (num == 0) break;
 					}
-					if (minus) num_stack[digit++] = 0x7F;
+					if (minus && zero_padding) {
+						/* sign goes before the zeros: %05d of -5 is -0005 */
+						xputc('-');
+						if (format_lenght) format_lenght--;
+					}
+					else if (minus) {
+						num_stack[digit++] = 0x7F;
+					}
 					if (format_lenght > digit) {
 						int8_t paddingint8_t = ' ';
 						format_lenght -= digit;

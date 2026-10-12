@@ -338,11 +338,7 @@ static void invaders_frame(uint32_t now_ms) {
 		gfx_text_center(46, "B3 fire", 1);
 	}
 	else if (state == 2) {
-		gfx_fill(20, 22, 88, 26, 0);
-		gfx_rect(20, 22, 88, 26, 1);
-		gfx_text_center(25, "GAME OVER", 1);
-		gfx_text(26, 36, "best", 1);
-		gfx_text(56, 36, gfx_utoa(buf, best, 1), 1);
+		ui_game_over(22, best);
 	}
 }
 

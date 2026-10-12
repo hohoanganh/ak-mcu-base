@@ -238,6 +238,63 @@ static int count_sig(uint8_t sig) {
 	return n;
 }
 
+/* timer_set() on a running timer takes the new duty and type, not only the
+ * new expiry: periodic -> one-shot stops repeating, one-shot -> periodic
+ * starts repeating. */
+static void test_timer_rearm_changes_type(void) {
+	setup();
+	timer_set(TASK_MID_ID, SIG_B, 10, TIMER_PERIODIC);
+	for (int i = 0; i < 25; i++) {
+		timer_tick(1);
+		run_all();
+	}
+	CHECK_EQ(log_n, 2);
+	timer_set(TASK_MID_ID, SIG_B, 10, TIMER_ONE_SHOT);
+	CHECK_EQ(get_timer_msg_pool_used(), 1);
+	for (int i = 0; i < 35; i++) {
+		timer_tick(1);
+		run_all();
+	}
+	CHECK_EQ(log_n, 3);
+	CHECK_EQ(get_timer_msg_pool_used(), 0);
+
+	timer_set(TASK_MID_ID, SIG_B, 100, TIMER_ONE_SHOT);
+	timer_set(TASK_MID_ID, SIG_B, 10, TIMER_PERIODIC);
+	for (int i = 0; i < 35; i++) {
+		timer_tick(1);
+		run_all();
+	}
+	CHECK_EQ(log_n, 6);
+	timer_remove_attr(TASK_MID_ID, SIG_B);
+}
+
+/* xprintf: sign before the zero padding, width counts the sign. */
+static char xp_buf[64];
+static int xp_n;
+static void xp_out(uint8_t c) {
+	if (xp_n < (int)sizeof(xp_buf) - 1) {
+		xp_buf[xp_n++] = (char)c;
+	}
+}
+static const char* xp(const char* fmt, int32_t v) {
+	void (*saved)(uint8_t) = xfunc_out;
+	xfunc_out = xp_out;
+	xp_n = 0;
+	xprintf(fmt, v);
+	xp_buf[xp_n] = 0;
+	xfunc_out = saved;
+	return xp_buf;
+}
+static void test_xprintf_numbers(void) {
+	CHECK(strcmp(xp("%05d", -5), "-0005") == 0);
+	CHECK(strcmp(xp("%5d", -5), "   -5") == 0);
+	CHECK(strcmp(xp("%03d", 7), "007") == 0);
+	CHECK(strcmp(xp("%d", -42), "-42") == 0);
+	CHECK(strcmp(xp("%02d", -123), "-123") == 0);
+	CHECK(strcmp(xp("%08X", 0xBEEF), "0000BEEF") == 0);
+	CHECK(strcmp(xp("%u", -1), "4294967295") == 0);
+}
+
 /* A late tick (handler hogged the CPU) must not shift the following periods. */
 static void test_timer_periodic_no_drift(void) {
 	setup();
@@ -438,6 +495,8 @@ TT_MAIN_BEGIN("test_kernel")
 	RUN_TEST(test_timer_periodic_and_remove);
 	RUN_TEST(test_timer_reset_existing);
 	RUN_TEST(test_timer_periodic_no_drift);
+	RUN_TEST(test_timer_rearm_changes_type);
+	RUN_TEST(test_xprintf_numbers);
 	RUN_TEST(test_timer_set_after_blocking);
 	RUN_TEST(test_timer_tick_only_when_due);
 	RUN_TEST(test_src_task_id_idle_and_isr);

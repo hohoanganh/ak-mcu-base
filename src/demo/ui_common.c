@@ -140,6 +140,18 @@ void ui_title(const char* left, const char* right) {
 	gfx_invert(0, 0, GFX_W, 9);
 }
 
+/* "GAME OVER" box with the best score, top edge at y (the games put it where
+ * their playfield leaves room). */
+void ui_game_over(int y, uint32_t best) {
+	char buf[12];
+
+	gfx_fill(20, y, 88, 26, 0);
+	gfx_rect(20, y, 88, 26, 1);
+	gfx_text_center(y + 3, "GAME OVER", 1);
+	gfx_text(26, y + 14, "best", 1);
+	gfx_text(56, y + 14, gfx_utoa(buf, best, 1), 1);
+}
+
 /* Bottom line: what the three buttons do, each above its button. */
 void ui_footer(const char* b1, const char* b2, const char* b3) {
 	gfx_hline(0, 54, GFX_W, 1);
