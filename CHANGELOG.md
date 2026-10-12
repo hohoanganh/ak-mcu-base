@@ -7,7 +7,9 @@ console lúc khởi động).
 Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 [docs/tinh-nang-moi-v1.2-v1.3.md](legacy/docs/tinh-nang-moi-v1.2-v1.3.md).
 
-## ak-mcu-base — sau v1.3.7, chưa phát hành
+## ak-mcu-base v1.3.8 — 12/10/2026
+
+App **1.3.8**, bootloader **1.2.1** (không đổi). Bản đầu tiên phát hành từ cấu trúc repo mới (`src/`).
 
 - **Lập trình kéo thả** (`docs/play/blocks.html`): kéo các khối (đèn, còi, nút, màn hình, cảm biến, biến, vòng lặp),
   bấm Chạy, chương trình chạy ngay trên kit trong trang hoặc gửi sang kit thật qua USB (Web Serial). Trang dịch khối

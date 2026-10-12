@@ -150,7 +150,7 @@ Trong tài liệu và chú thích mã, đường dẫn kiểu `port/stm32l151`, 
 
 | | Base này (gốc repo) | [`legacy/`](legacy/README.md) — base cũ |
 |---|---|---|
-| Phiên bản | **v1.3.7**, bootloader 1.2.1 | **v1.3.0**, bootloader 0.0.3 |
+| Phiên bản | **v1.3.8**, bootloader 1.2.1 | **v1.3.0**, bootloader 0.0.3 |
 | Dùng khi | Dự án mới: OTA an toàn khi mất điện, có unit test, dễ chuyển sang chip khác | Dự án đang chạy trên nó; cần driver có sẵn (EEPROM ngoài, nRF24, lớp Arduino…) |
 | Mức hoàn thiện | Kernel, bootloader, OTA, Modbus RTU, nhật ký sự cố, demo trên kit; driver khác tự viết thêm | Đầy đủ, đã dùng cho sản phẩm |
 | Build | PlatformIO hoặc CMake | PlatformIO (`cd legacy`) |

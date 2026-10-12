@@ -79,7 +79,7 @@ The connectors, pin by pin, from the schematic (*chân* = pin, *cầu hàn* = so
 
 - The repository is the base, **ak-mcu-base**: firmware sources in `src/`, tests in `tests/`, tools in `tools/` — start new projects here ([overview](docs/ak-mcu-base.md),
   Vietnamese). Portable (the code above the HAL never includes a chip header), unit-tested, builds with PlatformIO or
-  CMake. Current version: v1.3.7.
+  CMake. Current version: v1.3.8.
 - [`legacy/`](legacy/README.md) — the older base (v1.3.0), kept for projects already running on it. Until 7 October 2026
   it sat at the root and this base in `ak-mcu-base/`; older tags still have that layout. The repository was called `ak-base-kit-pio` until then.
 
