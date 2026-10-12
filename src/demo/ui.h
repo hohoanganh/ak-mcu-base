@@ -103,6 +103,7 @@ extern int ui_sin(uint8_t a);
 extern int ui_cos(uint8_t a);
 extern void ui_footer(const char* b1, const char* b2, const char* b3);
 extern void ui_title(const char* left, const char* right);
+extern void ui_game_over(int y, uint32_t best);
 
 /* RS485 for a screen that talks to another kit (Pong). Open takes the port
  * away from Modbus until close. getc: one received byte or -1; write blocks

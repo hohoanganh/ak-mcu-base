@@ -244,11 +244,7 @@ static void breakout_frame(uint32_t now_ms) {
 		gfx_text_center(38, "B3 serve", 1);
 	}
 	else if (state == 2) {
-		gfx_fill(20, 28, 88, 26, 0);
-		gfx_rect(20, 28, 88, 26, 1);
-		gfx_text_center(31, "GAME OVER", 1);
-		gfx_text(26, 42, "best", 1);
-		gfx_text(56, 42, gfx_utoa(buf, best, 1), 1);
+		ui_game_over(28, best);
 	}
 }
 

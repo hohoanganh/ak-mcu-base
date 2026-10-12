@@ -234,7 +234,9 @@ uint8_t timer_set(task_id_t des_task_id, timer_sig_t sig, uint32_t duty, timer_t
 		if (timer_msg->des_task_id == des_task_id &&
 				timer_msg->sig == sig) {
 
+			/* re-arm: new duty and type replace the old ones */
 			timer_msg->expire = ak_timer_payload_irq.now + duty;
+			timer_msg->period = (type == TIMER_PERIODIC) ? duty : 0;
 			timer_update_next_expire();
 
 			EXIT_CRITICAL();

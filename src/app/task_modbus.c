@@ -92,8 +92,14 @@ void app_modbus_init(void) {
 }
 
 void task_poll_modbus(void) {
-	info_regs[2] = (uint16_t)(hal_millis() / 1000U);
-	info_regs[3] = crash_log_count();
+	uint16_t uptime = (uint16_t)(hal_millis() / 1000U);
+
+	/* once a second: the crash log count scans the whole NVM ring (8 CRCs),
+	 * far too much for a poll that runs every pass of the kernel loop */
+	if (uptime != info_regs[2]) {
+		info_regs[2] = uptime;
+		info_regs[3] = crash_log_count();
+	}
 	mb_slave_poll();
 }
 

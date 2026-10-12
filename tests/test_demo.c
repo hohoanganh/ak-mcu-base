@@ -817,6 +817,49 @@ static void test_gfx_shapes(void) {
 	gfx_tri(-40, -40, 300, 20, 60, 200, 16);	/* far outside the screen: clipped, no crash */
 }
 
+/* gfx_fill() and gfx_invert() work a byte per column and page; they must
+ * match the pixel-by-pixel definition for every rectangle, including ones
+ * that hang off the screen or are empty. */
+static void test_gfx_rect_ops(void) {
+	uint8_t ref[KIT_LCD_PAGES][GFX_W];
+	int wrong = 0;
+
+	gfx_clear();
+	memset(ref, 0, sizeof(ref));
+	for (int n = 0; n < 400; n++) {
+		int x = (int)(ui_rand() % 160) - 16;
+		int y = (int)(ui_rand() % 90) - 13;
+		int w = (int)(ui_rand() % 70) - 2;
+		int h = (int)(ui_rand() % 40) - 2;
+		int op = (int)(ui_rand() % 3);
+
+		for (int j = y; j < y + h; j++) {
+			for (int i = x; i < x + w; i++) {
+				if (i < 0 || i >= GFX_W || j < 0 || j >= GFX_H) {
+					continue;
+				}
+				uint8_t bit = (uint8_t)(1U << (j & 7));
+				if (op == 0) ref[j >> 3][i] &= (uint8_t)~bit;
+				else if (op == 1) ref[j >> 3][i] |= bit;
+				else ref[j >> 3][i] ^= bit;
+			}
+		}
+		if (op == 2) gfx_invert(x, y, w, h);
+		else gfx_fill(x, y, w, h, (uint8_t)op);
+		if (memcmp(gfx_fb(), ref, sizeof(ref)) != 0) {
+			wrong++;
+		}
+	}
+	CHECK_EQ(wrong, 0);
+	gfx_clear();
+	gfx_fill(0, 0, GFX_W, GFX_H, 1);
+	gfx_flush(0);
+	CHECK_EQ(lit_pixels(), GFX_W * GFX_H);
+	gfx_invert(1, 1, GFX_W - 2, GFX_H - 2);
+	gfx_flush(0);
+	CHECK_EQ(lit_pixels(), 2 * GFX_W + 2 * (GFX_H - 2));
+}
+
 static void test_cube(void) {
 	int a, b;
 
@@ -2111,6 +2154,7 @@ int main(int argc, char** argv) {
 	RUN_TEST(test_flappy);
 	RUN_TEST(test_system);
 	RUN_TEST(test_gfx_shapes);
+	RUN_TEST(test_gfx_rect_ops);
 	RUN_TEST(test_cube);
 	RUN_TEST(test_dino);
 	RUN_TEST(test_music);

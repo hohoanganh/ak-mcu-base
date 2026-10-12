@@ -344,11 +344,7 @@ static void dino_frame(uint32_t now_ms) {
 		gfx_text_center(20, "B1 jump  B2 duck", 1);
 	}
 	else if (state == 2) {
-		gfx_fill(20, 16, 88, 26, 0);
-		gfx_rect(20, 16, 88, 26, 1);
-		gfx_text_center(19, "GAME OVER", 1);
-		gfx_text(26, 30, "best", 1);
-		gfx_text(56, 30, gfx_utoa(buf, best, 1), 1);
+		ui_game_over(16, best);
 	}
 }
 

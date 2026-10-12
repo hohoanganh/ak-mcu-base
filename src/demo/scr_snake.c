@@ -195,11 +195,7 @@ static void snake_frame(uint32_t now_ms) {
 	gfx_fill(FIELD_X + food.x * CELL, FIELD_Y + food.y * CELL + 1, 3, 1, 1);
 
 	if (dead) {
-		gfx_fill(20, 18, 88, 26, 0);
-		gfx_rect(20, 18, 88, 26, 1);
-		gfx_text_center(21, "GAME OVER", 1);
-		gfx_text(26, 32, "best", 1);
-		gfx_text(56, 32, gfx_utoa(buf, best, 1), 1);
+		ui_game_over(18, best);
 		ui_footer("NEW GAME", 0, "hold:MENU");
 	}
 	else if (paused) {

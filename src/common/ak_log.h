@@ -24,8 +24,12 @@
 #define AK_LOG_LEVEL			AK_LOG_LEVEL_INFO
 #endif
 
+/* "[    1234] I FW: " in one function instead of an xprintf call with four
+ * arguments at every LOG_x site (about 35 of them: 300 B of flash). */
+extern void ak_log_hdr(char lvl, const char* tag);
+
 #define AK_LOG_RAW(lvl, tag, ...) do { \
-	xprintf("[%8u] %c %s: ", ak_port_millis(), (lvl), (tag)); \
+	ak_log_hdr((lvl), (tag)); \
 	xprintf(__VA_ARGS__); \
 } while (0)
 

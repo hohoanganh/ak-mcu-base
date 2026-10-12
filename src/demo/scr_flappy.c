@@ -170,11 +170,7 @@ static void flappy_frame(uint32_t now_ms) {
 		gfx_text_center(48, "B1 / B2: FLAP", 1);
 	}
 	else if (state == 2) {
-		gfx_fill(20, 20, 88, 26, 0);
-		gfx_rect(20, 20, 88, 26, 1);
-		gfx_text_center(23, "GAME OVER", 1);
-		gfx_text(26, 34, "best", 1);
-		gfx_text(56, 34, gfx_utoa(buf, best, 1), 1);
+		ui_game_over(20, best);
 	}
 }
 

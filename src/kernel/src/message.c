@@ -421,15 +421,6 @@ uint32_t get_data_len_dynamic_msg(ak_msg_t* msg) {
  * debug message function define.
  *****************************************************************************/
 void msg_dbg_dum(ak_msg_t* msg) {
-	AK_PRINTF("stid:%d dtid:%d rfc:%02X sig:%d Istid:%d Idtid:%d Ist:%d Idt:%d Isig:%d\n",	\
-			msg->src_task_id,	\
-			msg->des_task_id,	\
-			msg->ref_count,		\
-			msg->sig,			\
-			msg->if_src_task_id,\
-			msg->if_des_task_id,\
-			msg->if_src_type,	\
-			msg->if_des_type,	\
-			msg->if_sig			\
-			);
+	AK_PRINTF("stid:%d dtid:%d rfc:%02X sig:%d\n",
+			msg->src_task_id, msg->des_task_id, msg->ref_count, msg->sig);
 }
