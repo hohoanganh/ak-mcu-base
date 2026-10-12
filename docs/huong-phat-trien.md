@@ -15,7 +15,7 @@ Cỡ việc: S = vài giờ, M = một hai ngày, L = nhiều ngày.
 
 | # | Hướng | Cỡ | Mở ra ứng dụng gì |
 |---|---|---|---|
-| 1 | **Port chip thứ hai** (STM32G0 hoặc STM32C0) | M – L | Chứng minh lớp HAL đủ tổng quát; dùng base cho sản phẩm giá rẻ |
+| 1 | ~~**Port chip thứ hai**~~ (đã làm: STM32G071, chạy trong Renode) | M – L | Chứng minh lớp HAL đủ tổng quát; dùng base cho sản phẩm giá rẻ |
 | 2 | ~~**Modbus TCP qua W5500**~~ (đã làm) | M | Gateway RTU ↔ TCP, thiết bị Ethernet công nghiệp |
 | 3 | ~~**Xác nhận ảnh và quay lui**~~ (đã làm) | M | OTA hiện trường không cần kỹ thuật viên; điều kiện cần để nói "cập nhật an toàn" |
 | 4 | ~~**Ghi log vào flash SPI**~~ (đã làm bước 1: vòng tròn) | S – M | Data logger, trạm thời tiết lưu 24 giờ, hộp đen sự cố |
@@ -141,7 +141,9 @@ mô-đun thật. Phần dưới là ghi chú thiết kế.
   [Espressif: file system considerations](https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32/api-guides/file-system-considerations.html) ·
   [cnx-software: littlefs](https://www.cnx-software.com/2018/01/02/littlefs-is-an-open-source-low-footprint-resilient-file-system-designed-for-tiny-devices/).
 
-### 3.5 Port chip thứ hai
+### 3.5 Port chip thứ hai — **đã làm** (12/10/2026, `port/stm32g071`, chạy trong Renode)
+
+Xem [porting.md](porting.md). Phần dưới là ghi chú thiết kế.
 
 | Chip | Vì sao | Lưu ý |
 |---|---|---|
@@ -190,7 +192,7 @@ bắt đầu đúng từ bộ phân tích header OTA.
 Nguồn: [Beningo: fuzzing for embedded](https://www.beningo.com/embedded-technology-atlas/2026/pages/024-fuzzing-for-embedded.html) ·
 [ví dụ harness libFuzzer (usbredir)](https://gitlab.freedesktop.org/spice/usbredir/-/merge_requests/6).
 
-### 4.2 Chạy ảnh thật trong Renode (M, chỉ sau khi có port G0)
+### 4.2 Chạy ảnh thật trong Renode — **đã làm** (`tests/renode/`, job CI `stm32g071-renode`)
 
 Renode chạy đúng file `.elf` của chip trong CI (GitHub Actions + Robot Framework), bắt được lỗi khởi động và linker
 mà test host không thấy. **Không có platform STM32L1** trong Renode; có `stm32f103.repl`, `stm32g0.repl`, `stm32f4.repl`.

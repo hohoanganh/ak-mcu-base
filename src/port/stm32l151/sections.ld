@@ -64,6 +64,9 @@ _sidata = LOADADDR(.data);
 	_edata = .;
 } > RAM AT > FLASH
 
+/* "AT > RAM" on the NOLOAD sections: without it the linker carries the
+ * flash load region of .data on, and an ELF loader that honours load
+ * addresses (Renode) would pour zeros over the flash after .data. */
 .bss (NOLOAD) : {
 	. = ALIGN(4);
 	_sbss = .;
@@ -72,7 +75,7 @@ _sidata = LOADADDR(.data);
 	*(COMMON)
 	. = ALIGN(4);
 	_ebss = .;
-} > RAM
+} > RAM AT > RAM
 
 /* Heap = remaining RAM minus minimum stack. RAM overflow -> link error. */
 ._heap (NOLOAD) : {
@@ -80,4 +83,4 @@ _sidata = LOADADDR(.data);
 	_heap_start = .;
 	. = ORIGIN(RAM) + LENGTH(RAM) - _min_stack;
 	_heap_end = .;
-} > RAM
+} > RAM AT > RAM

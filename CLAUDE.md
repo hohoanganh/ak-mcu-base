@@ -30,10 +30,10 @@ src/            mã nguồn firmware
   boot/         bootloader, không phụ thuộc chip
   app/          app mẫu: task_system, task_console, task_fw, task_modbus  ← dự án viết task ở đây
   demo/         demo trên AK Base Kit: task_ui, scr_*.c, gfx, music, video
-  port/         stm32l151 (chip) · host (máy tính, ak_sim) · web (WebAssembly)
-tests/          test_kernel, test_fw, test_modbus, test_demo (C) · test_ak_fw.py, test_sim_ota.py
+  port/         stm32l151 (chip) · stm32g071 (chip thứ hai, chạy trong Renode) · host (máy tính, ak_sim) · web (WebAssembly)
+tests/          test_kernel, test_fw, test_modbus, test_demo (C) · test_ak_fw.py, test_sim_ota.py · renode/ (STM32G071)
 tools/          ak_fw.py, ak_mb.py, mkimage.py, new_project.py, ak_screen.py, tool sinh sơ đồ
-third_party/    nanomodbus, p256-m (ECDSA), stm32l1 (SPL + CMSIS). Mã của bên khác: không sửa
+third_party/    nanomodbus, p256-m (ECDSA), stm32l1 (SPL + CMSIS), stm32g0 (CMSIS). Mã của bên khác: không sửa
 docs/           tài liệu, và trang web GitHub Pages (index.html, play/, kit/)
 legacy/         base cũ
 ```
@@ -51,7 +51,8 @@ make sim                       # bộ giả lập: bootloader + app, gõ help
 pio run -e boot -e app -e app_mbmaster -e app_gateway -e demo   # .pio/build/<env>/app.img, boot: firmware.bin
 pio run -e kit_tools                               # demo + lệnh spi (bắt SPI trên J6) và rf (nRF24)
 pio run -e remote                                  # kit 2.1 (64K): tay điều khiển thử nghiệm, OLED + 3 nút + nRF24 (src/remote)
-make stm32 stm32-internal stm32-sign               # cùng mã, build bằng CMake (CI dùng cách này); -sign: ảnh ký số
+make stm32 stm32-internal stm32-sign stm32-gateway # cùng mã, build bằng CMake (CI dùng cách này); -sign: ảnh ký số
+make stm32g0 renode                                # port STM32G071, rồi chạy trong Renode (tests/renode)
 
 # bản chạy trên trình duyệt, ghi vào docs/play/ (cần Emscripten)
 python src/port/web/build.py
@@ -60,6 +61,7 @@ python src/port/web/build.py
 - **Thay đổi chưa qua `make test` thì chưa xong.** Sửa `src/demo` phải chạy `test_demo` và dựng lại bản web rồi commit
   `docs/play/`. Sửa `tools/ak_fw.py` có `tests/test_ak_fw.py`.
 - Môi trường không có toolchain thì **nói rõ là chưa build, chưa test được**; không báo "đã build".
+- Linker script: section NOLOAD (`.bss`, `._heap`) phải có `AT > RAM`, không thì Renode nạp số 0 đè lên flash.
 - gcc 9 với ASan trong WSL treo vô hạn nếu không chạy qua `setarch x86_64 -R`.
 - PlatformIO và CMake build cùng một danh sách file: thêm file nguồn thì sửa **cả** `platformio.ini` **và**
   `CMakeLists.txt` / `src/port/*/port.cmake`. File trong `src/app`, `src/demo` tự vào build của PlatformIO, nhưng CMake

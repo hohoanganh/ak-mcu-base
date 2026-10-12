@@ -13,7 +13,7 @@
 # ==============================================================================
 cmake_minimum_required(VERSION 3.16)
 
-set(AK_PORT "host" CACHE STRING "Target port: host | stm32l151")
+set(AK_PORT "host" CACHE STRING "Target port: host | stm32l151 | stm32g071")
 
 project(ak_mcu_base C ASM)
 
@@ -136,6 +136,8 @@ if(AK_PORT STREQUAL "host")
 	include(${SRC}/port/host/port.cmake)
 elseif(AK_PORT STREQUAL "stm32l151")
 	include(${SRC}/port/stm32l151/port.cmake)
+elseif(AK_PORT STREQUAL "stm32g071")
+	include(${SRC}/port/stm32g071/port.cmake)
 else()
 	message(FATAL_ERROR "Unknown AK_PORT: ${AK_PORT}")
 endif()

@@ -67,3 +67,34 @@ jobs:
             build/stm32l151/boot.bin
             build/stm32l151/app.img
             build/stm32l151/*.elf
+
+  # second port: STM32G071 built with the same toolchain, then the real .elf
+  # files run in the Renode emulator (bootloader -> app -> shell)
+  stm32g071-renode:
+    runs-on: ubuntu-24.04
+    env:
+      RENODE_VERSION: 1.15.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi
+      - name: Build
+        run: |
+          make stm32g0
+          ls -l build/stm32g071/boot.bin build/stm32g071/app.img
+      - name: Renode
+        run: |
+          wget -q https://github.com/renode/renode/releases/download/v${RENODE_VERSION}/renode-${RENODE_VERSION}.linux-portable.tar.gz
+          mkdir renode && tar xzf renode-${RENODE_VERSION}.linux-portable.tar.gz -C renode --strip-components=1
+          pip install robotframework==6.1 psutil pyyaml
+      - name: Run in the emulator
+        run: renode/renode-test --results-dir build/renode tests/renode/stm32g071.robot
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ak-mcu-base-stm32g071
+          path: |
+            build/stm32g071/boot.bin
+            build/stm32g071/app.img
+            build/stm32g071/*.elf
+            build/renode/*.html

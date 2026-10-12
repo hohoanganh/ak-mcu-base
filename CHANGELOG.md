@@ -30,6 +30,19 @@ Rà lại toàn bộ mã để gọn và nhẹ hơn.
   theo lệnh, reset 3 lần không xác nhận → quay lui). Bootloader 8,2 → 9,7 KB (ngân sách CI 10 KB). **Chưa chạy trên
   kit thật.**
 
+### Port thứ hai: STM32G071RB, chạy trong Renode
+
+- `port/stm32g071` (NUCLEO-G071RB, Cortex-M0+ 16 MHz): viết thẳng trên thanh ghi với header CMSIS
+  (`third_party/stm32g0`, Apache-2.0), không HAL/LL. Flash trang 2K ghi double word; NVM giả lập bằng hai trang
+  flash cuối luân phiên có số thứ tự; BOOT 12K, APP 56K, STAGING 56K trong flash trong; console USART2 (COM ảo của
+  Nucleo), LED PA5; stub HardFault thuần Thumb-1. Không sửa dòng nào phía trên HAL. `make stm32g0`
+  (`-DAK_PORT=stm32g071 -DAK_MODBUS=none`): boot 8,0 KB, app 13,9 KB.
+- **Renode:** `tests/renode/stm32g071.resc` và `.robot` (3 ca: boot kiểm ảnh và khởi động app, shell trả lời,
+  không có app thì vào loader), `make renode`, job CI `stm32g071-renode` tải Renode 1.15.3 portable. Hai việc phải
+  làm cho Renode: vùng nhớ 12K tại địa chỉ 0 chép `boot.bin` (reset lấy SP/PC ở 0), và linker script ghi `AT > RAM`
+  cho `.bss`/`._heap` (sửa cả hai port, `.bin`/`.img` không đổi). Ghi flash trong Renode chưa chạy (mô hình F4).
+- Chi tiết: `docs/porting.md`. **Chưa có board thật**, chưa có RS485 trên port này.
+
 ### Gateway Modbus TCP ↔ RTU qua W5500 (`AK_MODBUS=gateway`)
 
 - HAL mới `hal/hal_tcp.h` (một socket server, đọc không chặn); driver `port/stm32l151/w5500.c` cho mô-đun W5500 trên

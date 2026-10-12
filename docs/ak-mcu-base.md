@@ -250,6 +250,13 @@ log queue debug của bản gốc.
 Khi thử trên board, nên kiểm theo thứ tự: log boot qua UART → `info` → OTA một ảnh →
 rút điện giữa lúc boot đang cài (log `installing...`) → cắm lại phải cài tiếp và chạy.
 
+## Port thứ hai: STM32G071 trong Renode
+
+`port/stm32g071` (NUCLEO-G071RB, Cortex-M0+, viết thẳng trên thanh ghi) dùng chung toàn bộ mã phía trên HAL, build
+bằng `make stm32g0` và chạy trong trình giả lập Renode (`make renode`, CI job `stm32g071-renode`): bootloader kiểm
+ảnh, khởi động app qua reset, app lên shell. Chi tiết và những điều cần biết khi đưa vào Renode: [porting.md](porting.md).
+Chưa có board thật.
+
 ## Giới hạn & bước tiếp theo
 
 - **Tốc độ ghi flash STM32L1:** đã chuyển sang half-page. Về lý thuyết nhanh khoảng 32 lần so với
@@ -257,5 +264,5 @@ rút điện giữa lúc boot đang cài (log `installing...`) → cắm lại p
   `ak_fw.py flash` in ra và khoảng giữa log `installing...` với `install ok`.
 - Quay lui: chưa thử trên board thật (mới qua unit test cắt điện ở từng thao tác flash và giả lập đầu-cuối).
 - Ký số ảnh: chưa thử trên board, chưa đo thời gian verify; chưa có chống hạ cấp phiên bản.
-- Port thứ hai (STM32 dòng mới với HAL/LL, hoặc ESP32/GD32) để kiểm lớp HAL.
+- Port STM32G071: chưa chạy trên board thật, chưa có RS485, chưa ghi flash được trong Renode.
 - Kênh OTA qua Modbus RS485: chỉ cần gọi `fw_update_*()` rồi post `FW_SIG_INSTALL` tới `task_fw`.
