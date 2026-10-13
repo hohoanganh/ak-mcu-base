@@ -24,16 +24,16 @@ khi việc được giao là về base chính, và không lấy mã từ `legacy
 ```
 src/            mã nguồn firmware
   kernel/       task, message, timer, fsm, tsm. Sửa ở đây phải có test trước
-  hal/          giao diện phần cứng mà mọi port phải có (hal.h, hal_flash.h, hal_rs485.h)
+  hal/          giao diện phần cứng mà mọi port phải có (hal.h, hal_flash.h, hal_rs485.h, hal_tcp.h)
   common/       xprintf, CRC, log
-  services/     fw (ảnh, OTA, boot_ctrl) · sys (nhật ký sự cố) · modbus (nanoMODBUS)
+  services/     fw (ảnh, OTA, boot_ctrl) · sys (nhật ký sự cố, flog) · modbus (nanoMODBUS: slave, master, gateway TCP)
   boot/         bootloader, không phụ thuộc chip
   app/          app mẫu: task_system, task_console, task_fw, task_modbus  ← dự án viết task ở đây
   demo/         demo trên AK Base Kit: task_ui, scr_*.c, gfx, music, video
-  port/         stm32l151 (chip) · host (máy tính, ak_sim) · web (WebAssembly)
-tests/          test_kernel, test_fw, test_modbus, test_demo (C) · test_ak_fw.py, test_sim_ota.py
+  port/         stm32l151 (chip) · stm32g071 (chip thứ hai, chạy trong Renode) · host (máy tính, ak_sim) · web (WebAssembly)
+tests/          test_kernel, test_fw, test_modbus, test_demo (C) · test_ak_fw.py, test_sim_ota.py · renode/ (STM32G071)
 tools/          ak_fw.py, ak_mb.py, mkimage.py, new_project.py, ak_screen.py, tool sinh sơ đồ
-third_party/    nanomodbus, stm32l1 (SPL + CMSIS). Mã của bên khác: không sửa
+third_party/    nanomodbus, p256-m (ECDSA), stm32l1 (SPL + CMSIS), stm32g0 (CMSIS). Mã của bên khác: không sửa
 docs/           tài liệu, và trang web GitHub Pages (index.html, play/, kit/)
 legacy/         base cũ
 ```
@@ -48,10 +48,11 @@ make test                      # hoặc: cmake -S . -B build/host && cmake --bui
 make sim                       # bộ giả lập: bootloader + app, gõ help
 
 # firmware
-pio run -e boot -e app -e app_mbmaster -e demo     # .pio/build/<env>/app.img, boot: firmware.bin
+pio run -e boot -e app -e app_mbmaster -e app_gateway -e demo   # .pio/build/<env>/app.img, boot: firmware.bin
 pio run -e kit_tools                               # demo + lệnh spi (bắt SPI trên J6) và rf (nRF24)
 pio run -e remote                                  # kit 2.1 (64K): tay điều khiển thử nghiệm, OLED + 3 nút + nRF24 (src/remote)
-make stm32 stm32-internal                          # cùng mã, build bằng CMake (CI dùng cách này)
+make stm32 stm32-internal stm32-sign stm32-gateway # cùng mã, build bằng CMake (CI dùng cách này); -sign: ảnh ký số
+make stm32g0 renode                                # port STM32G071, rồi chạy trong Renode (tests/renode)
 
 # bản chạy trên trình duyệt, ghi vào docs/play/ (cần Emscripten)
 python src/port/web/build.py
@@ -60,6 +61,7 @@ python src/port/web/build.py
 - **Thay đổi chưa qua `make test` thì chưa xong.** Sửa `src/demo` phải chạy `test_demo` và dựng lại bản web rồi commit
   `docs/play/`. Sửa `tools/ak_fw.py` có `tests/test_ak_fw.py`.
 - Môi trường không có toolchain thì **nói rõ là chưa build, chưa test được**; không báo "đã build".
+- Linker script: section NOLOAD (`.bss`, `._heap`) phải có `AT > RAM`, không thì Renode nạp số 0 đè lên flash.
 - gcc 9 với ASan trong WSL treo vô hạn nếu không chạy qua `setarch x86_64 -R`.
 - PlatformIO và CMake build cùng một danh sách file: thêm file nguồn thì sửa **cả** `platformio.ini` **và**
   `CMakeLists.txt` / `src/port/*/port.cmake`. File trong `src/app`, `src/demo` tự vào build của PlatformIO, nhưng CMake
@@ -90,9 +92,15 @@ Thêm lệnh shell: một dòng trong `shell_cmds[]` của `src/app/task_console
 - **Mọi `XXX_InitTypeDef` của SPL phải qua `XXX_StructInit()` trước khi gán field.** Thiếu một field là rác stack bị OR
   vào thanh ghi, đổi theo từng bản build, không báo lỗi.
 - Bản đồ bộ nhớ: BOOT 12K `0x08000000` · APP 116K `0x08003000` (header ảnh 256 B, vector ở `0x08003100`) · ảnh chờ cài
-  ở flash SPI ngoài `0x80000` · EEPROM: `[0,64)` boot_ctrl, `[64,224)` nhật ký sự cố, `[224,256)` dành cho dự án.
+  ở flash SPI ngoài `0x80000`, bản sao app cũ (quay lui) ở `0xA0000` · EEPROM: `[0,64)` boot_ctrl, `[64,224)` nhật ký
+  sự cố, `[224,256)` dành cho dự án. Kho media của demo là flash SPI `[0,0x80000)`: clip từ 0, log thời tiết ở 16
+  sector cuối trừ một, chương trình khối ở sector cuối.
+- Ảnh mới cài xong chạy **thử** (`boot_ctrl.trial`): app tự xác nhận sau `APP_FW_CONFIRM_MS` (30 s) hoặc `fw confirm`;
+  không xác nhận sau 3 lần khởi động thì bootloader cài lại ảnh cũ từ BACKUP. `fw rollback` quay lui chủ động.
+- Biến thể ký số (`AK_IMAGE_SIGN=ON` / `image_sign = 1`): bootloader 16K, APP từ `0x08004000`; ảnh phải ký bằng
+  `mkimage.py --sign-key`; khoá công khai ở `src/services/fw/fw_pubkey.c`. **Khoá riêng không bao giờ vào repo** (`tools/keys/` bị git bỏ qua): chạy `python tools/ak_sign.py devkey` một lần mỗi clone trước khi build bản ký; lệnh ghi lại `fw_pubkey.c`, đừng commit thay đổi đó trừ khi cặp khoá là của sản phẩm.
 - Bootloader chỉ chạy ảnh có CRC đúng: nạp `app.img`, không nạp `.bin` trần. **App và bootloader lấy cùng một bản
-  phát hành.**
+  phát hành** (bootloader 1.3.0 đổi bố cục `boot_ctrl`: bootloader cũ không đọc được trạng thái app mới ghi).
 - Chân của AK Base Kit 3.0 nằm trong `src/port/stm32l151/port_cfg.h` và `kit.c`, đã đối chiếu schematic
   (`docs/kit/`). LED PB8 sáng khi chân ở mức thấp.
 - Thao tác lên board thật (nạp, xoá flash, reset) phải nói rõ sẽ làm gì và được đồng ý trước; board đang có firmware

@@ -16,13 +16,23 @@ target_link_options(test_kernel PRIVATE -fsanitize=address,undefined)
 add_test(NAME kernel COMMAND test_kernel)
 
 # --- firmware update + bootloader tests ---
+# p256-m (vendor, no warning set): test_fw checks signed images
+add_library(p256m_host STATIC ${P256M_SRC})
+target_include_directories(p256m_host PUBLIC ${P256M_INC})
+target_compile_options(p256m_host PRIVATE -w -g -fsanitize=address,undefined)
+
+# test_fw signs with a key it makes itself: it gets a writable public key, not fw_pubkey.c
+set(TEST_FW_SRC ${FW_SRC})
+list(REMOVE_ITEM TEST_FW_SRC ${SRC}/services/fw/fw_pubkey.c)
 add_executable(test_fw
 	${ROOT}/tests/test_fw.c
-	${COMMON_SRC} ${FW_SRC} ${SYS_SRC} ${BOOT_SRC}
+	${ROOT}/tests/test_pubkey.c
+	${COMMON_SRC} ${TEST_FW_SRC} ${SYS_SRC} ${BOOT_SRC}
 	${HOST_DIR}/port_host.c
 )
 target_include_directories(test_fw PRIVATE ${ROOT}/tests ${BASE_INC} ${HOST_DIR})
-target_compile_definitions(test_fw PRIVATE AK_SIM ${VERSION_DEFS})
+target_compile_definitions(test_fw PRIVATE AK_SIM ${VERSION_DEFS} FW_IMAGE_SIGN=1)
+target_link_libraries(test_fw PRIVATE p256m_host)
 target_compile_options(test_fw PRIVATE ${HOST_WARN} -fsanitize=address,undefined -g)
 target_link_options(test_fw PRIVATE -fsanitize=address,undefined)
 add_test(NAME fw COMMAND test_fw)

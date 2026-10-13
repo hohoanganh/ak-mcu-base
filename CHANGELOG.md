@@ -9,7 +9,77 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 
 ## Chưa phát hành
 
-Bootloader **1.2.2**. Rà lại toàn bộ mã để gọn và nhẹ hơn; không đổi giao thức, không đổi bản đồ flash.
+Bootloader **1.3.0**: xác nhận ảnh và quay lui. Log bản ghi trên flash SPI, trạm thời tiết giữ số liệu qua reset.
+Rà lại toàn bộ mã để gọn và nhẹ hơn.
+
+### Xác nhận và quay lui (confirm + rollback)
+
+- Phân vùng mới **BACKUP** 116K trên flash SPI ở `0xA0000` (`FLASH_PART_BACKUP` trong HAL; board staging trong
+  flash trong không có, mọi lệnh quay lui bị bỏ qua có thông báo). Trước khi cài, bootloader chép ảnh đang chạy sang
+  BACKUP (header chép sau cùng, kiểm CRC) rồi mới chép STAGING → APP.
+- Ảnh mới chạy **thử**: `boot_ctrl` có thêm `trial`, `trial_boots`, `rolled_back` (bản ghi 24 B, vẫn trong ô 32 B;
+  **bootloader cũ không đọc được**, nạp bootloader 1.3.0 trước). Mỗi lần bootloader khởi động ảnh thử là một lượt, ghi
+  EEPROM trước khi nhảy. App xác nhận bằng `boot_ctrl_confirm()`: `task_system` làm sau `APP_FW_CONFIRM_MS` (30 s; 0 =
+  dự án tự gọi), hoặc shell `fw confirm`, hoặc lệnh giao thức `0x09`. Chưa xác nhận sau 3 lượt thì bootloader cài lại
+  BACKUP và xoá header STAGING. `fw rollback` / `ak_fw.py rollback` / lệnh `0x0A` quay lui chủ động. APP hỏng mà
+  STAGING không dùng được thì cứu từ BACKUP.
+- Shell: `fw` (trạng thái thử, ảnh backup), `info` và `verify` in thêm phân vùng backup; app báo lúc khởi động nếu đang
+  chạy ảnh do quay lui khôi phục.
+- Test: `boot_decide` 14 ca mới; cài kèm sao lưu, quay lui vì không xác nhận, quay lui theo lệnh, cứu từ BACKUP, cắt điện
+  ở từng thao tác flash của cài (10.081 điểm) và của quay lui; giả lập đầu-cuối thêm 12 bước (thử, xác nhận, quay lui
+  theo lệnh, reset 3 lần không xác nhận → quay lui). Bootloader 8,2 → 9,7 KB (ngân sách CI 10 KB). **Chưa chạy trên
+  kit thật.**
+
+### Port thứ hai: STM32G071RB, chạy trong Renode
+
+- `port/stm32g071` (NUCLEO-G071RB, Cortex-M0+ 16 MHz): viết thẳng trên thanh ghi với header CMSIS
+  (`third_party/stm32g0`, Apache-2.0), không HAL/LL. Flash trang 2K ghi double word; NVM giả lập bằng hai trang
+  flash cuối luân phiên có số thứ tự; BOOT 12K, APP 56K, STAGING 56K trong flash trong; console USART2 (COM ảo của
+  Nucleo), LED PA5; stub HardFault thuần Thumb-1. Không sửa dòng nào phía trên HAL. `make stm32g0`
+  (`-DAK_PORT=stm32g071 -DAK_MODBUS=none`): boot 8,0 KB, app 13,9 KB.
+- **Renode:** `tests/renode/stm32g071.resc` và `.robot` (3 ca: boot kiểm ảnh và khởi động app, shell trả lời,
+  không có app thì vào loader), `make renode`, job CI `stm32g071-renode` tải Renode 1.15.3 portable. Hai việc phải
+  làm cho Renode: vùng nhớ 12K tại địa chỉ 0 chép `boot.bin` (reset lấy SP/PC ở 0), và linker script ghi `AT > RAM`
+  cho `.bss`/`._heap` (sửa cả hai port, `.bin`/`.img` không đổi). Ghi flash trong Renode chưa chạy (mô hình F4).
+- Chi tiết: `docs/porting.md`. **Chưa có board thật**, chưa có RS485 trên port này.
+
+### Gateway Modbus TCP ↔ RTU qua W5500 (`AK_MODBUS=gateway`)
+
+- HAL mới `hal/hal_tcp.h` (một socket server, đọc không chặn); driver `port/stm32l151/w5500.c` cho mô-đun W5500 trên
+  J6 (SPI1 dùng chung với NOR, CS PA4); port host giả lập bằng hàng đợi RAM. Dịch vụ `services/modbus/mb_gateway.c`:
+  server nanoMODBUS TCP chuyển FC 03/04/06/16 sang `mb_master` trên RS485 theo unit id của MBAP; slave im lặng →
+  exception 4. Vai trò app mới `APP_MODBUS_GATEWAY` (`pio run -e app_gateway`, `make stm32-gateway`), cấu hình IP tĩnh
+  `APP_NET_*` trong `app.h`, shell `mb` in trạng thái. Chi tiết: `docs/modbus.md`.
+- Test: client TCP giả trong `test_modbus` (55 kiểm tra: đọc/ghi, exception, lệnh không hỗ trợ, slave im, unit khác,
+  client rớt giữa khung, khung cắt, không có chip). App gateway 25,1 KB flash. **Chưa thử với W5500 thật.**
+
+### Ký số ảnh (ECDSA P-256), biến thể build `AK_IMAGE_SIGN`
+
+- Header ảnh có `sig_type` (offset 44) và chữ ký `r||s` (offset 48) trên SHA-256(48 byte đầu header ‖ nhị phân).
+  Bootloader và app xây với `FW_IMAGE_SIGN=1` từ chối ảnh không ký / sai khoá (`bad signature`, mã lỗi 14). Xác
+  minh bằng `third_party/p256-m` (Apache-2.0) và `common/sha256.c` mới. Bootloader biến thể này 16K (`PORT_IMAGE_SIGN`,
+  APP từ `0x08004000`), linker lấy kích thước boot qua `--defsym __boot_size`.
+- Công cụ: `tools/ak_sign.py` (keygen, pubkey-c, verify), `mkimage.py … --sign-key`, `mkimage.py info --pub`; CMake
+  `-DAK_IMAGE_SIGN=ON` (`make stm32-sign`), PlatformIO `image_sign = 1`. Khoá riêng **không nằm trong repo**: `python tools/ak_sign.py devkey` tạo cặp khoá phát triển
+  trong `tools/keys/` (git bỏ qua) và ghi khoá công khai vào `services/fw/fw_pubkey.c`; CI tạo một cặp dùng một lần.
+  Test ký trên máy tính tự tạo khoá lúc chạy (`tests/test_pubkey.c`).
+- Test: SHA-256 (ba vector chuẩn + 1 MB stream); ảnh không ký, sửa 1 byte có vá CRC, sửa trường header, sửa chữ ký,
+  ký bằng khoá khác đều bị từ chối; ảnh ký đúng cài được qua bootloader; APP không ký không chạy. CI build thêm biến
+  thể ký (ngân sách bootloader 14 336 B; hiện 13 224 B). **Chưa chạy trên kit; chưa đo thời gian verify trên M3.**
+
+### Log bản ghi trên flash (`services/sys/flog.c`)
+
+- Vòng ghi bản ghi cố định trên flash xoá theo sector: header `[magic][seq][~seq]` mỗi sector, CRC16 từng bản ghi,
+  không chỉ mục trong RAM, mount lại từ flash. Bản ghi cắt điện giữa chừng bị bỏ qua, log ghi tiếp. Cách dùng:
+  `docs/tien-ich.md` mục 2b.
+- **Trạm thời tiết** ghi mẫu nhịp 1 phút / 15 phút vào 16 sector cuối kho media (dưới sector chương trình khối); reset
+  xong đồ thị và nhịp quay lại từ log; `th log` in CSV kèm giờ RTC, `th clear` xoá. Nhịp 1 giây vẫn chỉ trong RAM.
+- Test: ghi đầy vòng nhiều lần, cắt điện ở từng thao tác (296 điểm) rồi mount lại; nạp lại đồ thị sau reset trong
+  `test_demo`. Demo 56,7 → 59,9 KB flash.
+
+### Gọn và nhẹ hơn
+
+Không đổi giao thức.
 
 Số đo (arm-none-eabi-gcc 13.2, `-Os -flto`), trước → sau:
 
@@ -27,7 +97,7 @@ Số đo (arm-none-eabi-gcc 13.2, `-Os -flto`), trước → sau:
   `xprintf` bốn tham số ở từng chỗ ghi log.
 - **Ảnh firmware:** `fw_image_verify()` và `fw_update_finish()` đọc thẳng vào header của người gọi, bớt hai bản 256 B
   trên stack khi COMMIT (đỉnh stack −512 B). So tên board bằng vòng lặp nhỏ thay cho `strncmp` (gcc đổi nó thành
-  `strcmp` của newlib, 440 B, trong bootloader). Vì mã bootloader đổi: **bootloader 1.2.2**.
+  `strcmp` của newlib, 440 B, trong bootloader). Vì mã bootloader đổi: bootloader 1.2.2 (rồi 1.3.0 với quay lui, ở trên).
 - **Nhật ký sự cố:** `crash_log_count()` tìm bản ghi mới nhất một lần rồi đếm, thay vì gọi `crash_log_read(n)` n lần
   (mỗi lần quét cả 8 ô và tính CRC16). `task_poll_modbus` chỉ cập nhật thanh ghi số sự cố mỗi giây một lần thay vì mỗi
   vòng lặp kernel.

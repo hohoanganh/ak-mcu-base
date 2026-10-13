@@ -1,0 +1,14 @@
+23:25:09.3915 [INFO] System bus created.
+23:25:11.3174 [INFO] sysbus: Loading segment of 13768 bytes length at 0x8003000.
+23:25:11.3391 [INFO] sysbus: Loading segment of 2412 bytes length at 0x80065C8.
+23:25:11.3394 [INFO] sysbus: Loading segment of 32352 bytes length at 0x8006670.
+23:25:11.3395 [INFO] sysbus: Loading segment of 52 bytes length at 0x20000000.
+23:25:11.3806 [INFO] sysbus: Loading segment of 7904 bytes length at 0x8000000.
+23:25:11.3806 [INFO] sysbus: Loading segment of 536 bytes length at 0x8001EE0.
+23:25:11.3810 [INFO] sysbus: Loading segment of 34228 bytes length at 0x8001F38.
+23:25:11.3810 [INFO] sysbus: Loading segment of 52 bytes length at 0x20000000.
+23:25:11.4131 [INFO] cpu: Guessing VectorTableOffset value to be 0x8000000.
+23:25:11.4214 [INFO] cpu: Setting initial values: PC = 0x800152D, SP = 0x20009000.
+23:25:11.4254 [INFO] ak-g071: Machine started.
+23:25:11.7708 [INFO] ak-g071: Machine paused.
+23:25:12.6760 [INFO] ak-g071: Machine resumed.

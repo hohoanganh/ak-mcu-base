@@ -112,7 +112,6 @@ Chi tiết: [tien-ich.md](tien-ich.md). Các hướng tối ưu còn lại, kèm
 | Thiếu | Ghi chú |
 |---|---|
 | Driver: nút, còi, OLED, nRF24, EEPROM ngoài, lớp Arduino | Cố ý không mang sang; viết lại theo nhu cầu từng sản phẩm |
-| Rollback về ảnh trước | Chỉ có cài lại từ staging |
 | Ký số ảnh | Chỉ có CRC: chống hỏng dữ liệu, không chống giả mạo |
 | Dự án con | Chưa dự án nào chuyển sang; các dự án hiện có vẫn theo base cũ |
 

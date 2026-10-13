@@ -5,6 +5,8 @@
  *   APP_MODBUS_SLAVE   the board answers a register map and takes firmware
  *                      updates over RS485 (block 0xF000, tools/ak_mb.py)
  *   APP_MODBUS_MASTER  the board asks other devices; shell: mb read / mb write
+ *   APP_MODBUS_GATEWAY Modbus TCP server (W5500 on J6, hal_tcp) forwarding to
+ *                      the RS485 slaves as RTU master; shell as the master
  *
  *  Slave register map of this sample (holding, FC 03 / 06 / 16):
  *    0  R  app version, (major << 8) | minor
@@ -27,8 +29,8 @@
 #include "app.h"
 #include "task_list.h"
 
-#if defined(APP_MODBUS_SLAVE) && defined(APP_MODBUS_MASTER)
-#error "one RS485 port: build with APP_MODBUS_SLAVE or APP_MODBUS_MASTER, not both"
+#if (defined(APP_MODBUS_SLAVE) + defined(APP_MODBUS_MASTER) + defined(APP_MODBUS_GATEWAY)) > 1
+#error "one RS485 port: build with one of APP_MODBUS_SLAVE, APP_MODBUS_MASTER, APP_MODBUS_GATEWAY"
 #endif
 
 #define TAG "MB"
@@ -110,11 +112,18 @@ void cmd_mb(const char* args) {
 }
 
 /*----------------------------------------------------------------------------
- * master
+ * master, and the gateway (a master with a Modbus TCP server in front)
  *--------------------------------------------------------------------------*/
-#elif defined(APP_MODBUS_MASTER)
+#elif defined(APP_MODBUS_MASTER) || defined(APP_MODBUS_GATEWAY)
 
 #include "mb_master.h"
+#if defined(APP_MODBUS_GATEWAY)
+#include "mb_gateway.h"
+#include "hal_tcp.h"
+
+static const hal_net_cfg_t net_cfg = { APP_NET_MAC, APP_NET_IP, APP_NET_MASK, APP_NET_GW };
+static uint8_t gateway_up;
+#endif
 
 void app_modbus_init(void) {
 	if (mb_master_init(APP_MB_BAUD, APP_MB_RESPONSE_TIMEOUT_MS) != MB_OK) {
@@ -122,9 +131,27 @@ void app_modbus_init(void) {
 		return;
 	}
 	LOG_I(TAG, "master, %d 8N1, response timeout %d ms\n", APP_MB_BAUD, APP_MB_RESPONSE_TIMEOUT_MS);
+#if defined(APP_MODBUS_GATEWAY)
+	if (hal_tcp_init(&net_cfg) != 0) {
+		LOG_E(TAG, "no Ethernet chip: gateway off, RS485 master still works\n");
+		return;
+	}
+	if (mb_gateway_init(APP_MB_TCP_PORT) != 0) {
+		LOG_E(TAG, "gateway init failed\n");
+		return;
+	}
+	gateway_up = 1;
+	LOG_I(TAG, "gateway: Modbus TCP %d.%d.%d.%d:%d -> RS485\n", net_cfg.ip[0], net_cfg.ip[1],
+		  net_cfg.ip[2], net_cfg.ip[3], APP_MB_TCP_PORT);
+#endif
 }
 
 void task_poll_modbus(void) {
+#if defined(APP_MODBUS_GATEWAY)
+	if (gateway_up) {
+		mb_gateway_poll();
+	}
+#endif
 }
 
 /* decimal or 0x hex; returns 0 if *p is not a number */
@@ -168,6 +195,11 @@ void cmd_mb(const char* args) {
 		is_write = 1;
 	}
 	else {
+#if defined(APP_MODBUS_GATEWAY)
+		xprintf("gateway %s, link %s, client %s, %u request(s), %u failed\n",
+				gateway_up ? "on" : "off (no chip)", hal_tcp_link_up() ? "up" : "down",
+				hal_tcp_connected() ? "connected" : "none", mb_gateway_request_count(), mb_gateway_error_count());
+#endif
 		xprintf("usage: mb read <unit> <addr> [count 1..16] | mb write <unit> <addr> <value>\n");
 		return;
 	}

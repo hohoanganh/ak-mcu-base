@@ -7,11 +7,17 @@
  * The sensor is read once a second whatever screen is open (weather_poll),
  * so the graph keeps filling while a game runs. Shell: "th" prints the
  * values and the graph as CSV.
+ *
+ * Samples at 1 min and 15 min also go to a log on the SPI flash (flog ring
+ * at the end of the media store): after a reset the graph comes back, and
+ * "th log" prints the whole log. The 1 s rate stays in RAM: one write a
+ * second would wear the flash for nothing.
  */
 #include <string.h>
 
 #include "ui.h"
 #include "weather.h"
+#include "flog.h"
 
 #define READ_MS			(1000)
 #define GRAPH_X			(31)
@@ -33,26 +39,129 @@ static uint8_t period_idx;
 static uint8_t show_rh;
 static uint32_t last_read_ms, last_hist_ms;
 
+static flog_t wlog;
+static uint8_t wlog_ok;
+static const flog_ops_t wlog_ops = { kit_store_read, kit_store_write, kit_store_erase };
+
+typedef char weather_rec_size_check[(sizeof(weather_rec_t) == 8) ? 1 : -1];
+
+static void hist_push(int16_t t, uint16_t h) {
+	if (hist_n == WEATHER_HIST) {
+		memmove(hist_t, hist_t + 1, sizeof(hist_t) - sizeof(hist_t[0]));
+		memmove(hist_h, hist_h + 1, sizeof(hist_h) - sizeof(hist_h[0]));
+		hist_n--;
+	}
+	hist_t[hist_n] = t;
+	hist_h[hist_n] = h;
+	hist_n++;
+}
+
+/* The log sits at the end of the media store, below the block program's
+ * sector: WEATHER_LOG_SECTORS on the kit, a quarter of a small store. */
+static void wlog_mount(void) {
+	uint32_t size = kit_store_size();
+	uint32_t n = size / KIT_STORE_SECTOR;
+	uint8_t sectors = (uint8_t)(n >= 8 ? (n / 4 > WEATHER_LOG_SECTORS ? WEATHER_LOG_SECTORS : n / 4) : 0);
+
+	wlog_ok = 0;
+	if (sectors) {
+		uint32_t base = size - (1U + sectors) * KIT_STORE_SECTOR;
+
+		wlog_ok = flog_mount(&wlog, &wlog_ops, base, KIT_STORE_SECTOR, sectors, sizeof(weather_rec_t)) == 0;
+	}
+}
+
+/* The graph after a reset: the newest run of records taken at one rate, and
+ * that rate becomes the current one. */
+static void wlog_reload(void) {
+	uint32_t count = flog_count(&wlog);
+	uint32_t first = count;
+	weather_rec_t r;
+	uint8_t period = 0xFF;
+
+	while (first > 0 && first + WEATHER_HIST > count) {
+		if (weather_log_read(first - 1, &r) != 1) {
+			break;
+		}
+		if (period == 0xFF) {
+			if (r.period == 0 || r.period >= sizeof(periods_s) / sizeof(periods_s[0])) {
+				return;
+			}
+			period = r.period;
+		}
+		else if (r.period != period) {
+			break;
+		}
+		first--;
+	}
+	if (period == 0xFF) {
+		return;
+	}
+	period_idx = period;
+	for (uint32_t i = first; i < count; i++) {
+		if (weather_log_read(i, &r) == 1) {
+			hist_push(r.t10, r.rh10);
+		}
+	}
+}
+
+static void wlog_add(int16_t t, uint16_t h) {
+	weather_rec_t r;
+
+	if (!wlog_ok || periods_s[period_idx] < 60) {
+		return;
+	}
+	if (!kit_rtc_get(&r.hh, &r.mm, &r.ss)) {
+		r.hh = r.mm = r.ss = 0xFF;
+	}
+	r.period = period_idx;
+	r.t10 = t;
+	r.rh10 = h;
+	flog_append(&wlog, &r);
+}
+
+void weather_init(void) {
+	hist_n = 0;
+	have_value = pending = started = 0;
+	last_read_ms = last_hist_ms = 0;
+	period_idx = 0;
+	wlog_mount();
+	if (wlog_ok) {
+		wlog_reload();
+	}
+	started = 1;
+}
+
+uint32_t weather_log_count(void) {
+	return wlog_ok ? flog_count(&wlog) : 0;
+}
+
+int weather_log_read(uint32_t i, weather_rec_t* rec) {
+	return wlog_ok ? flog_read(&wlog, i, rec) : -1;
+}
+
+void weather_log_clear(void) {
+	if (wlog_ok) {
+		flog_clear(&wlog);
+	}
+}
+
 void weather_poll(uint32_t now_ms) {
+	if (!started) {
+		weather_init();
+	}
 	if (pending) {
 		/* started at least one frame ago: the sensor needs under 10 ms */
 		pending = 0;
 		have_value = kit_sht_read(&cur_t, &cur_h);
 		if (have_value && (hist_n == 0 || now_ms - last_hist_ms >= (uint32_t)periods_s[period_idx] * 1000U)) {
 			last_hist_ms = now_ms;
-			if (hist_n == WEATHER_HIST) {
-				memmove(hist_t, hist_t + 1, sizeof(hist_t) - sizeof(hist_t[0]));
-				memmove(hist_h, hist_h + 1, sizeof(hist_h) - sizeof(hist_h[0]));
-				hist_n--;
-			}
-			hist_t[hist_n] = cur_t;
-			hist_h[hist_n] = cur_h;
-			hist_n++;
+			hist_push(cur_t, cur_h);
+			wlog_add(cur_t, cur_h);
 		}
 		return;
 	}
-	if (!started || now_ms - last_read_ms >= READ_MS) {
-		started = 1;
+	if (now_ms - last_read_ms >= READ_MS || last_read_ms == 0) {
 		last_read_ms = now_ms;
 		pending = kit_sht_start();
 		if (!pending) {

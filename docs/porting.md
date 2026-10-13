@@ -1,6 +1,8 @@
 # Port ak-mcu-base sang chip mới
 
-Code phía trên HAL (kernel, services, boot, app) không đổi. Một port gồm:
+Code phía trên HAL (kernel, services, boot, app) không đổi. Hai port chip đang có: `port/stm32l151` (AK Base Kit,
+SPL) và `port/stm32g071` (NUCLEO-G071RB, viết thẳng trên thanh ghi với header CMSIS, không HAL/LL) — port thứ hai
+là bằng chứng lớp HAL đủ tổng quát: **không sửa một dòng nào** phía trên HAL. Một port gồm:
 
 | File | Nội dung |
 |---|---|
@@ -52,3 +54,42 @@ ISR), `ak_port_millis`, `ak_port_fatal` (không trả về), `ak_port_idle`.
 1. `make test` vẫn phải xanh (không phụ thuộc port).
 2. Build port mới, xem `--print-memory-usage`, rồi `python3 tools/mkimage.py info build/<chip>/app.img`.
 3. Trên board: log boot → `ak_fw.py info` → OTA → rút điện giữa lúc boot đang cài.
+
+## Port thứ hai: STM32G071RB (NUCLEO-G071RB)
+
+`port/stm32g071/`, build bằng `make stm32g0` (`-DAK_PORT=stm32g071 -DAK_MODBUS=none`). Cortex-M0+ 16 MHz (HSI16,
+không PLL), flash 128K trang 2K ghi theo double word 8 byte, RAM 36K. Khác port STM32L151 ở những điểm sau, và
+chỉ port biết:
+
+| Việc | STM32L151 | STM32G071 |
+|---|---|---|
+| Thư viện chip | SPL + CMSIS | Chỉ header CMSIS (`third_party/stm32g0`), mã thanh ghi |
+| Flash | trang 256 B, ghi word / half-page, xoá về 0x00 | trang 2K, ghi double word, xoá về 0xFF |
+| NVM (`hal_nvm`) | EEPROM dữ liệu 4K | **Hai trang flash cuối** luân phiên, bản ghi `[seq][~seq][256 B]`, bản mới hợp lệ là NVM; mỗi lần ghi có thay đổi là xoá + ghi lại một trang (10k lần/trang: đủ cho boot_ctrl và nhật ký sự cố, không dùng để đếm) |
+| Bản đồ | BOOT 12K · APP 116K · STAGING, BACKUP trên SPI NOR | BOOT 12K · APP 56K `0x08003000` · STAGING 56K `0x08011000` · NVM 4K `0x0801F000`; không BACKUP (không quay lui), không biến thể ký số |
+| Console | USART1 PA9/PA10 | USART2 PA2/PA3 AF1 (cổng COM ảo của ST-Link) |
+| LED | PB8, sáng khi thấp | PA5, sáng khi cao |
+| RS485 / Modbus | USART2 | chưa có (`AK_MODBUS=none`) |
+| HardFault | lưu PC/LR/CFSR | lưu PC/LR; M0+ không có CFSR; stub asm thuần Thumb-1 |
+
+Vector table: `reset_handler` tự đặt `SCB->VTOR` vào bảng của chính ảnh (boot hay app), nên app nạp bằng debugger
+không qua boot vẫn chạy.
+
+### Chạy trong Renode
+
+Chưa có board thật; port này được chạy trong **Renode** (`platforms/cpus/stm32g0.repl` của Renode 1.15.3):
+`tests/renode/stm32g071.resc` (mở thủ công) và `tests/renode/stm32g071.robot` (3 ca: boot kiểm ảnh rồi khởi động
+app, shell `ver`/`info`/`stat` trả lời đúng, không có app thì vào loader). `make renode` (cần `renode-test` của bản
+portable trong PATH, hoặc `RENODE_TEST=…`), CI chạy job `stm32g071-renode`.
+
+Hai điều phải biết khi đưa firmware này vào Renode:
+
+- STM32 thật ánh xạ flash tại địa chỉ 0 và lấy SP/PC ở đó sau **mỗi** reset; `stm32g0.repl` không có gì ở 0. Vì
+  bootloader khởi động app bằng cách reset (`hal_jump_to_app`), script đặt thêm một vùng nhớ 12K tại 0 và chép
+  `boot.bin` vào (vector chứa địa chỉ tuyệt đối trong flash nên chạy tiếp được). Thiếu nó CPU dừng sau lần reset
+  đầu tiên.
+- Trình nạp ELF của Renode nạp theo địa chỉ nạp (LMA) kể cả phần không có nội dung. Linker script phải ghi rõ
+  `AT > RAM` cho `.bss`/`._heap` (NOLOAD); không thì chúng thừa kế vùng nạp flash sau `.data` và Renode đổ số 0
+  đè lên vùng APP. Đã sửa cho cả hai port (`sections.ld`), file `.bin`/`.img` không đổi một byte.
+- Renode mô hình flash controller theo STM32F4, nên ghi flash (OTA, NVM) **chưa chạy** trong giả lập; đường
+  boot → app → shell không ghi flash nên chạy đủ.

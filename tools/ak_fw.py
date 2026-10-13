@@ -24,14 +24,14 @@ import time
 
 SOF = 0xA5
 RESP = 0x80
-CMD_INFO, CMD_BEGIN, CMD_DATA, CMD_END, CMD_INSTALL, CMD_LOADER, CMD_RESET, CMD_RUN = range(1, 9)
+CMD_INFO, CMD_BEGIN, CMD_DATA, CMD_END, CMD_INSTALL, CMD_LOADER, CMD_RESET, CMD_RUN, CMD_CONFIRM, CMD_ROLLBACK = range(1, 11)
 MAX_CHUNK = 128
 
 # keep in sync with services/fw/fw_types.h
 ERRORS = {
     0: "ok", 1: "bad arg", 2: "bad state", 3: "too big", 4: "flash error", 5: "no image",
     6: "header crc", 7: "wrong board", 8: "wrong load addr", 9: "image crc", 10: "bad offset",
-    11: "unknown cmd", 12: "bad size", 13: "bad vector table",
+    11: "unknown cmd", 12: "bad size", 13: "bad vector table", 14: "bad signature",
 }
 ROLES = {0: "bootloader", 1: "app"}
 
@@ -295,6 +295,12 @@ class AkFw:
     def simple(self, cmd, name):
         self._check(self.request(cmd), name)
 
+    def confirm(self):
+        """End the trial of the running image. Returns True if it was on trial."""
+        p = self.request(CMD_CONFIRM)
+        self._check(p, "CONFIRM")
+        return len(p) > 1 and p[1] == 1
+
 
 # ------------------------------------------------------------------------------
 # CLI
@@ -322,6 +328,8 @@ def main(argv=None):
     sub.add_parser("loader")
     sub.add_parser("reset")
     sub.add_parser("run", help="bootloader: leave loader, run app")
+    sub.add_parser("confirm", help="app: end the trial of the running image (else auto after APP_FW_CONFIRM_MS)")
+    sub.add_parser("rollback", help="put the image before the last update back")
     a = ap.parse_args(argv)
 
     if a.port:
@@ -359,6 +367,14 @@ def main(argv=None):
             fw.simple(CMD_RESET, "RESET")
         elif a.cmd == "run":
             fw.simple(CMD_RUN, "RUN")
+        elif a.cmd == "confirm":
+            print("confirmed" if fw.confirm() else "nothing to confirm (image not on trial)")
+        elif a.cmd == "rollback":
+            fw.simple(CMD_ROLLBACK, "ROLLBACK")
+            print("rolling back...")
+            time.sleep(0.3)
+            info = fw.wait_ready(20.0)
+            print("running %s v%s" % (info["role"], info["version"]))
     except FwError as e:
         print("error: %s" % e, file=sys.stderr)
         return 1

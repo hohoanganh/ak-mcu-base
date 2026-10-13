@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 600" width="1280" height="600" role="img" aria-labelledby="t d">
-<title id="t">Bản đồ bộ nhớ</title><desc id="d">Flash trong 128K chia cho bootloader 12K và app 116K; flash SPI 1 MB có kho clip 512K và vùng chờ OTA 116K; EEPROM giữ trạng thái cài đặt và nhật ký sự cố.</desc>
+<title id="t">Bản đồ bộ nhớ</title><desc id="d">Flash trong 128K chia cho bootloader 12K và app 116K; flash SPI 1 MB có kho clip 512K, vùng chờ OTA 116K và bản sao app cũ 116K để quay lui; EEPROM giữ trạng thái cài đặt và nhật ký sự cố.</desc>
 <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8d9bab"/></marker></defs>
 <rect width="1280" height="600" fill="#0b0f14"/>
 <text x="48.0" y="64.0" fill="#e6edf3" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="30" font-weight="700" text-anchor="start">Bản đồ bộ nhớ</text>
@@ -14,25 +14,28 @@
 <text x="734.7" y="214.0" fill="#0b0f14" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle">116K · 0x08003000 · 256 byte đầu là header (CRC32, tên board)</text>
 <text x="48.0" y="296.0" fill="#e6edf3" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="700" text-anchor="start">Flash SPI W25Q80 trên bo</text>
 <text x="1232.0" y="296.0" fill="#8d9bab" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="14" font-weight="400" text-anchor="end">1 MB · 0x00000 – 0xFFFFF</text>
-<rect x="48.0" y="310" width="592.0" height="74" fill="#22d3ee" stroke="#0b0f14" stroke-width="2"/>
-<text x="344.0" y="342.0" fill="#0b0f14" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="700" text-anchor="middle">Kho clip của demo</text>
-<text x="344.0" y="364.0" fill="#0b0f14" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle">512K · 0x00000</text>
-<rect x="640.0" y="310" width="236.8" height="74" fill="#c792ea" stroke="#0b0f14" stroke-width="2"/>
-<text x="758.4" y="342.0" fill="#0b0f14" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="700" text-anchor="middle">Vùng chờ OTA</text>
-<text x="758.4" y="364.0" fill="#0b0f14" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle">116K · 0x80000</text>
-<rect x="876.8" y="310" width="355.2" height="74" fill="#1b2632" stroke="#0b0f14" stroke-width="2"/>
-<text x="1054.4" y="342.0" fill="#8d9bab" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="700" text-anchor="middle">chưa dùng</text>
-<text x="1054.4" y="364.0" fill="#8d9bab" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle">396K · 0x9D000</text>
+<rect x="48.0" y="310" width="521.0" height="74" fill="#22d3ee" stroke="#0b0f14" stroke-width="2"/>
+<text x="308.5" y="342.0" fill="#0b0f14" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="700" text-anchor="middle">Kho clip của demo</text>
+<text x="308.5" y="364.0" fill="#0b0f14" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle">512K · 0x00000 · log thời tiết và chương trình khối ở cuối</text>
+<rect x="569.0" y="310" width="236.8" height="74" fill="#c792ea" stroke="#0b0f14" stroke-width="2"/>
+<text x="687.4" y="342.0" fill="#0b0f14" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="700" text-anchor="middle">Vùng chờ OTA</text>
+<text x="687.4" y="364.0" fill="#0b0f14" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle">116K · 0x80000</text>
+<rect x="805.8" y="310" width="236.8" height="74" fill="#c792ea" stroke="#0b0f14" stroke-width="2"/>
+<text x="924.2" y="342.0" fill="#0b0f14" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="700" text-anchor="middle">App cũ (quay lui)</text>
+<text x="924.2" y="364.0" fill="#0b0f14" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle">116K · 0xA0000</text>
+<rect x="1042.6" y="310" width="189.4" height="74" fill="#1b2632" stroke="#0b0f14" stroke-width="2"/>
+<text x="1137.3" y="342.0" fill="#8d9bab" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="700" text-anchor="middle">chưa dùng</text>
+<text x="1137.3" y="364.0" fill="#8d9bab" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle">268K · 0xBD000</text>
 <text x="48.0" y="446.0" fill="#e6edf3" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="700" text-anchor="start">EEPROM trong vi điều khiển</text>
 <text x="1232.0" y="446.0" fill="#8d9bab" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="14" font-weight="400" text-anchor="end">firmware dùng 224 byte đầu của 4K</text>
 <rect x="48.0" y="460" width="307.8" height="74" fill="#facc15" stroke="#0b0f14" stroke-width="2"/>
 <text x="201.9" y="492.0" fill="#0b0f14" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="700" text-anchor="middle">Trạng thái cài đặt</text>
-<text x="201.9" y="514.0" fill="#0b0f14" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle">2 ô × 32 byte</text>
+<text x="201.9" y="514.0" fill="#0b0f14" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle">2 ô × 32 byte (lệnh, lần thử, đang thử)</text>
 <rect x="355.8" y="460" width="473.6" height="74" fill="#fb7185" stroke="#0b0f14" stroke-width="2"/>
 <text x="592.6" y="492.0" fill="#0b0f14" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="700" text-anchor="middle">Nhật ký sự cố</text>
 <text x="592.6" y="514.0" fill="#0b0f14" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle">8 bản ghi × 20 byte</text>
 <rect x="829.4" y="460" width="402.6" height="74" fill="#1b2632" stroke="#0b0f14" stroke-width="2"/>
 <text x="1030.7" y="492.0" fill="#8d9bab" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="700" text-anchor="middle">chưa dùng</text>
 <text x="1030.7" y="514.0" fill="#8d9bab" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="13" font-weight="400" text-anchor="middle"></text>
-<text x="48.0" y="572.0" fill="#8d9bab" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" text-anchor="start">Chiều rộng các ô không theo tỉ lệ. App chỉ được ghi vùng chờ OTA; chỉ bootloader được ghi vùng APP.</text>
+<text x="48.0" y="572.0" fill="#8d9bab" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" text-anchor="start">Chiều rộng các ô không theo tỉ lệ. App chỉ được ghi vùng chờ OTA; chỉ bootloader được ghi APP và app cũ.</text>
 </svg>

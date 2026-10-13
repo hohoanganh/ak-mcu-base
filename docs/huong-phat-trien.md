@@ -15,16 +15,19 @@ Cỡ việc: S = vài giờ, M = một hai ngày, L = nhiều ngày.
 
 | # | Hướng | Cỡ | Mở ra ứng dụng gì |
 |---|---|---|---|
-| 1 | **Port chip thứ hai** (STM32G0 hoặc STM32C0) | M – L | Chứng minh lớp HAL đủ tổng quát; dùng base cho sản phẩm giá rẻ |
-| 2 | **Modbus TCP qua W5500** (nanoMODBUS đã có transport TCP) | M | Gateway RTU ↔ TCP, thiết bị Ethernet công nghiệp |
-| 3 | **Xác nhận ảnh và quay lui** (confirm + rollback) | M | OTA hiện trường không cần kỹ thuật viên; điều kiện cần để nói "cập nhật an toàn" |
-| 4 | **Ghi log vào flash SPI** (vòng tròn đơn giản, sau đó littlefs nếu cần) | S – M | Data logger, trạm thời tiết lưu 24 giờ, hộp đen sự cố |
+| 1 | ~~**Port chip thứ hai**~~ (đã làm: STM32G071, chạy trong Renode) | M – L | Chứng minh lớp HAL đủ tổng quát; dùng base cho sản phẩm giá rẻ |
+| 2 | ~~**Modbus TCP qua W5500**~~ (đã làm) | M | Gateway RTU ↔ TCP, thiết bị Ethernet công nghiệp |
+| 3 | ~~**Xác nhận ảnh và quay lui**~~ (đã làm) | M | OTA hiện trường không cần kỹ thuật viên; điều kiện cần để nói "cập nhật an toàn" |
+| 4 | ~~**Ghi log vào flash SPI**~~ (đã làm bước 1: vòng tròn) | S – M | Data logger, trạm thời tiết lưu 24 giờ, hộp đen sự cố |
 
 Chi tiết từng hướng ở các mục dưới.
 
 ## 2. Nền và cập nhật firmware
 
-### 2.1 Xác nhận ảnh và quay lui (confirm + rollback)
+### 2.1 Xác nhận ảnh và quay lui (confirm + rollback) — **đã làm** (bootloader 1.3.0, 12/10/2026)
+
+Làm theo cách (a): vùng BACKUP 116K trên flash SPI ở `0xA0000`. Xem mục "Xác nhận và quay lui" trong
+[ak-mcu-base.md](ak-mcu-base.md). Phần dưới giữ lại làm ghi chú thiết kế.
 
 - **Là gì:** theo mô hình của MCUboot: ảnh mới chạy ở trạng thái "thử"; app tự kiểm (Modbus trả lời, kernel chạy đủ
   N giây) rồi mới đánh dấu "ổn". Reset mà chưa đánh dấu thì bootloader quay về ảnh cũ. Bộ đếm anti-rollback chỉ tăng
@@ -38,7 +41,10 @@ Chi tiết từng hướng ở các mục dưới.
   thảo luận Nordic về chế độ một ô không quay lui được: [devzone](https://devzone.nordicsemi.com/f/nordic-q-a/127927/mcuboot-firmware-loader-ble_mcumgr-handling-of-two-slot-application/565567) ·
   bộ đếm bảo mật chỉ tăng sau xác nhận: [mcuboot commit](https://review.trustedfirmware.org/plugins/gitiles/mirror/mcuboot/+/0eaf6668189d9001ca5b94dba4e3d8051e7bbe83).
 
-### 2.2 Ký số ảnh (ECDSA P-256) và Cyber Resilience Act
+### 2.2 Ký số ảnh (ECDSA P-256) và Cyber Resilience Act — **đã làm** (12/10/2026, biến thể `AK_IMAGE_SIGN`)
+
+p256-m + SHA-256 trong bootloader 16K (13,2 KB dùng) và app; khoá riêng không nằm trong repo, `tools/ak_sign.py`
+tạo khoá phát triển (`devkey`) và khoá thật (`keygen`). Xem "Ký số ảnh" trong [ak-mcu-base.md](ak-mcu-base.md). Phần dưới là ghi chú thiết kế.
 
 - **Vì sao bây giờ:** CRA của EU (Regulation 2024/2847) áp dụng nghĩa vụ báo cáo từ **11/09/2026** và áp dụng đầy đủ
   từ **11/12/2027**; sản phẩm thiết kế năm 2025 bán năm 2028 vẫn thuộc phạm vi. Quy định trung lập về công nghệ nhưng
@@ -82,7 +88,10 @@ Chi tiết từng hướng ở các mục dưới.
 
 ## 3. Kết nối và ứng dụng
 
-### 3.1 Modbus TCP qua W5500 — gateway RTU ↔ TCP
+### 3.1 Modbus TCP qua W5500 — gateway RTU ↔ TCP — **đã làm** (12/10/2026, `AK_MODBUS=gateway`)
+
+`hal/hal_tcp.h`, `port/stm32l151/w5500.c`, `services/modbus/mb_gateway.c`; xem [modbus.md](modbus.md). Chưa thử với
+mô-đun thật. Phần dưới là ghi chú thiết kế.
 
 - **Vì sao hợp:** nanoMODBUS đã có `NMBS_TRANSPORT_TCP`; transport chỉ là hai hàm `read`/`write` có timeout (base
   đang cài cho RS485 ở `services/modbus/mb_port.c`). W5500 xử lý TCP/IP, ARP, ICMP trong phần cứng, 8 socket, 32 KB
@@ -132,7 +141,9 @@ Chi tiết từng hướng ở các mục dưới.
   [Espressif: file system considerations](https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32/api-guides/file-system-considerations.html) ·
   [cnx-software: littlefs](https://www.cnx-software.com/2018/01/02/littlefs-is-an-open-source-low-footprint-resilient-file-system-designed-for-tiny-devices/).
 
-### 3.5 Port chip thứ hai
+### 3.5 Port chip thứ hai — **đã làm** (12/10/2026, `port/stm32g071`, chạy trong Renode)
+
+Xem [porting.md](porting.md). Phần dưới là ghi chú thiết kế.
 
 | Chip | Vì sao | Lưu ý |
 |---|---|---|
@@ -181,7 +192,7 @@ bắt đầu đúng từ bộ phân tích header OTA.
 Nguồn: [Beningo: fuzzing for embedded](https://www.beningo.com/embedded-technology-atlas/2026/pages/024-fuzzing-for-embedded.html) ·
 [ví dụ harness libFuzzer (usbredir)](https://gitlab.freedesktop.org/spice/usbredir/-/merge_requests/6).
 
-### 4.2 Chạy ảnh thật trong Renode (M, chỉ sau khi có port G0)
+### 4.2 Chạy ảnh thật trong Renode — **đã làm** (`tests/renode/`, job CI `stm32g071-renode`)
 
 Renode chạy đúng file `.elf` của chip trong CI (GitHub Actions + Robot Framework), bắt được lỗi khởi động và linker
 mà test host không thấy. **Không có platform STM32L1** trong Renode; có `stm32f103.repl`, `stm32g0.repl`, `stm32f4.repl`.

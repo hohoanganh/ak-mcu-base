@@ -68,6 +68,23 @@ Kênh khác (Modbus, RF…) đọc nhật ký bằng `crash_log_count()` và `cr
 
 > Cần bootloader từ 1.2.0. Bootloader cũ hơn xoá mất thông tin HardFault trước khi app kịp đọc.
 
+## 2b. Log bản ghi trên flash (`services/sys/flog.c`)
+
+Vòng ghi bản ghi cố định trên flash xoá theo sector (flash SPI của kit, hoặc flash trong qua ba hàm
+read / write / erase bất kỳ). Dùng cho số liệu đo, hộp đen, lịch sử sự kiện: ghi nối tiếp, không cần
+chỉ mục trong RAM, đọc lại theo thứ tự thời gian, chịu mất điện.
+
+- Mỗi sector mở đầu bằng header `[magic][seq][~seq]`; sector có `seq` lớn nhất là sector đang ghi.
+  Mỗi bản ghi là `[dữ liệu rec_size byte][CRC16]`; bản ghi bị cắt điện giữa chừng thì sai CRC và
+  `flog_read()` trả 0 (bỏ qua), ô sau nó vẫn trắng nên log ghi tiếp bình thường. Header bị cắt thì
+  sector được xoá lại ở lần ghi sau. Hết sector thì xoá sector cũ nhất và ghi tiếp (vòng tròn).
+- API: `flog_mount()` (đọc flash dựng lại trạng thái), `flog_append()`, `flog_count()`,
+  `flog_read(i)` (0 = cũ nhất), `flog_clear()`. Bản ghi tối đa 60 byte.
+- Ví dụ: trạm thời tiết của demo ghi mẫu 1 phút / 15 phút vào 16 sector cuối kho media
+  (`demo/scr_weather.c`), nạp lại đồ thị sau reset, `th log` in ra.
+- Test: `test_fw` ghi đầy vòng nhiều lần, cắt điện ở **từng** thao tác ghi/xoá (296 điểm) rồi mount lại:
+  thứ tự luôn đúng, mất nhiều nhất bản ghi đang ghi; `test_demo` kiểm nạp lại đồ thị sau reset.
+
 ## 3. Giám sát task
 
 `task_system` có ưu tiên cao nhất trong các task ứng dụng. Mỗi nhịp heartbeat (1 s) nó:

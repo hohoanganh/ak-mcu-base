@@ -36,7 +36,10 @@ typedef struct {
 	uint32_t load_addr;			/*  16 vector table address (APP.addr + 256) */
 	fw_version_t version;		/*  20 major.minor.patch + build (8 B) */
 	char     board[FW_IMAGE_BOARD_LEN];	/* 28 board name, '\0' padded */
-	uint8_t  reserved[FW_IMAGE_HDR_SIZE - 48];	/* 44 */
+	uint8_t  sig_type;			/*  44 FW_SIGN_NONE / FW_SIGN_ECDSA_P256 (fw_sign.h) */
+	uint8_t  sig_reserved[3];	/*  45 */
+	uint8_t  sig[64];			/*  48 ECDSA r||s over SHA-256(bytes 0..47 || binary) */
+	uint8_t  reserved[FW_IMAGE_HDR_SIZE - 112 - 4];	/* 112 */
 	uint32_t hdr_crc32;			/* 252 crc32 of bytes 0..251 */
 } fw_image_hdr_t;
 

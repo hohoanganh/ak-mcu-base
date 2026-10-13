@@ -30,7 +30,9 @@
 #define APP_CRASH_TEST			(1)
 #endif
 
-/* Modbus on the RS485 port (role: -DAPP_MODBUS_SLAVE or -DAPP_MODBUS_MASTER) */
+/* Modbus on the RS485 port (role: -DAPP_MODBUS_SLAVE, -DAPP_MODBUS_MASTER or
+ * -DAPP_MODBUS_GATEWAY = Modbus TCP server on the Ethernet chip, RTU master
+ * on RS485) */
 #ifndef APP_MB_BAUD
 #define APP_MB_BAUD						(9600)
 #endif
@@ -39,10 +41,38 @@
 #endif
 #define APP_MB_RESPONSE_TIMEOUT_MS		(200)		/* master: wait for an answer */
 
+/* gateway: static address of the Ethernet chip (no DHCP) and the TCP port.
+ * The MAC is locally administered (bit 1 of the first byte). */
+#ifndef APP_NET_MAC
+#define APP_NET_MAC						{ 0x02, 0x41, 0x4B, 0x00, 0x00, 0x01 }
+#endif
+#ifndef APP_NET_IP
+#define APP_NET_IP						{ 192, 168, 1, 80 }
+#endif
+#ifndef APP_NET_MASK
+#define APP_NET_MASK					{ 255, 255, 255, 0 }
+#endif
+#ifndef APP_NET_GW
+#define APP_NET_GW						{ 192, 168, 1, 1 }
+#endif
+#ifndef APP_MB_TCP_PORT
+#define APP_MB_TCP_PORT					(502)
+#endif
+
+/* A freshly installed image runs on trial (boot_ctrl.trial): the bootloader
+ * rolls back to the previous one unless the app confirms itself. The sample
+ * app confirms after this long without a reset: kernel, watchdog, console
+ * and the heartbeat all proved to work. 0 = never automatically (the app
+ * calls boot_ctrl_confirm() itself, or the shell: "fw confirm"). */
+#ifndef APP_FW_CONFIRM_MS
+#define APP_FW_CONFIRM_MS		(30000)
+#endif
+
 /* TASK_SYSTEM_ID */
 enum {
 	SYSTEM_SIG_INIT = AK_USER_DEFINE_SIG,
 	SYSTEM_SIG_HEARTBEAT,
+	SYSTEM_SIG_CONFIRM,		/* timer: the trial image has run long enough */
 };
 
 /* TASK_CONSOLE_ID */
@@ -55,6 +85,7 @@ enum {
 enum {
 	FW_SIG_INSTALL = AK_USER_DEFINE_SIG,	/* verified image ready in STAGING */
 	FW_SIG_LOADER,							/* reset into bootloader */
+	FW_SIG_ROLLBACK,						/* reset, bootloader puts the previous image back */
 	FW_SIG_RESET,
 	FW_SIG_DO_RESET,						/* timer: reset once logs are flushed */
 	FW_SIG_TEST_STARVE,						/* crash test: keeps the CPU, starves lower tasks */

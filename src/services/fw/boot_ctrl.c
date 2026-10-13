@@ -97,3 +97,15 @@ int boot_ctrl_set_cmd(uint8_t cmd) {
 	ctrl.cmd = cmd;
 	return boot_ctrl_save(&ctrl);
 }
+
+int boot_ctrl_confirm(void) {
+	boot_ctrl_t ctrl;
+
+	boot_ctrl_load(&ctrl);
+	if (!ctrl.trial) {
+		return 0;
+	}
+	ctrl.trial = 0;
+	ctrl.trial_boots = 0;
+	return boot_ctrl_save(&ctrl) == 0 ? 1 : -1;
+}

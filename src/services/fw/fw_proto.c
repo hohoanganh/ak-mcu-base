@@ -2,6 +2,7 @@
 
 #include "fw_proto.h"
 #include "fw_update.h"
+#include "boot_ctrl.h"
 #include "crc.h"
 #include "hal.h"
 
@@ -138,6 +139,24 @@ static void handle_frame(void) {
 
 	case FW_PROTO_CMD_RUN:
 		pending_action = FW_PROTO_ACT_RUN;
+		break;
+
+	case FW_PROTO_CMD_CONFIRM: {
+		/* r[1]: 1 = was on trial, 0 = nothing to confirm */
+		int c = boot_ctrl_confirm();
+		r[1] = (uint8_t)(c > 0);
+		rl = 2;
+		st = (c < 0) ? FW_ERR_FLASH : FW_OK;
+	}
+		break;
+
+	case FW_PROTO_CMD_ROLLBACK:
+		if (hal_flash_info(FLASH_PART_BACKUP)->size == 0) {
+			st = FW_ERR_STATE;
+		}
+		else {
+			pending_action = FW_PROTO_ACT_ROLLBACK;
+		}
 		break;
 
 	default:

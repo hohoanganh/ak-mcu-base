@@ -13,6 +13,10 @@
 #include "fw_image.h"
 #include "fw_update.h"
 #include "fw_proto.h"
+#include "fw_sign.h"
+#include "flog.h"
+#include "sha256.h"
+#include "p256-m.h"
 #include "port_host.h"
 #include "tiny_test.h"
 
@@ -81,6 +85,45 @@ static void setup(uint8_t erased) {
 	host_jump_handler = 0;
 	hal_init();
 	fw_update_abort();
+	fw_image_sign_require(0);	/* most tests use unsigned images */
+}
+
+/* p256-m needs randomness to sign (test images only; verify never calls it) */
+int p256_generate_random(uint8_t* output, unsigned output_size) {
+	static uint32_t x = 0x12345678;
+
+	while (output_size--) {
+		x = x * 1103515245UL + 12345UL;
+		*output++ = (uint8_t)(x >> 16);
+	}
+	return 0;
+}
+
+/* The key the signature tests sign with: made when they start, never stored. The
+ * verifier's public key (fw_sign_pubkey) is the writable array of tests/test_pubkey.c
+ * instead of the product key in fw_pubkey.c. */
+static uint8_t dev_priv[32];
+
+static void test_make_key(void) {
+	uint8_t pub[64];
+
+	CHECK_EQ(p256_gen_keypair(dev_priv, pub), P256_SUCCESS);
+	memcpy((void*)fw_sign_pubkey, pub, sizeof(pub));
+}
+
+/* Sign an image in memory like tools/mkimage.py --sign-key does. */
+static void sign_image(uint8_t* img, uint32_t total, const uint8_t* priv) {
+	fw_image_hdr_t* h = (fw_image_hdr_t*)img;
+	uint8_t hash[SHA256_LEN];
+	sha256_t s;
+
+	h->sig_type = FW_SIGN_ECDSA_P256;
+	sha256_init(&s);
+	sha256_update(&s, img, FW_SIGN_HDR_LEN);
+	sha256_update(&s, img + FW_IMAGE_HDR_SIZE, total - FW_IMAGE_HDR_SIZE);
+	sha256_final(&s, hash);
+	CHECK_EQ(p256_ecdsa_sign(h->sig, priv, hash, sizeof(hash)), P256_SUCCESS);
+	rehdr(img);
 }
 
 static uint8_t part_version(flash_part_t part, fw_err_t* err) {
@@ -242,10 +285,15 @@ static void test_upload_errors(void) {
 static void test_boot_decide(void) {
 	boot_state_t s;
 	const uint8_t M = BOOT_MAX_INSTALL_ATTEMPTS;
+	const uint8_t T = BOOT_MAX_TRIAL_BOOTS;
 
+	memset(&s, 0, sizeof(s));
 #define DECIDE(cmd_, att_, app_, raw_, stg_) \
 	(s.cmd = (cmd_), s.install_attempts = (att_), s.app_ok = (app_), \
 	 s.app_raw_ok = (raw_), s.staging_ok = (stg_), boot_decide(&s))
+#define DECIDE_T(cmd_, att_, app_, stg_, bak_, trial_, boots_) \
+	(s.cmd = (cmd_), s.install_attempts = (att_), s.app_ok = (app_), s.app_raw_ok = 0, \
+	 s.staging_ok = (stg_), s.backup_ok = (bak_), s.trial = (trial_), s.trial_boots = (boots_), boot_decide(&s))
 
 	CHECK_EQ(DECIDE(BOOT_CMD_NONE, 0, 1, 0, 0), BOOT_ACT_RUN);
 	CHECK_EQ(DECIDE(BOOT_CMD_NONE, 0, 1, 0, 1), BOOT_ACT_RUN);
@@ -260,7 +308,24 @@ static void test_boot_decide(void) {
 	CHECK_EQ(DECIDE(BOOT_CMD_NONE, M, 0, 1, 1), BOOT_ACT_LOADER);
 	CHECK_EQ(DECIDE(BOOT_CMD_NONE, 0, 0, 0, 0), BOOT_ACT_LOADER);
 	CHECK_EQ(DECIDE(BOOT_CMD_LOADER, 0, 1, 0, 1), BOOT_ACT_LOADER);
+
+	/* trial and rollback */
+	CHECK_EQ(DECIDE_T(BOOT_CMD_NONE, 0, 1, 0, 1, 1, 0), BOOT_ACT_RUN);			/* on trial, boots left */
+	CHECK_EQ(DECIDE_T(BOOT_CMD_NONE, 0, 1, 0, 1, 1, T - 1), BOOT_ACT_RUN);
+	CHECK_EQ(DECIDE_T(BOOT_CMD_NONE, 0, 1, 0, 1, 1, T), BOOT_ACT_ROLLBACK);		/* never confirmed */
+	CHECK_EQ(DECIDE_T(BOOT_CMD_NONE, 0, 1, 0, 0, 1, T), BOOT_ACT_RUN);			/* ...but no backup: keep it */
+	CHECK_EQ(DECIDE_T(BOOT_CMD_NONE, M, 1, 0, 1, 1, T), BOOT_ACT_RUN);			/* rollback attempts exhausted */
+	CHECK_EQ(DECIDE_T(BOOT_CMD_NONE, 0, 1, 0, 1, 0, T), BOOT_ACT_RUN);			/* confirmed: boots irrelevant */
+	CHECK_EQ(DECIDE_T(BOOT_CMD_ROLLBACK, 0, 1, 0, 1, 0, 0), BOOT_ACT_ROLLBACK);	/* app asked for it */
+	CHECK_EQ(DECIDE_T(BOOT_CMD_ROLLBACK, 0, 1, 0, 0, 0, 0), BOOT_ACT_RUN);		/* nothing to go back to */
+	CHECK_EQ(DECIDE_T(BOOT_CMD_ROLLBACK, 1, 0, 0, 1, 0, 0), BOOT_ACT_ROLLBACK);	/* resume after power loss */
+	CHECK_EQ(DECIDE_T(BOOT_CMD_UPDATE, 0, 1, 1, 1, 1, T), BOOT_ACT_INSTALL);	/* a new update wins */
+	CHECK_EQ(DECIDE_T(BOOT_CMD_LOADER, 0, 1, 1, 1, 1, T), BOOT_ACT_LOADER);
+	CHECK_EQ(DECIDE_T(BOOT_CMD_NONE, 0, 0, 0, 1, 0, 0), BOOT_ACT_ROLLBACK);		/* APP corrupt, no staging: backup */
+	CHECK_EQ(DECIDE_T(BOOT_CMD_NONE, 0, 0, 1, 1, 0, 0), BOOT_ACT_INSTALL);		/* APP corrupt: staging first */
+	CHECK_EQ(DECIDE_T(BOOT_CMD_NONE, M, 0, 0, 1, 0, 0), BOOT_ACT_LOADER);
 #undef DECIDE
+#undef DECIDE_T
 }
 
 static void test_boot_ctrl(void) {
@@ -494,11 +559,194 @@ static void test_boot_update_flow(void) {
 	CHECK_EQ(c.cmd, BOOT_CMD_NONE);
 	CHECK_EQ(c.install_count, 1);
 	CHECK_EQ(c.install_attempts, 0);
+	if (host_layout_external()) {
+		/* the old image was kept, the new one runs on trial */
+		CHECK_EQ(part_version(FLASH_PART_BACKUP, &e), 1);
+		CHECK_EQ(c.trial, 1);
+		CHECK_EQ(c.trial_boots, 1);
+	}
+	else {
+		CHECK_EQ(c.trial, 0);			/* no backup partition: no trial */
+	}
 
-	/* reboot: run directly, no reinstall */
+	/* reboot: run directly, no reinstall; one more trial boot */
 	CHECK_EQ(run_boot(0), BOOT_JUMPED);
 	boot_ctrl_load(&c);
 	CHECK_EQ(c.install_count, 1);
+	CHECK_EQ(c.trial_boots, host_layout_external() ? 2 : 0);
+
+	/* the app confirms: trial over, boots no longer counted */
+	CHECK_EQ(boot_ctrl_confirm(), host_layout_external() ? 1 : 0);
+	CHECK_EQ(boot_ctrl_confirm(), 0);
+	CHECK_EQ(run_boot(0), BOOT_JUMPED);
+	boot_ctrl_load(&c);
+	CHECK_EQ(c.trial, 0);
+	CHECK_EQ(c.trial_boots, 0);
+	CHECK_EQ(part_version(FLASH_PART_APP, &e), 2);
+}
+
+/* The new image never confirms itself: after BOOT_MAX_TRIAL_BOOTS boots the
+ * bootloader puts the old one back and forgets the rejected image. */
+static void test_boot_rollback_unconfirmed(void) {
+	uint32_t n;
+	fw_err_t e;
+	boot_ctrl_t c;
+
+	if (!host_layout_external()) {
+		return;
+	}
+	setup(0xFF);
+	n = make_image(img_buf, 4000, 1, 0, 0, HOST_BOARD_NAME, 1);
+	put_part(FLASH_PART_APP, img_buf, n);
+	n = make_image(img_buf, 9000, 2, 0, 0, HOST_BOARD_NAME, 2);
+	CHECK_EQ(upload(img_buf, n, 128), FW_OK);
+	boot_ctrl_set_cmd(BOOT_CMD_UPDATE);
+
+	for (int i = 0; i < BOOT_MAX_TRIAL_BOOTS; i++) {
+		CHECK_EQ(run_boot(0), BOOT_JUMPED);		/* install + trial boot 1, then 2, 3 */
+		CHECK_EQ(part_version(FLASH_PART_APP, &e), 2);
+		boot_ctrl_load(&c);
+		CHECK_EQ(c.trial_boots, i + 1);
+	}
+	CHECK_EQ(run_boot(0), BOOT_JUMPED);			/* rollback, then run v1 */
+	CHECK_EQ(part_version(FLASH_PART_APP, &e), 1);
+	boot_ctrl_load(&c);
+	CHECK_EQ(c.cmd, BOOT_CMD_NONE);
+	CHECK_EQ(c.trial, 0);
+	CHECK_EQ(c.rolled_back, 1);
+	CHECK_EQ(c.install_attempts, 0);
+	CHECK_EQ(part_version(FLASH_PART_STAGING, &e), 0);	/* rejected image gone */
+	CHECK_EQ(e, FW_ERR_MAGIC);
+
+	/* v1 is not on trial: it keeps running, nothing changes */
+	CHECK_EQ(run_boot(0), BOOT_JUMPED);
+	CHECK_EQ(part_version(FLASH_PART_APP, &e), 1);
+	boot_ctrl_load(&c);
+	CHECK_EQ(c.rolled_back, 1);
+	CHECK_EQ(c.trial, 0);
+}
+
+/* The app asks for the previous image (BOOT_CMD_ROLLBACK), e.g. "fw rollback". */
+static void test_boot_rollback_on_request(void) {
+	uint32_t n;
+	fw_err_t e;
+	boot_ctrl_t c;
+
+	if (!host_layout_external()) {
+		return;
+	}
+	setup(0xFF);
+	n = make_image(img_buf, 4000, 1, 0, 0, HOST_BOARD_NAME, 1);
+	put_part(FLASH_PART_APP, img_buf, n);
+	n = make_image(img_buf, 9000, 2, 0, 0, HOST_BOARD_NAME, 2);
+	CHECK_EQ(upload(img_buf, n, 128), FW_OK);
+	boot_ctrl_set_cmd(BOOT_CMD_UPDATE);
+	CHECK_EQ(run_boot(0), BOOT_JUMPED);
+	CHECK_EQ(boot_ctrl_confirm(), 1);
+
+	CHECK_EQ(boot_ctrl_set_cmd(BOOT_CMD_ROLLBACK), 0);
+	CHECK_EQ(run_boot(0), BOOT_JUMPED);
+	CHECK_EQ(part_version(FLASH_PART_APP, &e), 1);
+	boot_ctrl_load(&c);
+	CHECK_EQ(c.cmd, BOOT_CMD_NONE);
+	CHECK_EQ(c.rolled_back, 1);
+
+	/* a rollback with nothing to go back to is dropped, the app keeps running */
+	memset(host_part_mem(FLASH_PART_BACKUP), 0xFF, 4096);
+	CHECK_EQ(boot_ctrl_set_cmd(BOOT_CMD_ROLLBACK), 0);
+	CHECK_EQ(run_boot(0), BOOT_JUMPED);
+	CHECK_EQ(part_version(FLASH_PART_APP, &e), 1);
+	boot_ctrl_load(&c);
+	CHECK_EQ(c.cmd, BOOT_CMD_NONE);
+
+	/* an image installed while APP was invalid has no backup: never on trial */
+	setup(0xFF);
+	n = make_image(img_buf, 9000, 2, 0, 0, HOST_BOARD_NAME, 2);
+	put_part(FLASH_PART_STAGING, img_buf, n);
+	boot_ctrl_set_cmd(BOOT_CMD_UPDATE);
+	for (int i = 0; i < BOOT_MAX_TRIAL_BOOTS + 2; i++) {
+		CHECK_EQ(run_boot(0), BOOT_JUMPED);
+		CHECK_EQ(part_version(FLASH_PART_APP, &e), 2);
+	}
+	boot_ctrl_load(&c);
+	CHECK_EQ(c.trial, 0);
+}
+
+/* APP corrupt, STAGING useless, BACKUP good: the bootloader restores BACKUP. */
+static void test_boot_recover_from_backup(void) {
+	uint32_t n;
+	fw_err_t e;
+
+	if (!host_layout_external()) {
+		return;
+	}
+	setup(0xFF);
+	n = make_image(img_buf, 5000, 3, 0, 0, HOST_BOARD_NAME, 9);
+	put_part(FLASH_PART_BACKUP, img_buf, n);
+	put_part(FLASH_PART_APP, img_buf, n);
+	host_part_mem(FLASH_PART_APP)[2000] ^= 0x10;
+	memset(host_part_mem(FLASH_PART_STAGING), 0xA5, 4096);
+	CHECK_EQ(run_boot(0), BOOT_JUMPED);
+	CHECK_EQ(part_version(FLASH_PART_APP, &e), 3);
+	CHECK_EQ(jumped_addr, app_entry());
+}
+
+/* Trial expired -> rollback, power cut at EVERY flash operation of it: the
+ * board always ends up running v1, never a partial image. */
+static void test_boot_rollback_power_cut_everywhere(void) {
+	static uint8_t old_img[0x10000];
+	uint32_t n_old, n_new, total_ops, k;
+	int failures = 0;
+	fw_err_t e;
+	boot_ctrl_t c;
+
+	if (!host_layout_external()) {
+		return;
+	}
+	setup(0xFF);
+	n_old = make_image(old_img, 6000, 1, 0, 0, HOST_BOARD_NAME, 11);
+	n_new = make_image(img_buf, 7000, 2, 0, 0, HOST_BOARD_NAME, 22);
+	put_part(FLASH_PART_APP, img_buf, n_new);
+	put_part(FLASH_PART_BACKUP, old_img, n_old);
+	put_part(FLASH_PART_STAGING, img_buf, n_new);
+	boot_ctrl_load(&c);
+	c.trial = 1;
+	c.trial_boots = BOOT_MAX_TRIAL_BOOTS;
+	boot_ctrl_save(&c);
+	{
+		uint32_t before = host_flash_ops();
+		CHECK_EQ(run_boot(0), BOOT_JUMPED);
+		total_ops = host_flash_ops() - before;
+	}
+	CHECK_EQ(part_version(FLASH_PART_APP, &e), 1);
+	CHECK(total_ops > 50);
+
+	for (k = 1; k <= total_ops; k++) {
+		int r, boots = 0;
+
+		setup(0xFF);
+		put_part(FLASH_PART_APP, img_buf, n_new);
+		put_part(FLASH_PART_BACKUP, old_img, n_old);
+		put_part(FLASH_PART_STAGING, img_buf, n_new);
+		boot_ctrl_load(&c);
+		c.trial = 1;
+		c.trial_boots = BOOT_MAX_TRIAL_BOOTS;
+		boot_ctrl_save(&c);
+
+		r = run_boot(k);
+		while (r == BOOT_CUT && boots < 5) {
+			r = run_boot(0);
+			boots++;
+		}
+		if (r != BOOT_JUMPED || part_version(FLASH_PART_APP, &e) != 1) {
+			failures++;
+			if (failures < 5) {
+				printf("    cut at op %u: r=%d app=%s\n", k, r, fw_err_str(e));
+			}
+		}
+	}
+	printf("    %u cut points tested\n", total_ops);
+	CHECK_EQ(failures, 0);
 }
 
 /* Power cut at EVERY erase/write of an install. After each cut, reboot until
@@ -536,7 +784,8 @@ static void test_boot_power_cut_everywhere(void) {
 			r = run_boot(0);	/* power back on */
 			boots++;
 		}
-		if (r != BOOT_JUMPED || part_version(FLASH_PART_APP, &e) != 2) {
+		if (r != BOOT_JUMPED || part_version(FLASH_PART_APP, &e) != 2 ||
+				(host_layout_external() && part_version(FLASH_PART_BACKUP, &e) != 1)) {
 			failures++;
 			if (failures < 5) {
 				printf("    cut at op %u: r=%d app=%s\n", k, r, fw_err_str(e));
@@ -791,8 +1040,337 @@ static void test_boot_recover_power_cut_everywhere(void) {
 	CHECK_EQ(failures, 0);
 }
 
+/*----------------------------------------------------------------------------
+ * flog: record ring on a RAM "NOR" with power-cut injection
+ *--------------------------------------------------------------------------*/
+#define FL_SECTOR		(512U)
+#define FL_SECTORS		(4)
+#define FL_BASE			(1024U)
+static uint8_t fl_mem[FL_BASE + FL_SECTOR * FL_SECTORS];
+static uint32_t fl_ops, fl_cut_at;
+static jmp_buf fl_cut_jmp;
+
+typedef struct {
+	uint32_t n;			/* sequence number of the record */
+	uint8_t  pad[5];
+} fl_rec_t;				/* 9 B: an odd size, slot 11 B */
+
+static void fl_tick(void) {
+	fl_ops++;
+	if (fl_cut_at && fl_ops >= fl_cut_at) {
+		longjmp(fl_cut_jmp, 1);
+	}
+}
+static uint8_t fl_read(uint32_t off, void* buf, uint32_t len) {
+	if (off + len > sizeof(fl_mem)) return 0;
+	memcpy(buf, fl_mem + off, len);
+	return 1;
+}
+static uint8_t fl_write(uint32_t off, const void* data, uint32_t len) {
+	if (off + len > sizeof(fl_mem)) return 0;
+	/* a cut lands in the middle of the write: the first half is on flash */
+	if (fl_cut_at && fl_ops + 1 >= fl_cut_at) {
+		for (uint32_t i = 0; i < len / 2; i++) fl_mem[off + i] &= ((const uint8_t*)data)[i];
+	}
+	fl_tick();
+	for (uint32_t i = 0; i < len; i++) fl_mem[off + i] &= ((const uint8_t*)data)[i];
+	return 1;
+}
+static uint8_t fl_erase(uint32_t off) {
+	if (off % FL_SECTOR || off + FL_SECTOR > sizeof(fl_mem)) return 0;
+	if (fl_cut_at && fl_ops + 1 >= fl_cut_at) {
+		memset(fl_mem + off, 0xFF, FL_SECTOR / 2);	/* half erased */
+	}
+	fl_tick();
+	memset(fl_mem + off, 0xFF, FL_SECTOR);
+	return 1;
+}
+static const flog_ops_t fl_ops_tbl = { fl_read, fl_write, fl_erase };
+
+static int fl_mount(flog_t* l) {
+	return flog_mount(l, &fl_ops_tbl, FL_BASE, FL_SECTOR, FL_SECTORS, sizeof(fl_rec_t));
+}
+
+/* every readable record is in order; returns the number of torn ones */
+static int fl_check_order(const flog_t* l, uint32_t* last_n) {
+	fl_rec_t r;
+	uint32_t prev = 0;
+	int torn = 0;
+
+	for (uint32_t i = 0; i < flog_count(l); i++) {
+		int ok = flog_read(l, i, &r);
+		if (ok == 1) {
+			CHECK(prev == 0 || r.n > prev);
+			prev = r.n;
+		}
+		else {
+			CHECK_EQ(ok, 0);
+			torn++;
+		}
+	}
+	*last_n = prev;
+	return torn;
+}
+
+static void test_flog_ring(void) {
+	flog_t l;
+	fl_rec_t r;
+	uint32_t per, last;
+
+	memset(fl_mem, 0x00, sizeof(fl_mem));		/* a foreign, unformatted region */
+	fl_ops = fl_cut_at = 0;
+	CHECK_EQ(fl_mount(&l), 0);
+	CHECK_EQ(flog_count(&l), 0);
+	CHECK_EQ(flog_read(&l, 0, &r), -1);
+	per = l.per_sector;
+	CHECK_EQ(per, (FL_SECTOR - FLOG_HDR_SIZE) / (sizeof(fl_rec_t) + 2));
+
+	/* fill one sector and a bit, remount: everything back */
+	for (uint32_t n = 1; n <= per + 3; n++) {
+		memset(&r, 0, sizeof(r));
+		r.n = n;
+		CHECK_EQ(flog_append(&l, &r), 0);
+	}
+	CHECK_EQ(flog_count(&l), per + 3);
+	CHECK_EQ(fl_mount(&l), 0);
+	CHECK_EQ(flog_count(&l), per + 3);
+	CHECK_EQ(l.used, 2);
+	CHECK_EQ(flog_read(&l, 0, &r), 1);
+	CHECK_EQ(r.n, 1);
+	CHECK_EQ(flog_read(&l, per + 2, &r), 1);
+	CHECK_EQ(r.n, per + 3);
+	CHECK_EQ(fl_check_order(&l, &last), 0);
+
+	/* wrap the ring several times: the oldest sector goes, order is kept */
+	for (uint32_t n = per + 4; n <= 10 * per; n++) {
+		r.n = n;
+		CHECK_EQ(flog_append(&l, &r), 0);
+	}
+	CHECK_EQ(l.used, FL_SECTORS);
+	CHECK(flog_count(&l) > (FL_SECTORS - 1) * per && flog_count(&l) <= FL_SECTORS * per);
+	CHECK_EQ(fl_check_order(&l, &last), 0);
+	CHECK_EQ(last, 10 * per);
+	CHECK_EQ(fl_mount(&l), 0);
+	CHECK_EQ(fl_check_order(&l, &last), 0);
+	CHECK_EQ(last, 10 * per);
+	CHECK_EQ(flog_read(&l, 0, &r), 1);
+	CHECK_EQ(r.n, 10 * per - flog_count(&l) + 1);
+
+	/* clear: every header is gone, so the ring starts over */
+	CHECK_EQ(flog_clear(&l), 0);
+	CHECK_EQ(flog_count(&l), 0);
+	CHECK_EQ(fl_mount(&l), 0);
+	CHECK_EQ(flog_count(&l), 0);
+	r.n = 1;
+	CHECK_EQ(flog_append(&l, &r), 0);
+	CHECK_EQ(fl_mount(&l), 0);
+	CHECK_EQ(flog_count(&l), 1);
+	CHECK_EQ(l.head_seq, 1);
+
+	/* bad arguments */
+	CHECK_EQ(flog_mount(&l, &fl_ops_tbl, FL_BASE, FL_SECTOR, 1, 9), -1);
+	CHECK_EQ(flog_mount(&l, &fl_ops_tbl, FL_BASE, FL_SECTOR, 4, 0), -1);
+	CHECK_EQ(flog_mount(&l, &fl_ops_tbl, FL_BASE, 16, 4, 9), -1);
+}
+
+/* Power cut at every flash operation while the ring wraps twice: after each
+ * cut the log mounts, keeps its order, loses at most the record being
+ * written, and goes on taking records. */
+static void test_flog_power_cut_everywhere(void) {
+	static uint8_t snapshot[sizeof(fl_mem)];
+	flog_t l;
+	fl_rec_t r;
+	uint32_t total_ops, k, last, next_n;
+	int torn_total = 0, failures = 0;
+
+	memset(fl_mem, 0xFF, sizeof(fl_mem));
+	fl_ops = fl_cut_at = 0;
+	CHECK_EQ(fl_mount(&l), 0);
+	memcpy(snapshot, fl_mem, sizeof(fl_mem));
+	next_n = 1;
+	for (uint32_t n = 1; n <= 2 * FL_SECTORS * l.per_sector; n++) {
+		memset(&r, 0, sizeof(r));
+		r.n = n;
+		flog_append(&l, &r);
+	}
+	total_ops = fl_ops;
+	CHECK(total_ops > 100);
+
+	for (k = 1; k <= total_ops; k++) {
+		uint32_t before;
+
+		memcpy(fl_mem, snapshot, sizeof(fl_mem));
+		fl_ops = 0;
+		fl_cut_at = k;
+		CHECK_EQ(fl_mount(&l), 0);
+		if (setjmp(fl_cut_jmp) == 0) {
+			for (uint32_t n = 1; ; n++) {
+				memset(&r, 0, sizeof(r));
+				r.n = n;
+				flog_append(&l, &r);
+			}
+		}
+		fl_cut_at = 0;
+		/* power back on */
+		if (fl_mount(&l) != 0) {
+			failures++;
+			continue;
+		}
+		torn_total += fl_check_order(&l, &last);
+		before = flog_count(&l);
+		/* the log keeps working: 2 more records, both readable */
+		r.n = last + 1;
+		if (flog_append(&l, &r) != 0 || flog_append(&l, &r) != 0 || flog_count(&l) < 2 ||
+				flog_read(&l, flog_count(&l) - 1, &r) != 1 || r.n != last + 1 ||
+				flog_read(&l, flog_count(&l) - 2, &r) != 1 || r.n != last + 1) {
+			failures++;
+		}
+		(void)before;
+		(void)next_n;
+	}
+	printf("    %u cut points tested, %d torn records seen\n", total_ops, torn_total);
+	CHECK_EQ(failures, 0);
+	CHECK(torn_total > 0);		/* the cuts really land inside writes */
+}
+
+/*----------------------------------------------------------------------------
+ * signed images
+ *--------------------------------------------------------------------------*/
+static void test_sha256(void) {
+	static const uint8_t abc[] = { 0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41, 0x41, 0x40, 0xde,
+		0x5d, 0xae, 0x22, 0x23, 0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c, 0xb4, 0x10, 0xff, 0x61,
+		0xf2, 0x00, 0x15, 0xad };
+	static const uint8_t empty[] = { 0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4,
+		0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99,
+		0x1b, 0x78, 0x52, 0xb8, 0x55 };
+	/* "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" */
+	static const uint8_t two_blocks[] = { 0x24, 0x8d, 0x6a, 0x61, 0xd2, 0x06, 0x38, 0xb8, 0xe5, 0xc0,
+		0x26, 0x93, 0x0c, 0x3e, 0x60, 0x39, 0xa3, 0x3c, 0xe4, 0x59, 0x64, 0xff, 0x21, 0x67, 0xf6, 0xec,
+		0xed, 0xd4, 0x19, 0xdb, 0x06, 0xc1 };
+	uint8_t out[SHA256_LEN];
+	sha256_t s;
+	const char* msg = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+
+	sha256("abc", 3, out);
+	CHECK(memcmp(out, abc, 32) == 0);
+	sha256("", 0, out);
+	CHECK(memcmp(out, empty, 32) == 0);
+	sha256(msg, 56, out);
+	CHECK(memcmp(out, two_blocks, 32) == 0);
+	/* streamed in odd pieces: same result */
+	sha256_init(&s);
+	sha256_update(&s, msg, 7);
+	sha256_update(&s, msg + 7, 30);
+	sha256_update(&s, msg + 37, 19);
+	sha256_final(&s, out);
+	CHECK(memcmp(out, two_blocks, 32) == 0);
+	/* a million 'a': 1 MB through the streaming interface */
+	{
+		static const uint8_t million[] = { 0xcd, 0xc7, 0x6e, 0x5c, 0x99, 0x14, 0xfb, 0x92, 0x81, 0xa1,
+			0xc7, 0xe2, 0x84, 0xd7, 0x3e, 0x67, 0xf1, 0x80, 0x9a, 0x48, 0xa4, 0x97, 0x20, 0x0e, 0x04, 0x6d,
+			0x39, 0xcc, 0xc7, 0x11, 0x2c, 0xd0 };
+		uint8_t a[1000];
+
+		memset(a, 'a', sizeof(a));
+		sha256_init(&s);
+		for (int i = 0; i < 1000; i++) {
+			sha256_update(&s, a, sizeof(a));
+		}
+		sha256_final(&s, out);
+		CHECK(memcmp(out, million, 32) == 0);
+	}
+}
+
+/* With the signature required: unsigned, tampered and foreign-key images are
+ * refused, a properly signed one is installed and runs. */
+static void test_image_signature(void) {
+	uint32_t n;
+	fw_err_t e;
+	uint8_t other_priv[32], other_pub[64];
+
+	test_make_key();
+	setup(0xFF);
+	fw_image_sign_require(1);
+
+	/* unsigned: refused at the header, before the binary is read */
+	n = make_image(img_buf, 3000, 1, 0, 0, HOST_BOARD_NAME, 1);
+	CHECK_EQ(upload(img_buf, n, 128), FW_ERR_SIG);
+	CHECK_EQ(fw_update_state(), FW_UPDATE_IDLE);
+
+	/* signed with the test key: accepted */
+	sign_image(img_buf, n, dev_priv);
+	CHECK_EQ(upload(img_buf, n, 128), FW_OK);
+	CHECK_EQ(part_version(FLASH_PART_STAGING, &e), 1);
+
+	/* a changed byte of the binary with the CRC fixed up: the signature catches it */
+	{
+		fw_image_hdr_t* h = (fw_image_hdr_t*)img_buf;
+		img_buf[FW_IMAGE_HDR_SIZE + 1234] ^= 0x01;
+		h->img_crc32 = crc32_update(CRC32_INIT, img_buf + FW_IMAGE_HDR_SIZE, h->img_size);
+		rehdr(img_buf);
+		CHECK_EQ(upload(img_buf, n, 128), FW_ERR_SIG);
+		img_buf[FW_IMAGE_HDR_SIZE + 1234] ^= 0x01;
+		h->img_crc32 = crc32_update(CRC32_INIT, img_buf + FW_IMAGE_HDR_SIZE, h->img_size);
+		rehdr(img_buf);
+		CHECK_EQ(upload(img_buf, n, 128), FW_OK);
+		/* a changed signed header field (version) too */
+		h->version.build = 99;
+		rehdr(img_buf);
+		CHECK_EQ(upload(img_buf, n, 128), FW_ERR_SIG);
+		h->version.build = 1;
+		rehdr(img_buf);
+		/* a changed signature byte */
+		h->sig[10] ^= 0x80;
+		rehdr(img_buf);
+		CHECK_EQ(upload(img_buf, n, 128), FW_ERR_SIG);
+		h->sig[10] ^= 0x80;
+		rehdr(img_buf);
+	}
+
+	/* signed with another key: refused */
+	CHECK_EQ(p256_gen_keypair(other_priv, other_pub), P256_SUCCESS);
+	n = make_image(img_buf, 3000, 2, 0, 0, HOST_BOARD_NAME, 2);
+	sign_image(img_buf, n, other_priv);
+	CHECK_EQ(upload(img_buf, n, 128), FW_ERR_SIG);
+
+	/* boot: a signed app runs, a signed update is installed, an unsigned
+	 * update is dropped and the signed app keeps running */
+	setup(0xFF);
+	fw_image_sign_require(1);
+	n = make_image(img_buf, 4000, 1, 0, 0, HOST_BOARD_NAME, 1);
+	sign_image(img_buf, n, dev_priv);
+	put_part(FLASH_PART_APP, img_buf, n);
+	CHECK_EQ(run_boot(0), BOOT_JUMPED);
+	n = make_image(img_buf, 5000, 2, 0, 0, HOST_BOARD_NAME, 2);
+	sign_image(img_buf, n, dev_priv);
+	put_part(FLASH_PART_STAGING, img_buf, n);
+	boot_ctrl_set_cmd(BOOT_CMD_UPDATE);
+	CHECK_EQ(run_boot(0), BOOT_JUMPED);
+	CHECK_EQ(part_version(FLASH_PART_APP, &e), 2);
+	n = make_image(img_buf, 5000, 3, 0, 0, HOST_BOARD_NAME, 3);
+	put_part(FLASH_PART_STAGING, img_buf, n);
+	boot_ctrl_set_cmd(BOOT_CMD_UPDATE);
+	CHECK_EQ(run_boot(0), BOOT_JUMPED);
+	CHECK_EQ(part_version(FLASH_PART_APP, &e), 2);
+	CHECK_EQ(part_version(FLASH_PART_STAGING, &e), 0);
+	CHECK_EQ(e, FW_ERR_SIG);
+
+	/* an unsigned APP (flashed over SWD) does not run either: loader */
+	setup(0xFF);
+	fw_image_sign_require(1);
+	n = make_image(img_buf, 4000, 1, 0, 0, HOST_BOARD_NAME, 1);
+	put_part(FLASH_PART_APP, img_buf, n);
+	inject_frame(FW_PROTO_CMD_RESET, 1, 0, 0);
+	CHECK_EQ(run_boot(0), BOOT_RESET);
+	fw_image_sign_require(0);
+}
+
 TT_MAIN_BEGIN("test_fw")
 	RUN_TEST(test_crc);
+	RUN_TEST(test_sha256);
+	RUN_TEST(test_image_signature);
+	RUN_TEST(test_flog_ring);
+	RUN_TEST(test_flog_power_cut_everywhere);
 	RUN_TEST(test_boot_decide);
 	RUN_TEST(test_proto_robustness);
 
@@ -812,6 +1390,10 @@ TT_MAIN_BEGIN("test_fw")
 		RUN_TEST(test_boot_runs_valid_app);
 		RUN_TEST(test_boot_skips_staging_when_app_ok);
 		RUN_TEST(test_boot_update_flow);
+		RUN_TEST(test_boot_rollback_unconfirmed);
+		RUN_TEST(test_boot_rollback_on_request);
+		RUN_TEST(test_boot_recover_from_backup);
+		RUN_TEST(test_boot_rollback_power_cut_everywhere);
 		RUN_TEST(test_boot_recover_corrupt_app);
 		RUN_TEST(test_loader_full_flow);
 		RUN_TEST(test_boot_attempts_exhausted);

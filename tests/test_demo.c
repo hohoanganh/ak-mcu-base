@@ -1107,12 +1107,81 @@ static void test_weather(void) {
 	}
 
 	sht_present = 0;							/* sensor gone */
+	weather_log_clear();
 	frames(&scr_weather, 30);
 	CHECK_EQ(weather_now(&t, &h), 0);
 	snapshot("27_weather_no_sensor");
 	sht_present = 1;
 	frames(&scr_weather, 30);
 	CHECK_EQ(weather_now(&t, &h), 1);
+}
+
+/* Samples at the 1 min rate land in the flash log; after a "reset"
+ * (weather_init) the graph and the rate are back from the log, and the 1 s
+ * rate is never logged. */
+static void test_weather_log(void) {
+	weather_rec_t r;
+	uint32_t n;
+	int16_t t;
+	uint16_t h;
+
+	sht_present = 1;
+	weather_log_clear();
+	weather_init();
+	CHECK_EQ(weather_log_count(), 0);
+	CHECK_EQ(weather_period_s(), 1);
+	scr_weather.enter();
+	frames(&scr_weather, 20 * 10);				/* 10 s at 1 s: RAM only */
+	CHECK(weather_count() >= 9);
+	CHECK_EQ(weather_log_count(), 0);
+
+	scr_weather.key(KIT_BTN_2);					/* 1 min */
+	frames(&scr_weather, 20 * 60 * 5 + 10);		/* 5 minutes: 6 samples */
+	n = weather_log_count();
+	CHECK_EQ(n, weather_count());
+	CHECK(n >= 5 && n <= 7);
+	CHECK_EQ(weather_log_read(n - 1, &r), 1);
+	CHECK_EQ(r.period, 1);
+	CHECK(r.t10 > 240 && r.t10 < 290);
+	CHECK_EQ(r.hh, 0xFF);						/* no RTC in this test */
+	weather_sample((uint8_t)(weather_count() - 1), &t, &h);
+	CHECK_EQ(r.t10, t);
+	CHECK_EQ(r.rh10, h);
+
+	/* reset: the graph is reloaded, the rate too; the first reading after
+	 * the reset is a fresh point, then one a minute */
+	weather_init();
+	CHECK_EQ(weather_period_s(), 60);
+	CHECK_EQ(weather_count(), n);
+	weather_sample(0, &t, &h);
+	CHECK_EQ(weather_log_read(0, &r), 1);
+	CHECK_EQ(r.t10, t);
+	frames(&scr_weather, 20 * 60 + 10);
+	CHECK_EQ(weather_log_count(), n + 2);
+	snapshot("27_weather_from_log");
+
+	/* a run at 15 min, then back to 1 min: only the newest run is reloaded */
+	scr_weather.key(KIT_BTN_2);					/* 15 min: a point now, then every 15 min */
+	frames(&scr_weather, 20 * 60 * 31);			/* 31 min: 3 samples */
+	CHECK_EQ(weather_log_count(), n + 2 + 3);
+	weather_init();
+	CHECK_EQ(weather_period_s(), 900);
+	CHECK_EQ(weather_count(), 3);
+
+	rtc_present = 1;
+	rtc_h = 12; rtc_m = 34; rtc_s = 56;
+	rtc_base_ms = now_ms;
+	scr_weather.key(KIT_BTN_2);
+	scr_weather.key(KIT_BTN_2);					/* 1 min again, with the clock set */
+	frames(&scr_weather, 20 * 60 + 10);
+	CHECK_EQ(weather_log_read(weather_log_count() - 1, &r), 1);
+	CHECK_EQ(r.hh, 12);
+	CHECK(r.mm == 34 || r.mm == 35);
+	rtc_present = 0;
+	sht_present = 0;
+	weather_log_clear();
+	weather_init();
+	CHECK_EQ(weather_log_count(), 0);
 }
 
 static void test_maze(void) {
@@ -2160,6 +2229,7 @@ int main(int argc, char** argv) {
 	RUN_TEST(test_music);
 	RUN_TEST(test_video);
 	RUN_TEST(test_weather);
+	RUN_TEST(test_weather_log);
 	RUN_TEST(test_maze);
 	RUN_TEST(test_tetris);
 	RUN_TEST(test_breakout);

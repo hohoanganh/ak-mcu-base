@@ -7,6 +7,9 @@
  *   FLASH_PART_STAGING : download slot for new images (OTA) before install.
  *                        Internal flash by default, or external SPI NOR -
  *                        the port only has to report info + erase/write.
+ *   FLASH_PART_BACKUP  : copy of the APP image taken by the bootloader before
+ *                        it installs a new one: the image a rollback returns
+ *                        to. A port without room for it reports size 0.
  *
  * Offsets are relative to the partition start. Returns 0 = OK, < 0 = error.
  ******************************************************************************
@@ -26,6 +29,7 @@ typedef enum {
 	FLASH_PART_BOOT = 0,
 	FLASH_PART_APP,
 	FLASH_PART_STAGING,
+	FLASH_PART_BACKUP,
 	FLASH_PART_NUM
 } flash_part_t;
 

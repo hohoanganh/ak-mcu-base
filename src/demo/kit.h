@@ -85,9 +85,12 @@ extern uint8_t kit_spi_sniff_frame(uint16_t i, const uint8_t** data, uint16_t* l
  * pin, to tell SCK / CSN / DATA apart before capturing */
 extern void kit_spi_watch(uint32_t n, uint8_t pull, uint32_t high[3], uint32_t edges[3]);	/* pull: 0 none, 1 up, 2 down */
 
-/* Media store: the part of the SPI flash the firmware update does not use.
- * Erase before writing; an erase clears one sector of KIT_STORE_SECTOR bytes
- * and can take some 100 ms. All return 1 on success. */
+/* Media store: the part of the SPI flash the firmware update does not use
+ * (0 up to the OTA staging area). Who uses what, counted in sectors from the
+ * end: the last sector holds the block program (scr_blocks.c), the
+ * WEATHER_LOG_SECTORS before it the weather log (scr_weather.c), the video
+ * clip starts at 0. Erase before writing; an erase clears one sector of
+ * KIT_STORE_SECTOR bytes and can take some 100 ms. All return 1 on success. */
 #define KIT_STORE_SECTOR	(4096U)
 extern uint32_t kit_store_size(void);					/* bytes, 0 = no flash */
 extern uint8_t kit_store_read(uint32_t off, void* buf, uint32_t len);

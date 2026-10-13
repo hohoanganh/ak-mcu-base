@@ -1,0 +1,29 @@
+:name: ak-mcu-base on STM32G071
+:description: Bootloader + app of the stm32g071 port on Renode's STM32G0 platform. Console on usart2.
+
+using sysbus
+$name?="ak-g071"
+mach create $name
+
+machine LoadPlatformDescription @platforms/cpus/stm32g0.repl
+# A real STM32 aliases the flash at address 0 and fetches SP/PC from there
+# after every reset; the platform file has nothing at 0. A copy of the
+# bootloader there (vectors hold absolute flash addresses) does the job: the
+# bootloader starts the app through a reset, so this alias is essential.
+machine LoadPlatformDescriptionFromString "boot_alias: Memory.MappedMemory @ sysbus 0x0 { size: 0x3000 }"
+
+$boot?=@build/stm32g071/boot.elf
+$bootbin?=@build/stm32g071/boot.bin
+$app?=@build/stm32g071/app.elf
+
+showAnalyzer usart2
+
+macro reset
+"""
+    sysbus LoadELF $app
+    sysbus LoadELF $boot
+    sysbus LoadBinary $bootbin 0x0
+    cpu VectorTableOffset 0x08000000
+"""
+
+runMacro $reset

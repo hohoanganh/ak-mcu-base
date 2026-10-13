@@ -27,10 +27,13 @@ extern "C"
 #define HOST_RAM_END			(0x20004000UL)
 #define HOST_BOARD_NAME			"ak-host"
 
-/* Emulated external SPI NOR staging (same as stm32l151 external mode) */
+/* Emulated external SPI NOR: staging + backup (same as stm32l151 external mode) */
 #define HOST_EXT_STAGING_ADDR	(0x00080000UL)
 #define HOST_EXT_STAGING_SIZE	(0x1D000UL)
+#define HOST_EXT_BACKUP_ADDR	(0x000A0000UL)
+#define HOST_EXT_BACKUP_SIZE	(0x1D000UL)
 #define HOST_EXT_SECTOR			(4096UL)
+#define HOST_EXT_MEM_SIZE		(HOST_EXT_BACKUP_ADDR + HOST_EXT_BACKUP_SIZE - HOST_EXT_STAGING_ADDR)
 
 /* Reset all port state (flash erased, NVM blank). */
 extern void host_reset_state(uint8_t erased_val);
@@ -90,6 +93,15 @@ extern uint8_t host_cur_sig(void);
 extern void host_rs485_inject(const uint8_t* data, uint32_t len);
 extern uint32_t host_rs485_take_tx(uint8_t* out, uint32_t max);
 extern uint32_t host_rs485_baud(void);
+
+/* Emulated Ethernet chip (hal_tcp.h): present or not, a client that
+ * connects / disconnects, its bytes in and the firmware's bytes out. */
+extern void host_tcp_set_present(uint8_t present);		/* default 1 */
+extern uint16_t host_tcp_port(void);					/* 0 = not listening */
+extern int host_tcp_connect(void);						/* 0 = ok, -1 = not listening / busy */
+extern void host_tcp_disconnect(void);
+extern void host_tcp_inject(const uint8_t* data, uint32_t len);
+extern uint32_t host_tcp_take_tx(uint8_t* out, uint32_t max);
 
 /* Periodic service: feeds elapsed ms to hal_tick_hook(). */
 extern void host_service(void);

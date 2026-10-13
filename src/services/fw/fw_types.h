@@ -31,6 +31,7 @@ typedef enum {
 	FW_ERR_CMD = 11,
 	FW_ERR_SIZE = 12,
 	FW_ERR_VECTOR = 13,
+	FW_ERR_SIG = 14,		/* unsigned, or signed with another key (FW_IMAGE_SIGN builds) */
 } fw_err_t;
 
 typedef struct {

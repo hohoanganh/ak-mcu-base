@@ -13,7 +13,7 @@
 # ==============================================================================
 cmake_minimum_required(VERSION 3.16)
 
-set(AK_PORT "host" CACHE STRING "Target port: host | stm32l151")
+set(AK_PORT "host" CACHE STRING "Target port: host | stm32l151 | stm32g071")
 
 project(ak_mcu_base C ASM)
 
@@ -24,7 +24,7 @@ set(CMAKE_C_EXTENSIONS ON)
 # App version: edit here or pass -DAPP_VERSION=1.2.3
 set(APP_VERSION "1.3.8" CACHE STRING "App version major.minor.patch")
 set(APP_BUILD "0" CACHE STRING "Build number (incremented by CI)")
-set(BOOT_VERSION "1.2.2" CACHE STRING "Bootloader version")
+set(BOOT_VERSION "1.3.0" CACHE STRING "Bootloader version")
 
 string(REPLACE "." ";" _av ${APP_VERSION})
 list(GET _av 0 APP_VER_MAJOR)
@@ -53,6 +53,7 @@ set(COMMON_SRC
 	${SRC}/common/xprintf.c
 	${SRC}/common/crc.c
 	${SRC}/common/ak_log.c
+	${SRC}/common/sha256.c
 )
 
 set(FW_SRC
@@ -60,25 +61,38 @@ set(FW_SRC
 	${SRC}/services/fw/fw_update.c
 	${SRC}/services/fw/fw_proto.c
 	${SRC}/services/fw/boot_ctrl.c
+	${SRC}/services/fw/fw_pubkey.c
 )
 
 set(SYS_SRC
 	${SRC}/services/sys/crash_log.c
+	${SRC}/services/sys/flog.c
 )
 
-# Modbus on RS485: slave | master | none (role of the sample app)
-set(AK_MODBUS "slave" CACHE STRING "Modbus role of the app: slave | master | none")
+# Signed images: bootloader and app refuse images not signed with the key in
+# src/services/fw/fw_pubkey.c (see fw_sign.h). AK_SIGN_KEY signs app.img.
+option(AK_IMAGE_SIGN "Require ECDSA P-256 signed images" OFF)
+set(AK_SIGN_KEY "${ROOT}/tools/keys/dev_priv.pem" CACHE FILEPATH "Private key (PEM) that signs app.img")
+set(P256M_SRC ${ROOT}/third_party/p256-m/p256-m.c)
+set(P256M_INC ${ROOT}/third_party/p256-m)
+
+# Modbus on RS485: slave | master | gateway | none (role of the sample app);
+# gateway = Modbus TCP server on the Ethernet chip (hal_tcp) forwarding to RS485
+set(AK_MODBUS "slave" CACHE STRING "Modbus role of the app: slave | master | gateway | none")
 set(MB_SRC
 	${SRC}/services/modbus/mb_port.c
 	${SRC}/services/modbus/mb_slave.c
 	${SRC}/services/modbus/mb_ota.c
 	${SRC}/services/modbus/mb_master.c
+	${SRC}/services/modbus/mb_gateway.c
 )
 set(MB_INC ${SRC}/services/modbus ${ROOT}/third_party/nanomodbus)
 if(AK_MODBUS STREQUAL "slave")
 	set(MB_DEFS APP_MODBUS_SLAVE NMBS_CLIENT_DISABLED NMBS_STRERROR_DISABLED)
 elseif(AK_MODBUS STREQUAL "master")
 	set(MB_DEFS APP_MODBUS_MASTER NMBS_SERVER_DISABLED NMBS_STRERROR_DISABLED)
+elseif(AK_MODBUS STREQUAL "gateway")
+	set(MB_DEFS APP_MODBUS_GATEWAY NMBS_STRERROR_DISABLED)
 elseif(AK_MODBUS STREQUAL "none")
 	set(MB_DEFS "")
 else()
@@ -122,6 +136,8 @@ if(AK_PORT STREQUAL "host")
 	include(${SRC}/port/host/port.cmake)
 elseif(AK_PORT STREQUAL "stm32l151")
 	include(${SRC}/port/stm32l151/port.cmake)
+elseif(AK_PORT STREQUAL "stm32g071")
+	include(${SRC}/port/stm32g071/port.cmake)
 else()
 	message(FATAL_ERROR "Unknown AK_PORT: ${AK_PORT}")
 endif()

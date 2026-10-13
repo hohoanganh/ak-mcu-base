@@ -1,0 +1,815 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 6.1 (Python 3.13.16 on linux)" generated="20261012 23:25:08.664" rpa="false" schemaversion="4">
+<suite id="s1" name="stm32g071" source="/home/user/ak-mcu-base/tests/renode/stm32g071.robot">
+<kw name="Setup" library="renode-keywords" type="SETUP">
+<msg timestamp="20261012 23:25:08.706" level="TRACE">Arguments: [  ]</msg>
+<kw name="Evaluate" library="BuiltIn">
+<var>${SYSTEM}</var>
+<arg>platform.system()</arg>
+<arg>modules=platform</arg>
+<doc>Evaluates the given expression in Python and returns the result.</doc>
+<msg timestamp="20261012 23:25:08.706" level="TRACE">Arguments: [ 'platform.system()' | modules='platform' ]</msg>
+<msg timestamp="20261012 23:25:08.708" level="TRACE">Return: 'Linux'</msg>
+<msg timestamp="20261012 23:25:08.708" level="INFO">${SYSTEM} = Linux</msg>
+<status status="PASS" starttime="20261012 23:25:08.706" endtime="20261012 23:25:08.708"/>
+</kw>
+<kw name="Set Variable If" library="BuiltIn">
+<var>${CONFIGURATION}</var>
+<arg>not ${SKIP_RUNNING_SERVER} and ${SERVER_REMOTE_DEBUG}</arg>
+<arg>Debug</arg>
+<arg>${CONFIGURATION}</arg>
+<doc>Sets variable based on the given condition.</doc>
+<msg timestamp="20261012 23:25:08.709" level="TRACE">Arguments: [ 'not True and False' | 'Debug' | '${CONFIGURATION}' ]</msg>
+<msg timestamp="20261012 23:25:08.709" level="TRACE">Return: 'Release'</msg>
+<msg timestamp="20261012 23:25:08.709" level="INFO">${CONFIGURATION} = Release</msg>
+<status status="PASS" starttime="20261012 23:25:08.708" endtime="20261012 23:25:08.709"/>
+</kw>
+<kw name="Create List" library="BuiltIn">
+<var>@{PARAMS}</var>
+<arg>--robot-server-port</arg>
+<arg>${PORT_NUMBER}</arg>
+<arg>--hide-log</arg>
+<doc>Returns a list containing given items.</doc>
+<msg timestamp="20261012 23:25:08.709" level="TRACE">Arguments: [ '--robot-server-port' | '49152' | '--hide-log' ]</msg>
+<msg timestamp="20261012 23:25:08.709" level="TRACE">Return: ['--robot-server-port', '49152', '--hide-log']</msg>
+<msg timestamp="20261012 23:25:08.709" level="INFO">@{PARAMS} = [ --robot-server-port | 49152 | --hide-log ]</msg>
+<status status="PASS" starttime="20261012 23:25:08.709" endtime="20261012 23:25:08.709"/>
+</kw>
+<if>
+<branch type="IF" condition="${DISABLE_GUI}">
+<kw name="Insert Into List" library="Collections">
+<arg>${PARAMS}</arg>
+<arg>0</arg>
+<arg>--disable-gui</arg>
+<doc>Inserts ``value`` into ``list`` to the position specified with ``index``.</doc>
+<status status="NOT RUN" starttime="20261012 23:25:08.709" endtime="20261012 23:25:08.709"/>
+</kw>
+<status status="NOT RUN" starttime="20261012 23:25:08.709" endtime="20261012 23:25:08.709"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:08.709" endtime="20261012 23:25:08.709"/>
+</if>
+<if>
+<branch type="IF" condition="not ${SKIP_RUNNING_SERVER}">
+<kw name="File Should Exist" library="OperatingSystem">
+<arg>${DIRECTORY}/${BINARY_NAME}</arg>
+<arg>msg=Robot Framework remote server binary not found (${DIRECTORY}/${BINARY_NAME}). Did you forget to build it in ${CONFIGURATION} configuration?</arg>
+<doc>Fails unless the given ``path`` points to an existing file.</doc>
+<status status="NOT RUN" starttime="20261012 23:25:08.710" endtime="20261012 23:25:08.710"/>
+</kw>
+<status status="NOT RUN" starttime="20261012 23:25:08.709" endtime="20261012 23:25:08.710"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:08.709" endtime="20261012 23:25:08.710"/>
+</if>
+<if>
+<branch type="IF" condition="not ${SKIP_RUNNING_SERVER} and not ${SERVER_REMOTE_DEBUG} and not '${SYSTEM}' == 'Windows' and not ${NET_PLATFORM}">
+<kw name="Start Process" library="Process">
+<arg>mono</arg>
+<arg>${BINARY_NAME}</arg>
+<arg>@{PARAMS}</arg>
+<arg>cwd=${DIRECTORY}</arg>
+<doc>Starts a new process on background.</doc>
+<status status="NOT RUN" starttime="20261012 23:25:08.710" endtime="20261012 23:25:08.710"/>
+</kw>
+<status status="NOT RUN" starttime="20261012 23:25:08.710" endtime="20261012 23:25:08.710"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:08.710" endtime="20261012 23:25:08.710"/>
+</if>
+<if>
+<branch type="IF" condition="not ${SKIP_RUNNING_SERVER} and not ${SERVER_REMOTE_DEBUG} and '${SYSTEM}' == 'Windows'">
+<kw name="Start Process" library="Process">
+<arg>${BINARY_NAME}</arg>
+<arg>@{PARAMS}</arg>
+<arg>cwd=${DIRECTORY}</arg>
+<arg>shell=true</arg>
+<doc>Starts a new process on background.</doc>
+<status status="NOT RUN" starttime="20261012 23:25:08.710" endtime="20261012 23:25:08.710"/>
+</kw>
+<status status="NOT RUN" starttime="20261012 23:25:08.710" endtime="20261012 23:25:08.710"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:08.710" endtime="20261012 23:25:08.710"/>
+</if>
+<if>
+<branch type="IF" condition="not ${SKIP_RUNNING_SERVER} and not ${SERVER_REMOTE_DEBUG} and ${NET_PLATFORM}">
+<kw name="Start Process" library="Process">
+<arg>dotnet ${BINARY_NAME}</arg>
+<arg>@{PARAMS}</arg>
+<arg>cwd=${DIRECTORY}</arg>
+<arg>shell=true</arg>
+<doc>Starts a new process on background.</doc>
+<status status="NOT RUN" starttime="20261012 23:25:08.710" endtime="20261012 23:25:08.710"/>
+</kw>
+<status status="NOT RUN" starttime="20261012 23:25:08.710" endtime="20261012 23:25:08.710"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:08.710" endtime="20261012 23:25:08.710"/>
+</if>
+<if>
+<branch type="IF" condition="not ${SKIP_RUNNING_SERVER} and ${SERVER_REMOTE_DEBUG} and not '${SYSTEM}' == 'Windows' and not ${NET_PLATFORM}">
+<kw name="Start Process" library="Process">
+<arg>mono</arg>
+<arg>--debug</arg>
+<arg>--debugger-agent\=transport\=dt_socket,address\=0.0.0.0:${SERVER_REMOTE_PORT},server\=y,suspend\=${SERVER_REMOTE_SUSPEND}</arg>
+<arg>${BINARY_NAME}</arg>
+<arg>@{PARAMS}</arg>
+<arg>cwd=${DIRECTORY}</arg>
+<doc>Starts a new process on background.</doc>
+<status status="NOT RUN" starttime="20261012 23:25:08.711" endtime="20261012 23:25:08.711"/>
+</kw>
+<status status="NOT RUN" starttime="20261012 23:25:08.710" endtime="20261012 23:25:08.711"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:08.710" endtime="20261012 23:25:08.711"/>
+</if>
+<if>
+<branch type="IF" condition="not ${SKIP_RUNNING_SERVER} and ${SERVER_REMOTE_DEBUG} and '${SYSTEM}' == 'Windows'">
+<kw name="Fatal Error" library="BuiltIn">
+<arg>Windows doesn't support server remote debug option.</arg>
+<doc>Stops the whole test execution.</doc>
+<status status="NOT RUN" starttime="20261012 23:25:08.711" endtime="20261012 23:25:08.711"/>
+</kw>
+<status status="NOT RUN" starttime="20261012 23:25:08.711" endtime="20261012 23:25:08.711"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:08.711" endtime="20261012 23:25:08.711"/>
+</if>
+<if>
+<branch type="IF" condition="not '${SYSTEM}' == 'Windows'">
+<kw name="Wait Until Keyword Succeeds" library="BuiltIn">
+<arg>60s</arg>
+<arg>1s</arg>
+<arg>Import Library</arg>
+<arg>Remote</arg>
+<arg>http://127.0.0.1:${PORT_NUMBER}/</arg>
+<doc>Runs the specified keyword and retries if it fails.</doc>
+<msg timestamp="20261012 23:25:08.711" level="TRACE">Arguments: [ '60s' | '1s' | 'Import Library' | 'Remote' | 'http://127.0.0.1:${PORT_NUMBER}/' ]</msg>
+<kw name="Import Library" library="BuiltIn">
+<arg>Remote</arg>
+<arg>http://127.0.0.1:${PORT_NUMBER}/</arg>
+<doc>Imports a library with the given name and optional arguments.</doc>
+<msg timestamp="20261012 23:25:08.712" level="TRACE">Arguments: [ 'Remote' | 'http://127.0.0.1:${PORT_NUMBER}/' ]</msg>
+<msg timestamp="20261012 23:25:09.281" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:08.712" endtime="20261012 23:25:09.281"/>
+</kw>
+<msg timestamp="20261012 23:25:09.281" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:08.711" endtime="20261012 23:25:09.281"/>
+</kw>
+<status status="PASS" starttime="20261012 23:25:08.711" endtime="20261012 23:25:09.281"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:08.711" endtime="20261012 23:25:09.281"/>
+</if>
+<if>
+<branch type="IF" condition="'${SYSTEM}' == 'Windows'">
+<kw name="Wait Until Keyword Succeeds" library="BuiltIn">
+<arg>60s</arg>
+<arg>1s</arg>
+<arg>Import Library</arg>
+<arg>Remote</arg>
+<arg>http://localhost:${PORT_NUMBER}/</arg>
+<doc>Runs the specified keyword and retries if it fails.</doc>
+<status status="NOT RUN" starttime="20261012 23:25:09.281" endtime="20261012 23:25:09.281"/>
+</kw>
+<status status="NOT RUN" starttime="20261012 23:25:09.281" endtime="20261012 23:25:09.281"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:09.281" endtime="20261012 23:25:09.281"/>
+</if>
+<kw name="Setup Renode" library="renode-keywords">
+<msg timestamp="20261012 23:25:09.282" level="TRACE">Arguments: [  ]</msg>
+<kw name="Set Default Uart Timeout" library="Remote">
+<arg>${DEFAULT_UART_TIMEOUT}</arg>
+<msg timestamp="20261012 23:25:09.282" level="TRACE">Arguments: [ '8' ]</msg>
+<msg timestamp="20261012 23:25:09.315" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:09.282" endtime="20261012 23:25:09.315"/>
+</kw>
+<if>
+<branch type="IF" condition="${SAVE_LOGS}">
+<kw name="Enable Logging To Cache" library="Remote">
+<msg timestamp="20261012 23:25:09.315" level="TRACE">Arguments: [  ]</msg>
+<msg timestamp="20261012 23:25:09.321" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:09.315" endtime="20261012 23:25:09.321"/>
+</kw>
+<status status="PASS" starttime="20261012 23:25:09.315" endtime="20261012 23:25:09.321"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:09.315" endtime="20261012 23:25:09.321"/>
+</if>
+<kw name="Set Variable" library="BuiltIn">
+<var>${allowed_chars}</var>
+<arg>abcdefghijklmnopqrstuvwxyz01234567890_-</arg>
+<doc>Returns the given values which can then be assigned to a variables.</doc>
+<msg timestamp="20261012 23:25:09.322" level="TRACE">Arguments: [ 'abcdefghijklmnopqrstuvwxyz01234567890_-' ]</msg>
+<msg timestamp="20261012 23:25:09.322" level="TRACE">Return: 'abcdefghijklmnopqrstuvwxyz01234567890_-'</msg>
+<msg timestamp="20261012 23:25:09.322" level="INFO">${allowed_chars} = abcdefghijklmnopqrstuvwxyz01234567890_-</msg>
+<status status="PASS" starttime="20261012 23:25:09.321" endtime="20261012 23:25:09.322"/>
+</kw>
+<kw name="Convert To Lower Case" library="String">
+<var>${metrics_fname}</var>
+<arg>${SUITE_NAME}</arg>
+<doc>Converts string to lower case.</doc>
+<msg timestamp="20261012 23:25:09.322" level="TRACE">Arguments: [ 'stm32g071' ]</msg>
+<msg timestamp="20261012 23:25:09.322" level="TRACE">Return: 'stm32g071'</msg>
+<msg timestamp="20261012 23:25:09.322" level="INFO">${metrics_fname} = stm32g071</msg>
+<status status="PASS" starttime="20261012 23:25:09.322" endtime="20261012 23:25:09.322"/>
+</kw>
+<kw name="Replace String" library="String">
+<var>${metrics_fname}</var>
+<arg>${metrics_fname}</arg>
+<arg>${SPACE}</arg>
+<arg>_</arg>
+<doc>Replaces ``search_for`` in the given ``string`` with ``replace_with``.</doc>
+<msg timestamp="20261012 23:25:09.322" level="TRACE">Arguments: [ 'stm32g071' | ' ' | '_' ]</msg>
+<msg timestamp="20261012 23:25:09.322" level="TRACE">Return: 'stm32g071'</msg>
+<msg timestamp="20261012 23:25:09.322" level="INFO">${metrics_fname} = stm32g071</msg>
+<status status="PASS" starttime="20261012 23:25:09.322" endtime="20261012 23:25:09.322"/>
+</kw>
+<kw name="Replace String Using Regexp" library="String">
+<var>${metrics_fname}</var>
+<arg>${metrics_fname}</arg>
+<arg>[^${allowed_chars}]+</arg>
+<arg>${EMPTY}</arg>
+<doc>Replaces ``pattern`` in the given ``string`` with ``replace_with``.</doc>
+<msg timestamp="20261012 23:25:09.323" level="TRACE">Arguments: [ 'stm32g071' | '[^abcdefghijklmnopqrstuvwxyz01234567890_-]+' | '' ]</msg>
+<msg timestamp="20261012 23:25:09.323" level="TRACE">Return: 'stm32g071'</msg>
+<msg timestamp="20261012 23:25:09.323" level="INFO">${metrics_fname} = stm32g071</msg>
+<status status="PASS" starttime="20261012 23:25:09.322" endtime="20261012 23:25:09.323"/>
+</kw>
+<kw name="Join Path" library="OperatingSystem">
+<var>${metrics_path}</var>
+<arg>${RESULTS_DIRECTORY}</arg>
+<arg>profiler-${metrics_fname}</arg>
+<doc>Joins the given path part(s) to the given base path.</doc>
+<msg timestamp="20261012 23:25:09.323" level="TRACE">Arguments: [ '/home/user/ak-mcu-base/' | 'profiler-stm32g071' ]</msg>
+<msg timestamp="20261012 23:25:09.323" level="TRACE">Return: '/home/user/ak-mcu-base/profiler-stm32g071'</msg>
+<msg timestamp="20261012 23:25:09.323" level="INFO">${metrics_path} = /home/user/ak-mcu-base/profiler-stm32g071</msg>
+<status status="PASS" starttime="20261012 23:25:09.323" endtime="20261012 23:25:09.323"/>
+</kw>
+<if>
+<branch type="IF" condition="${CREATE_EXECUTION_METRICS}">
+<kw name="Execute Command" library="Remote">
+<arg>EnableProfilerGlobally "${metrics_path}"</arg>
+<status status="NOT RUN" starttime="20261012 23:25:09.324" endtime="20261012 23:25:09.324"/>
+</kw>
+<status status="NOT RUN" starttime="20261012 23:25:09.323" endtime="20261012 23:25:09.324"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:09.323" endtime="20261012 23:25:09.324"/>
+</if>
+<kw name="Reset Emulation" library="Remote">
+<msg timestamp="20261012 23:25:09.324" level="TRACE">Arguments: [  ]</msg>
+<msg timestamp="20261012 23:25:09.339" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:09.324" endtime="20261012 23:25:09.339"/>
+</kw>
+<msg timestamp="20261012 23:25:09.339" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:09.281" endtime="20261012 23:25:09.339"/>
+</kw>
+<msg timestamp="20261012 23:25:09.339" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:08.706" endtime="20261012 23:25:09.339"/>
+</kw>
+<test id="s1-t1" name="Bootloader Verifies And Runs The App" line="24">
+<kw name="Reset Emulation" library="Remote" type="SETUP">
+<msg timestamp="20261012 23:25:09.340" level="TRACE">Arguments: [  ]</msg>
+<msg timestamp="20261012 23:25:09.344" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:09.340" endtime="20261012 23:25:09.344"/>
+</kw>
+<kw name="Create Machine">
+<msg timestamp="20261012 23:25:09.344" level="TRACE">Arguments: [  ]</msg>
+<kw name="Execute Command" library="Remote">
+<arg>using sysbus</arg>
+<msg timestamp="20261012 23:25:09.344" level="TRACE">Arguments: [ 'using sysbus' ]</msg>
+<msg timestamp="20261012 23:25:09.368" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:09.344" endtime="20261012 23:25:09.368"/>
+</kw>
+<kw name="Execute Command" library="Remote">
+<arg>mach create "ak-g071"</arg>
+<msg timestamp="20261012 23:25:09.368" level="TRACE">Arguments: [ 'mach create "ak-g071"' ]</msg>
+<msg timestamp="20261012 23:25:09.395" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:09.368" endtime="20261012 23:25:09.395"/>
+</kw>
+<kw name="Execute Command" library="Remote">
+<arg>machine LoadPlatformDescription @platforms/cpus/stm32g0.repl</arg>
+<msg timestamp="20261012 23:25:09.395" level="TRACE">Arguments: [ 'machine LoadPlatformDescription @platforms/cpus/stm32g0.repl' ]</msg>
+<msg timestamp="20261012 23:25:11.284" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:09.395" endtime="20261012 23:25:11.284"/>
+</kw>
+<kw name="Execute Command" library="Remote">
+<arg>sysbus LoadELF @${BUILD}/app.elf</arg>
+<msg timestamp="20261012 23:25:11.284" level="TRACE">Arguments: [ 'sysbus LoadELF @/home/user/ak-mcu-base/tests/renode/../../build/stm32g071/app.elf' ]</msg>
+<msg timestamp="20261012 23:25:11.372" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:11.284" endtime="20261012 23:25:11.372"/>
+</kw>
+<kw name="Execute Command" library="Remote">
+<arg>sysbus LoadELF @${BUILD}/boot.elf</arg>
+<msg timestamp="20261012 23:25:11.373" level="TRACE">Arguments: [ 'sysbus LoadELF @/home/user/ak-mcu-base/tests/renode/../../build/stm32g071/boot.elf' ]</msg>
+<msg timestamp="20261012 23:25:11.388" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:11.372" endtime="20261012 23:25:11.388"/>
+</kw>
+<kw name="Create Terminal Tester" library="Remote">
+<arg>${UART}</arg>
+<msg timestamp="20261012 23:25:11.388" level="TRACE">Arguments: [ 'sysbus.usart2' ]</msg>
+<msg timestamp="20261012 23:25:11.404" level="TRACE">Return: 0</msg>
+<status status="PASS" starttime="20261012 23:25:11.388" endtime="20261012 23:25:11.404"/>
+</kw>
+<msg timestamp="20261012 23:25:11.404" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:09.344" endtime="20261012 23:25:11.404"/>
+</kw>
+<kw name="Start Emulation" library="Remote">
+<msg timestamp="20261012 23:25:11.405" level="TRACE">Arguments: [  ]</msg>
+<msg timestamp="20261012 23:25:11.528" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:11.405" endtime="20261012 23:25:11.528"/>
+</kw>
+<kw name="Wait For Line On Uart" library="Remote">
+<arg>ak-mcu-base bootloader v</arg>
+<msg timestamp="20261012 23:25:11.528" level="TRACE">Arguments: [ 'ak-mcu-base bootloader v' ]</msg>
+<msg timestamp="20261012 23:25:11.654" level="TRACE">Return: {'groups': [],
+ 'line': '[       0] I BOOT: ak-mcu-base bootloader v1.3.0, board ak-g071, reset reason 0',
+ 'timestamp': 0.16381}</msg>
+<status status="PASS" starttime="20261012 23:25:11.528" endtime="20261012 23:25:11.654"/>
+</kw>
+<kw name="Wait For Line On Uart" library="Remote">
+<arg>app</arg>
+<arg>: v1.3.8</arg>
+<msg timestamp="20261012 23:25:11.655" level="TRACE">Arguments: [ 'app' | ': v1.3.8' ]</msg>
+<msg timestamp="20261012 23:25:11.664" level="FAIL">ArgumentException: Type "Nullable`1" does not have a "Parse" method with the requested parameters
+</msg>
+<msg timestamp="20261012 23:25:11.664" level="DEBUG">ArgumentException:   at Antmicro.Renode.Utilities.SmartParser.GetFromCacheOrAdd (System.Collections.Generic.Dictionary`2[TKey,TValue] cacheDict, System.Type outputType, System.Func`1[TResult] function) [0x00036] in &lt;db185fd5a89c4288b535afca646065ea&gt;:0 
+  at Antmicro.Renode.Utilities.SmartParser.TryParse (System.String input, System.Type outputType, System.Object&amp; result) [0x001b4] in &lt;db185fd5a89c4288b535afca646065ea&gt;:0 
+  at Antmicro.Renode.RobotFramework.Keyword.TryParseArguments (System.Reflection.ParameterInfo[] parameters, System.Object[] arguments, System.Object[]&amp; parsedArguments) [0x00142] in &lt;2f038b0b31654ae3be188d6da55b89b8&gt;:0 
+  at Antmicro.Renode.RobotFramework.Keyword.TryMatchArguments (System.Object[] arguments, System.Object[]&amp; parsedArguments) [0x00089] in &lt;2f038b0b31654ae3be188d6da55b89b8&gt;:0 
+  at Antmicro.Renode.RobotFramework.KeywordManager+&lt;&gt;c__DisplayClass3_0.&lt;TryExecuteKeyword&gt;b__0 (Antmicro.Renode.RobotFramework.Keyword x) [0x00000] in &lt;2f038b0b31654ae3be188d6da55b89b8&gt;:0 
+  at System.Linq.Enumerable.TryGetFirst[TSource] (System.Collections.Generic.IEnumerable`1[T] source, System.Func`2[T,TResult] predicate, System.Boolean&amp; found) [0x0003f] in &lt;6057d80645ae427baa7af324a4639384&gt;:0 
+  at System.Linq.Enumerable.FirstOrDefault[TSource] (System.Collections.Generic.IEnumerable`1[T] source, System.Func`2[T,TResult] predicate) [0x00000] in &lt;6057d80645ae427baa7af324a4639384&gt;:0 
+  at Antmicro.Renode.RobotFramework.KeywordManager.TryExecuteKeyword (System.String keywordName, System.Object[] arguments, System.Object&amp; keywordResult) [0x00029] in &lt;2f038b0b31654ae3be188d6da55b89b8&gt;:0 
+  at Antmicro.Renode.RobotFramework.XmlRpcServer.RunKeyword (System.String keywordName, System.Object[] arguments) [0x00008] in &lt;2f038b0b31654ae3be188d6da55b89b8&gt;:0 
+</msg>
+<status status="FAIL" starttime="20261012 23:25:11.655" endtime="20261012 23:25:11.664"/>
+</kw>
+<kw name="Wait For Line On Uart" library="Remote">
+<arg>staging: not checked</arg>
+<status status="NOT RUN" starttime="20261012 23:25:11.664" endtime="20261012 23:25:11.664"/>
+</kw>
+<kw name="Wait For Line On Uart" library="Remote">
+<arg>cmd 0, attempts 0, trial 0 -&gt; run</arg>
+<status status="NOT RUN" starttime="20261012 23:25:11.664" endtime="20261012 23:25:11.664"/>
+</kw>
+<kw name="Wait For Line On Uart" library="Remote">
+<arg>jump to 0x08003100</arg>
+<status status="NOT RUN" starttime="20261012 23:25:11.664" endtime="20261012 23:25:11.664"/>
+</kw>
+<kw name="Wait For Line On Uart" library="Remote">
+<arg>ak-mcu-base app v1.3.8 build 0, board ak-g071</arg>
+<status status="NOT RUN" starttime="20261012 23:25:11.664" endtime="20261012 23:25:11.664"/>
+</kw>
+<kw name="Wait For Line On Uart" library="Remote">
+<arg>watchdog 8000 ms, heartbeat 1000 ms</arg>
+<status status="NOT RUN" starttime="20261012 23:25:11.664" endtime="20261012 23:25:11.664"/>
+</kw>
+<kw name="Test Teardown" library="renode-keywords" type="TEARDOWN">
+<msg timestamp="20261012 23:25:11.665" level="TRACE">Arguments: [  ]</msg>
+<kw name="Stop Profiler" library="renode-keywords">
+<msg timestamp="20261012 23:25:11.665" level="TRACE">Arguments: [  ]</msg>
+<if>
+<branch type="IF" condition="${PROFILER_PROCESS}">
+<kw name="Terminate Process" library="Process">
+<arg>${PROFILER_PROCESS}</arg>
+<doc>Stops the process gracefully or forcefully.</doc>
+<status status="NOT RUN" starttime="20261012 23:25:11.666" endtime="20261012 23:25:11.666"/>
+</kw>
+<kw name="Set Test Variable" library="BuiltIn">
+<arg>${PROFILER_PROCESS}</arg>
+<arg>None</arg>
+<doc>Makes a variable available everywhere within the scope of the current test.</doc>
+<status status="NOT RUN" starttime="20261012 23:25:11.666" endtime="20261012 23:25:11.666"/>
+</kw>
+<status status="NOT RUN" starttime="20261012 23:25:11.665" endtime="20261012 23:25:11.666"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:11.665" endtime="20261012 23:25:11.666"/>
+</if>
+<msg timestamp="20261012 23:25:11.666" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:11.665" endtime="20261012 23:25:11.666"/>
+</kw>
+<kw name="Run Keyword If Test Failed" library="BuiltIn">
+<var>${failed}</var>
+<arg>Set Variable</arg>
+<arg>True</arg>
+<doc>Runs the given keyword with the given arguments, if the test failed.</doc>
+<msg timestamp="20261012 23:25:11.666" level="TRACE">Arguments: [ 'Set Variable' | 'True' ]</msg>
+<kw name="Set Variable" library="BuiltIn">
+<arg>True</arg>
+<doc>Returns the given values which can then be assigned to a variables.</doc>
+<msg timestamp="20261012 23:25:11.666" level="TRACE">Arguments: [ 'True' ]</msg>
+<msg timestamp="20261012 23:25:11.667" level="TRACE">Return: 'True'</msg>
+<status status="PASS" starttime="20261012 23:25:11.666" endtime="20261012 23:25:11.667"/>
+</kw>
+<msg timestamp="20261012 23:25:11.667" level="TRACE">Return: 'True'</msg>
+<msg timestamp="20261012 23:25:11.667" level="INFO">${failed} = True</msg>
+<status status="PASS" starttime="20261012 23:25:11.666" endtime="20261012 23:25:11.667"/>
+</kw>
+<if>
+<branch type="IF" condition="${failed}">
+<kw name="Strip String" library="String">
+<var>${message}</var>
+<arg>${TEST_MESSAGE}</arg>
+<arg>mode=right</arg>
+<doc>Remove leading and/or trailing whitespaces from the given string.</doc>
+<msg timestamp="20261012 23:25:11.667" level="TRACE">Arguments: [ 'ArgumentException: Type "Nullable`1" does not have a "Parse" method with the requested parameters\n' | mode='right' ]</msg>
+<msg timestamp="20261012 23:25:11.667" level="TRACE">Return: 'ArgumentException: Type "Nullable`1" does not have a "Parse" method with the requested parameters'</msg>
+<msg timestamp="20261012 23:25:11.667" level="INFO">${message} = ArgumentException: Type "Nullable`1" does not have a "Parse" method with the requested parameters</msg>
+<status status="PASS" starttime="20261012 23:25:11.667" endtime="20261012 23:25:11.667"/>
+</kw>
+<kw name="Set Test Message" library="BuiltIn">
+<arg>${message}</arg>
+<doc>Sets message for the current test case.</doc>
+<msg timestamp="20261012 23:25:11.667" level="TRACE">Arguments: [ 'ArgumentException: Type "Nullable`1" does not have a "Parse" method with the requested parameters' ]</msg>
+<msg timestamp="20261012 23:25:11.667" level="INFO">Set test message to:
+ArgumentException: Type "Nullable`1" does not have a "Parse" method with the requested parameters</msg>
+<msg timestamp="20261012 23:25:11.668" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:11.667" endtime="20261012 23:25:11.668"/>
+</kw>
+<status status="PASS" starttime="20261012 23:25:11.667" endtime="20261012 23:25:11.668"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:11.667" endtime="20261012 23:25:11.668"/>
+</if>
+<kw name="Run Keyword If Timeout Occurred" library="BuiltIn">
+<var>${timed_out}</var>
+<arg>Set Variable</arg>
+<arg>True</arg>
+<doc>Runs the given keyword if either a test or a keyword timeout has occurred.</doc>
+<msg timestamp="20261012 23:25:11.668" level="TRACE">Arguments: [ 'Set Variable' | 'True' ]</msg>
+<msg timestamp="20261012 23:25:11.668" level="TRACE">Return: None</msg>
+<msg timestamp="20261012 23:25:11.668" level="INFO">${timed_out} = None</msg>
+<status status="PASS" starttime="20261012 23:25:11.668" endtime="20261012 23:25:11.668"/>
+</kw>
+<if>
+<branch type="IF" condition="${timed_out}">
+<return>
+<status status="NOT RUN" starttime="20261012 23:25:11.668" endtime="20261012 23:25:11.668"/>
+</return>
+<status status="NOT RUN" starttime="20261012 23:25:11.668" endtime="20261012 23:25:11.669"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:11.668" endtime="20261012 23:25:11.669"/>
+</if>
+<if>
+<branch type="IF" condition="${CREATE_SNAPSHOT_ON_FAIL}">
+<kw name="Run Keyword If Test Failed" library="BuiltIn">
+<arg>Create Snapshot Of Failed Test</arg>
+<doc>Runs the given keyword with the given arguments, if the test failed.</doc>
+<msg timestamp="20261012 23:25:11.669" level="TRACE">Arguments: [ 'Create Snapshot Of Failed Test' ]</msg>
+<kw name="Create Snapshot Of Failed Test" library="renode-keywords">
+<msg timestamp="20261012 23:25:11.669" level="TRACE">Arguments: [  ]</msg>
+<kw name="Return From Keyword If" library="BuiltIn">
+<arg>'skipped' in @{TEST TAGS}</arg>
+<doc>Returns from the enclosing user keyword if ``condition`` is true.</doc>
+<msg timestamp="20261012 23:25:11.669" level="TRACE">Arguments: [ "'skipped' in []" ]</msg>
+<msg timestamp="20261012 23:25:11.669" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:11.669" endtime="20261012 23:25:11.669"/>
+</kw>
+<kw name="Get Variable Value" library="BuiltIn">
+<var>${retry_index}</var>
+<arg>\${RETRYFAILED_RETRY_INDEX}</arg>
+<arg>0</arg>
+<doc>Returns variable value or ``default`` if the variable does not exist.</doc>
+<msg timestamp="20261012 23:25:11.670" level="TRACE">Arguments: [ '\\${RETRYFAILED_RETRY_INDEX}' | '0' ]</msg>
+<msg timestamp="20261012 23:25:11.671" level="TRACE">Return: '0'</msg>
+<msg timestamp="20261012 23:25:11.671" level="INFO">${retry_index} = 0</msg>
+<status status="PASS" starttime="20261012 23:25:11.670" endtime="20261012 23:25:11.671"/>
+</kw>
+<kw name="Set Variable" library="BuiltIn">
+<var>${test_name}</var>
+<arg>${SUITE NAME}.${TEST NAME}.fail${retry_index}.save</arg>
+<doc>Returns the given values which can then be assigned to a variables.</doc>
+<msg timestamp="20261012 23:25:11.671" level="TRACE">Arguments: [ 'stm32g071.Bootloader Verifies And Runs The App.fail0.save' ]</msg>
+<msg timestamp="20261012 23:25:11.671" level="TRACE">Return: 'stm32g071.Bootloader Verifies And Runs The App.fail0.save'</msg>
+<msg timestamp="20261012 23:25:11.671" level="INFO">${test_name} = stm32g071.Bootloader Verifies And Runs The App.fail0.save</msg>
+<status status="PASS" starttime="20261012 23:25:11.671" endtime="20261012 23:25:11.671"/>
+</kw>
+<kw name="Sanitize Test Name" library="renode-keywords">
+<var>${test_name}</var>
+<arg>${test_name}</arg>
+<msg timestamp="20261012 23:25:11.671" level="TRACE">Arguments: [ ${test_name}='stm32g071.Bootloader Verifies And Runs The App.fail0.save' ]</msg>
+<kw name="Replace String" library="String">
+<var>${test_name}</var>
+<arg>${test_name}</arg>
+<arg>${SPACE}</arg>
+<arg>_</arg>
+<doc>Replaces ``search_for`` in the given ``string`` with ``replace_with``.</doc>
+<msg timestamp="20261012 23:25:11.672" level="TRACE">Arguments: [ 'stm32g071.Bootloader Verifies And Runs The App.fail0.save' | ' ' | '_' ]</msg>
+<msg timestamp="20261012 23:25:11.672" level="TRACE">Return: 'stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.save'</msg>
+<msg timestamp="20261012 23:25:11.672" level="INFO">${test_name} = stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.save</msg>
+<status status="PASS" starttime="20261012 23:25:11.672" endtime="20261012 23:25:11.672"/>
+</kw>
+<kw name="Replace String Using Regexp" library="String">
+<var>${test_name}</var>
+<arg>${test_name}</arg>
+<arg>[/""]</arg>
+<arg>-</arg>
+<doc>Replaces ``pattern`` in the given ``string`` with ``replace_with``.</doc>
+<msg timestamp="20261012 23:25:11.672" level="TRACE">Arguments: [ 'stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.save' | '[/""]' | '-' ]</msg>
+<msg timestamp="20261012 23:25:11.672" level="TRACE">Return: 'stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.save'</msg>
+<msg timestamp="20261012 23:25:11.672" level="INFO">${test_name} = stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.save</msg>
+<status status="PASS" starttime="20261012 23:25:11.672" endtime="20261012 23:25:11.672"/>
+</kw>
+<return>
+<value>${test_name}</value>
+<status status="PASS" starttime="20261012 23:25:11.672" endtime="20261012 23:25:11.672"/>
+</return>
+<msg timestamp="20261012 23:25:11.673" level="TRACE">Return: 'stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.save'</msg>
+<msg timestamp="20261012 23:25:11.673" level="INFO">${test_name} = stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.save</msg>
+<status status="PASS" starttime="20261012 23:25:11.671" endtime="20261012 23:25:11.673"/>
+</kw>
+<kw name="Set Variable" library="BuiltIn">
+<var>${snapshots_dir}</var>
+<arg>${RESULTS_DIRECTORY}/snapshots</arg>
+<doc>Returns the given values which can then be assigned to a variables.</doc>
+<msg timestamp="20261012 23:25:11.673" level="TRACE">Arguments: [ '/home/user/ak-mcu-base//snapshots' ]</msg>
+<msg timestamp="20261012 23:25:11.673" level="TRACE">Return: '/home/user/ak-mcu-base//snapshots'</msg>
+<msg timestamp="20261012 23:25:11.673" level="INFO">${snapshots_dir} = /home/user/ak-mcu-base//snapshots</msg>
+<status status="PASS" starttime="20261012 23:25:11.673" endtime="20261012 23:25:11.673"/>
+</kw>
+<kw name="Create Directory" library="OperatingSystem">
+<arg>${snapshots_dir}</arg>
+<doc>Creates the specified directory.</doc>
+<msg timestamp="20261012 23:25:11.673" level="TRACE">Arguments: [ '/home/user/ak-mcu-base//snapshots' ]</msg>
+<msg timestamp="20261012 23:25:11.673" level="INFO" html="true">Created directory '&lt;a href="file:///home/user/ak-mcu-base/snapshots"&gt;/home/user/ak-mcu-base/snapshots&lt;/a&gt;'.</msg>
+<msg timestamp="20261012 23:25:11.674" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:11.673" endtime="20261012 23:25:11.674"/>
+</kw>
+<kw name="Set Variable" library="BuiltIn">
+<var>${snapshot_path}</var>
+<arg>"${snapshots_dir}/${test_name}"</arg>
+<doc>Returns the given values which can then be assigned to a variables.</doc>
+<msg timestamp="20261012 23:25:11.674" level="TRACE">Arguments: [ '"/home/user/ak-mcu-base//snapshots/stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.save"' ]</msg>
+<msg timestamp="20261012 23:25:11.674" level="TRACE">Return: '"/home/user/ak-mcu-base//snapshots/stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.save"'</msg>
+<msg timestamp="20261012 23:25:11.674" level="INFO">${snapshot_path} = "/home/user/ak-mcu-base//snapshots/stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.save"</msg>
+<status status="PASS" starttime="20261012 23:25:11.674" endtime="20261012 23:25:11.674"/>
+</kw>
+<kw name="Execute Command" library="Remote">
+<arg>Save ${snapshot_path}</arg>
+<msg timestamp="20261012 23:25:11.674" level="TRACE">Arguments: [ 'Save "/home/user/ak-mcu-base//snapshots/stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.save"' ]</msg>
+<msg timestamp="20261012 23:25:12.677" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:11.674" endtime="20261012 23:25:12.677"/>
+</kw>
+<kw name="Log To Console" library="BuiltIn">
+<arg>!!!!! Emulation's state saved to ${snapshot_path}</arg>
+<doc>Logs the given message to the console.</doc>
+<msg timestamp="20261012 23:25:12.678" level="TRACE">Arguments: [ '!!!!! Emulation\'s state saved to "/home/user/ak-mcu-base//snapshots/stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.save"' ]</msg>
+<msg timestamp="20261012 23:25:12.678" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:12.677" endtime="20261012 23:25:12.678"/>
+</kw>
+<msg timestamp="20261012 23:25:12.678" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:11.669" endtime="20261012 23:25:12.678"/>
+</kw>
+<msg timestamp="20261012 23:25:12.678" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:11.669" endtime="20261012 23:25:12.678"/>
+</kw>
+<status status="PASS" starttime="20261012 23:25:11.669" endtime="20261012 23:25:12.678"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:11.669" endtime="20261012 23:25:12.678"/>
+</if>
+<if>
+<branch type="IF" condition="${SAVE_LOGS}">
+<if>
+<branch type="IF" condition="&quot;${SAVE_LOGS_WHEN}&quot; == &quot;Always&quot;">
+<kw name="Save Test Log" library="renode-keywords">
+<status status="NOT RUN" starttime="20261012 23:25:12.679" endtime="20261012 23:25:12.679"/>
+</kw>
+<status status="NOT RUN" starttime="20261012 23:25:12.679" endtime="20261012 23:25:12.679"/>
+</branch>
+<branch type="ELSE IF" condition="&quot;${SAVE_LOGS_WHEN}&quot; == &quot;Fail&quot;">
+<kw name="Run Keyword If Test Failed" library="BuiltIn">
+<arg>Save Test Log</arg>
+<doc>Runs the given keyword with the given arguments, if the test failed.</doc>
+<msg timestamp="20261012 23:25:12.679" level="TRACE">Arguments: [ 'Save Test Log' ]</msg>
+<kw name="Save Test Log" library="renode-keywords">
+<msg timestamp="20261012 23:25:12.680" level="TRACE">Arguments: [  ]</msg>
+<kw name="Return From Keyword If" library="BuiltIn">
+<arg>'skipped' in @{TEST TAGS}</arg>
+<doc>Returns from the enclosing user keyword if ``condition`` is true.</doc>
+<msg timestamp="20261012 23:25:12.680" level="TRACE">Arguments: [ "'skipped' in []" ]</msg>
+<msg timestamp="20261012 23:25:12.680" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:12.680" endtime="20261012 23:25:12.680"/>
+</kw>
+<kw name="Get Variable Value" library="BuiltIn">
+<var>${retry_index}</var>
+<arg>\${RETRYFAILED_RETRY_INDEX}</arg>
+<arg>0</arg>
+<doc>Returns variable value or ``default`` if the variable does not exist.</doc>
+<msg timestamp="20261012 23:25:12.680" level="TRACE">Arguments: [ '\\${RETRYFAILED_RETRY_INDEX}' | '0' ]</msg>
+<msg timestamp="20261012 23:25:12.681" level="TRACE">Return: '0'</msg>
+<msg timestamp="20261012 23:25:12.681" level="INFO">${retry_index} = 0</msg>
+<status status="PASS" starttime="20261012 23:25:12.680" endtime="20261012 23:25:12.681"/>
+</kw>
+<kw name="Set Variable" library="BuiltIn">
+<var>${test_name}</var>
+<arg>${SUITE NAME}.${TEST NAME}.fail${retry_index}</arg>
+<doc>Returns the given values which can then be assigned to a variables.</doc>
+<msg timestamp="20261012 23:25:12.681" level="TRACE">Arguments: [ 'stm32g071.Bootloader Verifies And Runs The App.fail0' ]</msg>
+<msg timestamp="20261012 23:25:12.681" level="TRACE">Return: 'stm32g071.Bootloader Verifies And Runs The App.fail0'</msg>
+<msg timestamp="20261012 23:25:12.681" level="INFO">${test_name} = stm32g071.Bootloader Verifies And Runs The App.fail0</msg>
+<status status="PASS" starttime="20261012 23:25:12.681" endtime="20261012 23:25:12.681"/>
+</kw>
+<kw name="Sanitize Test Name" library="renode-keywords">
+<var>${test_name}</var>
+<arg>${test_name}</arg>
+<msg timestamp="20261012 23:25:12.682" level="TRACE">Arguments: [ ${test_name}='stm32g071.Bootloader Verifies And Runs The App.fail0' ]</msg>
+<kw name="Replace String" library="String">
+<var>${test_name}</var>
+<arg>${test_name}</arg>
+<arg>${SPACE}</arg>
+<arg>_</arg>
+<doc>Replaces ``search_for`` in the given ``string`` with ``replace_with``.</doc>
+<msg timestamp="20261012 23:25:12.682" level="TRACE">Arguments: [ 'stm32g071.Bootloader Verifies And Runs The App.fail0' | ' ' | '_' ]</msg>
+<msg timestamp="20261012 23:25:12.682" level="TRACE">Return: 'stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0'</msg>
+<msg timestamp="20261012 23:25:12.682" level="INFO">${test_name} = stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0</msg>
+<status status="PASS" starttime="20261012 23:25:12.682" endtime="20261012 23:25:12.682"/>
+</kw>
+<kw name="Replace String Using Regexp" library="String">
+<var>${test_name}</var>
+<arg>${test_name}</arg>
+<arg>[/""]</arg>
+<arg>-</arg>
+<doc>Replaces ``pattern`` in the given ``string`` with ``replace_with``.</doc>
+<msg timestamp="20261012 23:25:12.682" level="TRACE">Arguments: [ 'stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0' | '[/""]' | '-' ]</msg>
+<msg timestamp="20261012 23:25:12.682" level="TRACE">Return: 'stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0'</msg>
+<msg timestamp="20261012 23:25:12.682" level="INFO">${test_name} = stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0</msg>
+<status status="PASS" starttime="20261012 23:25:12.682" endtime="20261012 23:25:12.682"/>
+</kw>
+<return>
+<value>${test_name}</value>
+<status status="PASS" starttime="20261012 23:25:12.682" endtime="20261012 23:25:12.682"/>
+</return>
+<msg timestamp="20261012 23:25:12.682" level="TRACE">Return: 'stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0'</msg>
+<msg timestamp="20261012 23:25:12.682" level="INFO">${test_name} = stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0</msg>
+<status status="PASS" starttime="20261012 23:25:12.682" endtime="20261012 23:25:12.683"/>
+</kw>
+<kw name="Set Variable" library="BuiltIn">
+<var>${logs_dir}</var>
+<arg>${RESULTS_DIRECTORY}/logs</arg>
+<doc>Returns the given values which can then be assigned to a variables.</doc>
+<msg timestamp="20261012 23:25:12.683" level="TRACE">Arguments: [ '/home/user/ak-mcu-base//logs' ]</msg>
+<msg timestamp="20261012 23:25:12.683" level="TRACE">Return: '/home/user/ak-mcu-base//logs'</msg>
+<msg timestamp="20261012 23:25:12.683" level="INFO">${logs_dir} = /home/user/ak-mcu-base//logs</msg>
+<status status="PASS" starttime="20261012 23:25:12.683" endtime="20261012 23:25:12.683"/>
+</kw>
+<kw name="Create Directory" library="OperatingSystem">
+<arg>${logs_dir}</arg>
+<doc>Creates the specified directory.</doc>
+<msg timestamp="20261012 23:25:12.683" level="TRACE">Arguments: [ '/home/user/ak-mcu-base//logs' ]</msg>
+<msg timestamp="20261012 23:25:12.683" level="INFO" html="true">Created directory '&lt;a href="file:///home/user/ak-mcu-base/logs"&gt;/home/user/ak-mcu-base/logs&lt;/a&gt;'.</msg>
+<msg timestamp="20261012 23:25:12.683" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:12.683" endtime="20261012 23:25:12.683"/>
+</kw>
+<kw name="Set Variable" library="BuiltIn">
+<var>${log_path}</var>
+<arg>${logs_dir}/${test_name}.log</arg>
+<doc>Returns the given values which can then be assigned to a variables.</doc>
+<msg timestamp="20261012 23:25:12.684" level="TRACE">Arguments: [ '/home/user/ak-mcu-base//logs/stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.log' ]</msg>
+<msg timestamp="20261012 23:25:12.684" level="TRACE">Return: '/home/user/ak-mcu-base//logs/stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.log'</msg>
+<msg timestamp="20261012 23:25:12.684" level="INFO">${log_path} = /home/user/ak-mcu-base//logs/stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.log</msg>
+<status status="PASS" starttime="20261012 23:25:12.684" endtime="20261012 23:25:12.684"/>
+</kw>
+<kw name="Log To Console" library="BuiltIn">
+<arg>!!!!! Log saved to "${log_path}"</arg>
+<doc>Logs the given message to the console.</doc>
+<msg timestamp="20261012 23:25:12.684" level="TRACE">Arguments: [ '!!!!! Log saved to "/home/user/ak-mcu-base//logs/stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.log"' ]</msg>
+<msg timestamp="20261012 23:25:12.684" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:12.684" endtime="20261012 23:25:12.684"/>
+</kw>
+<kw name="Save Cached Log" library="Remote">
+<arg>${log_path}</arg>
+<msg timestamp="20261012 23:25:12.684" level="TRACE">Arguments: [ '/home/user/ak-mcu-base//logs/stm32g071.Bootloader_Verifies_And_Runs_The_App.fail0.log' ]</msg>
+<msg timestamp="20261012 23:25:12.689" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:12.684" endtime="20261012 23:25:12.689"/>
+</kw>
+<msg timestamp="20261012 23:25:12.689" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:12.679" endtime="20261012 23:25:12.689"/>
+</kw>
+<msg timestamp="20261012 23:25:12.689" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:12.679" endtime="20261012 23:25:12.689"/>
+</kw>
+<status status="PASS" starttime="20261012 23:25:12.679" endtime="20261012 23:25:12.689"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:12.679" endtime="20261012 23:25:12.689"/>
+</if>
+<status status="PASS" starttime="20261012 23:25:12.679" endtime="20261012 23:25:12.689"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:12.679" endtime="20261012 23:25:12.690"/>
+</if>
+<if>
+<branch type="IF" condition="${HOLD_ON_ERROR}">
+<kw name="Run Keyword If Test Failed" library="BuiltIn">
+<var>${res}</var>
+<arg>Run Keyword And Ignore Error</arg>
+<arg>Import Library</arg>
+<arg>Dialogs</arg>
+<doc>Runs the given keyword with the given arguments, if the test failed.</doc>
+<status status="NOT RUN" starttime="20261012 23:25:12.690" endtime="20261012 23:25:12.690"/>
+</kw>
+<kw name="Run Keyword If Test Failed" library="BuiltIn">
+<arg>Run Keywords</arg>
+<arg>Run Keyword If</arg>
+<arg>'${res[0]}' == 'FAIL'</arg>
+<arg>Log</arg>
+<arg>Couldn't load the Dialogs library - interactive debugging is not possible</arg>
+<arg>console=True</arg>
+<arg>AND</arg>
+<arg>Run Keyword If</arg>
+<arg>'${res[0]}' != 'FAIL'</arg>
+<arg>Open GUI</arg>
+<arg>AND</arg>
+<arg>Run Keyword If</arg>
+<arg>'${res[0]}' != 'FAIL'</arg>
+<arg>Pause Execution</arg>
+<arg>Test failed. Press OK once done debugging.</arg>
+<arg>AND</arg>
+<arg>Run Keyword If</arg>
+<arg>'${res[0]}' != 'FAIL'</arg>
+<arg>Close GUI</arg>
+<doc>Runs the given keyword with the given arguments, if the test failed.</doc>
+<status status="NOT RUN" starttime="20261012 23:25:12.690" endtime="20261012 23:25:12.690"/>
+</kw>
+<status status="NOT RUN" starttime="20261012 23:25:12.690" endtime="20261012 23:25:12.690"/>
+</branch>
+<status status="PASS" starttime="20261012 23:25:12.690" endtime="20261012 23:25:12.690"/>
+</if>
+<kw name="Reset Emulation" library="Remote">
+<msg timestamp="20261012 23:25:12.690" level="TRACE">Arguments: [  ]</msg>
+<msg timestamp="20261012 23:25:12.740" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:12.690" endtime="20261012 23:25:12.740"/>
+</kw>
+<kw name="Clear Cached Log" library="Remote">
+<msg timestamp="20261012 23:25:12.740" level="TRACE">Arguments: [  ]</msg>
+<msg timestamp="20261012 23:25:12.747" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:12.740" endtime="20261012 23:25:12.747"/>
+</kw>
+<msg timestamp="20261012 23:25:12.747" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:11.665" endtime="20261012 23:25:12.747"/>
+</kw>
+<status status="FAIL" starttime="20261012 23:25:09.339" endtime="20261012 23:25:12.748">ArgumentException: Type "Nullable`1" does not have a "Parse" method with the requested parameters</status>
+</test>
+<test id="s1-t2" name="App Shell Answers" line="35">
+<kw name="Reset Emulation" library="Remote" type="SETUP">
+<msg timestamp="20261012 23:25:12.748" level="TRACE">Arguments: [  ]</msg>
+<msg timestamp="20261012 23:25:12.752" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:12.748" endtime="20261012 23:25:12.752"/>
+</kw>
+<kw name="Create Machine">
+<msg timestamp="20261012 23:25:12.752" level="TRACE">Arguments: [  ]</msg>
+<kw name="Execute Command" library="Remote">
+<arg>using sysbus</arg>
+<msg timestamp="20261012 23:25:12.753" level="TRACE">Arguments: [ 'using sysbus' ]</msg>
+<msg timestamp="20261012 23:25:12.755" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:12.753" endtime="20261012 23:25:12.755"/>
+</kw>
+<kw name="Execute Command" library="Remote">
+<arg>mach create "ak-g071"</arg>
+<msg timestamp="20261012 23:25:12.755" level="TRACE">Arguments: [ 'mach create "ak-g071"' ]</msg>
+<msg timestamp="20261012 23:25:12.759" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:12.755" endtime="20261012 23:25:12.759"/>
+</kw>
+<kw name="Execute Command" library="Remote">
+<arg>machine LoadPlatformDescription @platforms/cpus/stm32g0.repl</arg>
+<msg timestamp="20261012 23:25:12.759" level="TRACE">Arguments: [ 'machine LoadPlatformDescription @platforms/cpus/stm32g0.repl' ]</msg>
+<msg timestamp="20261012 23:25:13.178" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:12.759" endtime="20261012 23:25:13.178"/>
+</kw>
+<kw name="Execute Command" library="Remote">
+<arg>sysbus LoadELF @${BUILD}/app.elf</arg>
+<msg timestamp="20261012 23:25:13.179" level="TRACE">Arguments: [ 'sysbus LoadELF @/home/user/ak-mcu-base/tests/renode/../../build/stm32g071/app.elf' ]</msg>
+<msg timestamp="20261012 23:25:13.199" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:13.178" endtime="20261012 23:25:13.199"/>
+</kw>
+<kw name="Execute Command" library="Remote">
+<arg>sysbus LoadELF @${BUILD}/boot.elf</arg>
+<msg timestamp="20261012 23:25:13.199" level="TRACE">Arguments: [ 'sysbus LoadELF @/home/user/ak-mcu-base/tests/renode/../../build/stm32g071/boot.elf' ]</msg>
+<msg timestamp="20261012 23:25:13.210" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:13.199" endtime="20261012 23:25:13.210"/>
+</kw>
+<kw name="Create Terminal Tester" library="Remote">
+<arg>${UART}</arg>
+<msg timestamp="20261012 23:25:13.210" level="TRACE">Arguments: [ 'sysbus.usart2' ]</msg>
+<msg timestamp="20261012 23:25:13.214" level="TRACE">Return: 0</msg>
+<status status="PASS" starttime="20261012 23:25:13.210" endtime="20261012 23:25:13.215"/>
+</kw>
+<msg timestamp="20261012 23:25:13.215" level="TRACE">Return: None</msg>
+<status status="PASS" starttime="20261012 23:25:12.752" endtime="20261012 23:25:13.215"/>
+</kw>
+<kw name="Start Emulation" library="Remote">
+<msg timestamp="20261012 23:25:13.215" level="TRACE">Arguments: [  ]</msg>
+<msg timestamp="20261012 23:25:13.319" level="TRACE">Return: ''</msg>
+<status status="PASS" starttime="20261012 23:25:13.215" endtime="20261012 23:25:13.319"/>
+</kw>
+<kw name="Wait For Line On Uart" library="Remote">
+<arg>ak-mcu-base app v1.3.8</arg>
+<msg timestamp="20261012 23:25:13.319" level="TRACE">Arguments: [ 'ak-mcu-base app v1.3.8' ]</msg>
+<status status="FAIL" starttime="20261012 23:25:13.319" endtime="20261012 23:36:07.337"/>
+</kw>
+<kw name="Wait For Prompt On Uart" library="Remote">
+<arg>&gt;</arg>
+<status status="NOT RUN" starttime="20261012 23:36:07.337" endtime="20261012 23:36:07.337"/>
+</kw>
+<kw name="Write Line To Uart" library="Remote">
+<arg>ver</arg>
+<status status="NOT RUN" starttime="20261012 23:36:07.337" endtime="20261012 23:36:07.337"/>
+</kw>
+<kw name="Wait For Line On Uart" library="Remote">
+<arg>app v1.3.8 build 0, kernel</arg>
+<status status="NOT RUN" starttime="20261012 23:36:07.337" endtime="20261012 23:36:07.337"/>
+</kw>
+<kw name="Write Line To Uart" library="Remote">
+<errors>
+</errors>
+</robot>
