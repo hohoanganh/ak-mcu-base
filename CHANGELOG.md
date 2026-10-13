@@ -27,8 +27,10 @@ Rà lại toàn bộ mã để gọn và nhẹ hơn.
   chạy ảnh do quay lui khôi phục.
 - Test: `boot_decide` 14 ca mới; cài kèm sao lưu, quay lui vì không xác nhận, quay lui theo lệnh, cứu từ BACKUP, cắt điện
   ở từng thao tác flash của cài (10.081 điểm) và của quay lui; giả lập đầu-cuối thêm 12 bước (thử, xác nhận, quay lui
-  theo lệnh, reset 3 lần không xác nhận → quay lui). Bootloader 8,2 → 9,7 KB (ngân sách CI 10 KB). **Chưa chạy trên
-  kit thật.**
+  theo lệnh, reset 3 lần không xác nhận → quay lui). Bootloader 8,2 → 9,3 KB (ngân sách CI 10 KB).
+- **Đã chạy trên AK Base Kit 3.0 (13/10/2026):** bootloader 1.3.0 nạp bằng ST-Link; app của `main` nạp bằng ST-Link; sau đó một lần OTA qua UART đi đúng đường mới: ảnh đang chạy được sao sang BACKUP, ảnh mới chạy thử "boot 1 of 3", tự xác nhận sau 30 s, `fw` báo "image confirmed". Chương trình khối, các màn hình và nhật ký sự cố bình thường.
+- **Bẫy khi nâng cấp:** bản ghi `boot_ctrl` đổi kích thước nên CRC cũ không còn khớp. Kit đang chạy app **cũ** thì sau khi nạp bootloader 1.3.0, OTA ảnh mới **không được cài** (ảnh nằm trong STAGING, lệnh cài bị bỏ qua, `installs` đứng nguyên). Lần đầu phải nạp app mới bằng ST-Link vào `0x08003000`; từ đó OTA chạy bình thường.
+- Chưa thử trên kit: tự quay lui khi ảnh thử không xác nhận sau 3 lượt, `fw rollback`, biến thể ký số (bootloader 16K đổi bản đồ flash), gateway với W5500, port STM32G071 (chỉ chạy trong Renode).
 
 ### Port thứ hai: STM32G071RB, chạy trong Renode
 
