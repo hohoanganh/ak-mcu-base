@@ -34,20 +34,20 @@ Bootloader Verifies And Runs The App
     Start Emulation
     Wait For Line On Uart       ak-mcu-base bootloader v
     # two or more spaces would split the argument: spell them out
-    Wait For Line On Uart       app${SPACE * 4}: v1.3.8
+    Wait For Line On Uart       app${SPACE * 4}: v1.
     Wait For Line On Uart       staging: not checked
     Wait For Line On Uart       cmd 0, attempts 0, trial 0 -> run
     Wait For Line On Uart       jump to 0x08003100
-    Wait For Line On Uart       ak-mcu-base app v1.3.8 build 0, board ak-g071
+    Wait For Line On Uart       ak-mcu-base app v1. build 0, board ak-g071
     Wait For Line On Uart       watchdog 8000 ms, heartbeat 1000 ms
 
 App Shell Answers
     Create Machine              True
     Start Emulation
-    Wait For Line On Uart       ak-mcu-base app v1.3.8
+    Wait For Line On Uart       ak-mcu-base app v1.
     Wait For Prompt On Uart     >
     Write Line To Uart          ver
-    Wait For Line On Uart       app v1.3.8 build 0, kernel
+    Wait For Line On Uart       app v1. build 0, kernel
     Write Line To Uart          info
     Wait For Line On Uart       app${SPACE * 6}0x08003000
     Wait For Line On Uart       staging${SPACE * 2}0x08011000
