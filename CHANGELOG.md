@@ -7,7 +7,11 @@ console lúc khởi động).
 Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 [docs/tinh-nang-moi-v1.2-v1.3.md](legacy/docs/tinh-nang-moi-v1.2-v1.3.md).
 
-## Chưa phát hành
+## ak-mcu-base v1.3.9 — 13/10/2026
+
+App **1.3.9**, bootloader **1.3.0**.
+
+**Nâng cấp từ v1.3.8: đọc mục "Bẫy khi nâng cấp" bên dưới trước.** Bootloader 1.3.0 phải nạp bằng ST-Link, và app đầu tiên sau đó cũng phải nạp bằng ST-Link.
 
 Bootloader **1.3.0**: xác nhận ảnh và quay lui. Log bản ghi trên flash SPI, trạm thời tiết giữ số liệu qua reset.
 Rà lại toàn bộ mã để gọn và nhẹ hơn.
