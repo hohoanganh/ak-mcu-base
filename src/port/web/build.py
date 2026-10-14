@@ -84,7 +84,7 @@ def main():
     ]
     print("emcc: %d source files" % len(files))
     subprocess.check_call(cmd)
-    pages = ("index.html", "pong.html", "blocks.html", "kit-ui.js", "blocks.js", "blocks-compiler.js",
+    pages = ("index.html", "pong.html", "blocks.html", "inside.html", "inside.js", "kit-ui.js", "blocks.js", "blocks-compiler.js",
              "blocks-examples.js", "page.css", "social.png")
     for name in pages:
         shutil.copyfile(os.path.join(HERE, name), os.path.join(a.out, name))

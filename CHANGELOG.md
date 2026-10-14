@@ -7,6 +7,15 @@ console lúc khởi động).
 Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 [docs/tinh-nang-moi-v1.2-v1.3.md](legacy/docs/tinh-nang-moi-v1.2-v1.3.md).
 
+## Chưa phát hành
+
+- **Trang "Bên trong firmware"** (`docs/play/inside.html`): giải thích mã nguồn cho người không lập trình, bằng cách cho nghịch
+  trên chính firmware chạy trong trang. Bấm nút kit thì một tờ phiếu đi qua năm chặng; số dải màn hình vừa gửi đọc thật từ
+  firmware (lệnh `ui`); bảng tự vẽ để thấy 8 dải; ba hộp thư theo đúng ưu tiên của bản demo; mô phỏng nạp firmware có nút
+  rút điện ở từng bước; chạy chương trình khối và xem từng byte; hỏi firmware bằng lệnh shell thật; đổi chip xem lớp nào viết
+  lại. Không đổi firmware. Phần nạp firmware và hộp thư là mô phỏng trong JavaScript, có ghi rõ trên trang; số mili giây và
+  RAM là số đo của v1.3.8 – v1.3.9.
+
 ## ak-mcu-base v1.3.9 — 13/10/2026
 
 App **1.3.9**, bootloader **1.3.0**.

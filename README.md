@@ -26,6 +26,7 @@ cập nhật firmware qua UART và RS485. Dựng lại từ
 | Muốn… | Vào đây |
 |---|---|
 | **Xem nó chạy** | [Một kit, đủ 17 màn hình](https://hohoanganh.github.io/ak-mcu-base/play/) · [hai kit chơi Pong với nhau](https://hohoanganh.github.io/ak-mcu-base/play/pong.html) |
+| **Hiểu bên trong, không cần biết code** | [Bấm, vẽ, rút điện thử](https://hohoanganh.github.io/ak-mcu-base/play/inside.html): firmware thật chạy trên trang và cho thấy nó vừa làm gì |
 | **Lập trình bằng kéo thả** | [Nối các khối lại, bấm Chạy](https://hohoanganh.github.io/ak-mcu-base/play/blocks.html): chạy ngay trên kit trong trang, gửi được sang kit thật qua USB |
 | **Biết demo có gì** | [Từng màn hình, kèm ảnh động](docs/demo-kit.md) |
 | **Bắt đầu dự án mới** | `python tools/new_project.py <thư-mục> --board <tên-board>` · [hướng dẫn](docs/tien-ich.md) |
