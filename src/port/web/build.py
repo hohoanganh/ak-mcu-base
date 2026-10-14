@@ -35,7 +35,8 @@ INCLUDES = ["kernel/inc", "common", "hal", "services/fw", "services/sys", "servi
             "../third_party/nanomodbus", "boot", "app", "demo", "port/host"]
 # APP_CRASH_TEST=0: "crash test hang" and "test fault" would freeze or kill the page
 DEFINES = ["AK_SIM", "APP_KIT_DEMO", "APP_MODBUS_SLAVE", "NMBS_CLIENT_DISABLED", "NMBS_STRERROR_DISABLED",
-           "APP_CRASH_TEST=0"]
+           "APP_CRASH_TEST=0",
+           "AK_TASK_TRACE_ENABLE"]          # inside.html shows the messages (web_trace)
 
 
 def clip_header(src, dst):

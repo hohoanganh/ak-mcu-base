@@ -9,12 +9,14 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 
 ## Chưa phát hành
 
-- **Trang "Bên trong firmware"** (`docs/play/inside.html`): giải thích mã nguồn cho người không lập trình, bằng cách cho nghịch
-  trên chính firmware chạy trong trang. Bấm nút kit thì một tờ phiếu đi qua năm chặng; số dải màn hình vừa gửi đọc thật từ
-  firmware (lệnh `ui`); bảng tự vẽ để thấy 8 dải; ba hộp thư theo đúng ưu tiên của bản demo; mô phỏng nạp firmware có nút
-  rút điện ở từng bước; chạy chương trình khối và xem từng byte; hỏi firmware bằng lệnh shell thật; đổi chip xem lớp nào viết
-  lại. Không đổi firmware. Phần nạp firmware và hộp thư là mô phỏng trong JavaScript, có ghi rõ trên trang; số mili giây và
-  RAM là số đo của v1.3.8 – v1.3.9.
+- **Trang "Bên trong firmware"** (`docs/play/inside.html`): cho người không lập trình xem mã nguồn chạy thế nào, trên chính
+  firmware chạy trong trang. (1) Bốn việc của vòng lặp chính, kèm đoạn mã thật của `kernel/src/task.c`. (2) **Mọi message
+  kernel giao cho task**, đọc thật từ firmware: ai gửi, ai nhận, tín hiệu gì, lời giải thích và file xử lý; dừng firmware
+  lại và chạy từng message một được. (3) Bảy bước từ lúc cấp điện, có nút khởi động lại kit để xem các message đầu tiên.
+  (4) Nạp firmware có sao lưu, chạy thử, quay lui: mô phỏng trên trang, rút điện được ở từng bước. (5) Thư mục nào làm gì.
+- Bản web bật `AK_TASK_TRACE_ENABLE` (móc theo dõi có sẵn của kernel) và thêm `web_trace()`, `web_step()`,
+  `web_trace_names()` trong `port/web/web_main.c`; `kit-ui.js` thêm `pause()`, `step()`, `trace()`, `names()`. Firmware
+  cho kit không đổi. Trong bản web thời gian là ảo nên thời gian chạy của từng handler luôn là 0 và trang không hiện nó.
 
 ## ak-mcu-base v1.3.9 — 13/10/2026
 

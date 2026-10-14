@@ -72,7 +72,7 @@ The connectors, pin by pin, from the schematic (*chân* = pin, *cầu hàn* = so
 | **Crash log** | HardFault, fatal error, watchdog and stalled task are written to EEPROM and reported at the next start |
 | **Modbus RTU** | Slave and master on top of nanoMODBUS (MIT) |
 | **Demo** | 17 screens on a 128×64 OLED with three buttons: seven games, 3D, video from SPI flash, a weather station, a scope |
-| **How it works, no code needed** | [Press, draw, pull the plug](https://hohoanganh.github.io/ak-mcu-base/play/inside.html) (in Vietnamese): the real firmware runs on the page and shows what it just did |
+| **How it works, no code needed** | [Pause the firmware, step through it](https://hohoanganh.github.io/ak-mcu-base/play/inside.html) (in Vietnamese): every message the kernel delivers, on the real firmware running in the page |
 | **Block programming** | [Drag blocks, press Run](https://hohoanganh.github.io/ak-mcu-base/play/blocks.html): a small bytecode machine in the firmware runs the program at once, in the browser or on a real kit over USB; nothing is compiled or flashed |
 | **Tests** | Kernel, bootloader, update and every demo screen run on a PC under ASan; CI on every push |
 

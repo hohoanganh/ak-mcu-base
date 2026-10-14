@@ -1,89 +1,92 @@
 /*
- * inside.js - the page "Bên trong firmware" (inside.html): one running kit and
- * a handful of things to play with around it.
+ * inside.js - the page "Bên trong firmware" (inside.html): how the source runs,
+ * shown on the firmware of this page.
  *
- *   01  a button press lights the five stops a key message passes; the strip
- *       of display pages is read from the running firmware (shell command "ui")
- *   02  a drawing pad: which of the eight display pages a change touches
- *   03  three mailboxes and a dispatcher that always serves the highest priority
- *   04  an update with backup, trial and rollback, as a simulation in the order
- *       the bootloader works (boot_core.c); "pull the plug" at any step
- *   05  a block program compiled here and run on the kit of this page
- *   06  shell commands sent to the kit of this page, with its real answer
- *   07  what changes when the firmware moves to another chip
- *   08  RAM used by three builds (numbers printed by the linker, v1.3.9)
+ *   1  the four things the main loop does (kernel/src/task.c), with the real code
+ *   2  every message the kernel hands to a task, read from the running firmware
+ *      (kit.trace(), web_trace() in web_main.c); the firmware can be paused and
+ *      run one message at a time (kit.pause(), kit.step())
+ *   3  the order of things from power-on to the main loop
+ *   4  an update with backup, trial and rollback: a simulation in the order the
+ *      bootloader works (boot/boot_core.c), "pull the plug" at any step
+ *   5  which folder does what
  */
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
   var press = function (box, hit) { each(box.children, function (b) { b.setAttribute("aria-pressed", b === hit ? "true" : "false"); }); };
-  var COLORS = ["#a8ff3e", "#3ee0ff", "#a493ff", "#ffb43e", "#ff6aa9"];
-  var examples = window.AkBlocksExamples || [];
+  var GH = "https://github.com/hohoanganh/ak-mcu-base/blob/main/";
+  var link = function (path) { return 'Trong mã nguồn: <a href="' + GH + path + '">' + path + "</a>"; };
 
-  /* ------------------------------------------------------------------ 02: drawing pad */
-  (function () {
-    var pad = $("pad"), g = pad.getContext("2d"), cells = $("vs").children;
-    var dirty = 0, down = false, last = null, fade = null;
-    g.fillStyle = "#000"; g.fillRect(0, 0, 128, 64);
-    function show(mask, text) {
-      var n = 0;
-      each(cells, function (c, k) { var on = !!(mask & (1 << k)); c.className = on ? "on" : ""; n += on ? 1 : 0; });
-      $("padms").textContent = (n * 5) + " ms / 50";
-      $("padbar").style.width = (n * 10) + "%";
-      $("padm").className = "meter" + (n === 8 ? " hot" : "");
-      if (text !== undefined) { $("padsay").textContent = text; }
-      else if (n) { $("padsay").textContent = "Phải gửi " + n + " / 8 dải"; }
-    }
-    function at(e) {
-      var r = pad.getBoundingClientRect();
-      return [Math.max(0, Math.min(127, Math.floor((e.clientX - r.left) * 128 / r.width))),
-              Math.max(0, Math.min(63, Math.floor((e.clientY - r.top) * 64 / r.height)))];
-    }
-    function dot(x, y) {
-      g.fillStyle = "#e9fbff";
-      g.fillRect(x - 1, y - 1, 3, 3);
-      for (var p = Math.max(0, y - 1) >> 3; p <= Math.min(63, y + 1) >> 3; p++) { dirty |= 1 << p; }
-    }
-    function line(a, b) {
-      var n = Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]), 1);
-      for (var k = 0; k <= n; k++) { dot(Math.round(a[0] + (b[0] - a[0]) * k / n), Math.round(a[1] + (b[1] - a[1]) * k / n)); }
-    }
-    function settle() { clearTimeout(fade); fade = setTimeout(function () { dirty = 0; show(0, "Không có gì đổi: không gửi gì cả"); }, 1400); }
-    pad.addEventListener("pointerdown", function (e) { e.preventDefault(); pad.setPointerCapture(e.pointerId); down = true; dirty = 0; last = at(e); dot(last[0], last[1]); show(dirty); clearTimeout(fade); });
-    pad.addEventListener("pointermove", function (e) { if (!down) { return; } var p = at(e); line(last, p); last = p; show(dirty); });
-    pad.addEventListener("pointerup", function () { down = false; settle(); });
-    pad.addEventListener("pointercancel", function () { down = false; settle(); });
-    $("padfill").onclick = function () { g.fillStyle = "#e9fbff"; g.fillRect(0, 0, 128, 64); dirty = 255; show(255, "Cả 8 dải đều đổi: sát ngân sách"); settle(); };
-    $("padclear").onclick = function () { g.fillStyle = "#000"; g.fillRect(0, 0, 128, 64); dirty = 255; show(255, "Xoá cũng là đổi cả 8 dải"); settle(); };
-    show(0);
-  })();
+  /* ------------------------------------------------------------------ 1: the main loop */
+  var STAGES = [
+    { t: "Việc 1: có message nào không?",
+      p: "Mỗi task có một hộp thư. Vòng lặp nhìn tất cả hộp thư và chọn hộp có ưu tiên cao nhất đang có message. Lấy message đứng đầu hộp đó.",
+      c: "while ((t_task_new = LOG2LKUP(task_ready)) > t_task_current) {\n    tcb_t* t_tcb = &task_pri_queue[t_task_new - 1];   <i>/* hộp thư ưu tiên cao nhất đang có message */</i>\n    ak_msg_t* t_msg = t_tcb->qhead;                   <i>/* message đứng đầu hộp */</i>\n    t_tcb->qhead = t_msg->next;\n    ...",
+      s: "src/kernel/src/task.c" },
+    { t: "Việc 2: giao cho task, chờ nó làm xong",
+      p: "Message được đưa cho đúng task. Task làm trọn việc đó rồi mới trả quyền lại; không ai chen ngang được. Vì thế mỗi việc phải ngắn: muốn chờ thì đặt hẹn giờ rồi về, không đứng đợi.",
+      c: "    task_table[t_msg->des_task_id].task(t_msg);       <i>/* gọi task nhận message, chờ nó xong */</i>\n    ...\n    msg_free(t_msg);                                  <i>/* xong việc: bỏ tờ phiếu */</i>\n}",
+      s: "src/kernel/src/task.c" },
+    { t: "Việc 3: đi tuần một vòng",
+      p: "Có những thứ không tự báo: nút bấm, chữ gõ vào dòng lệnh, đường RS485. Vòng lặp ghé hỏi từng thứ. Thấy gì mới thì không xử lý tại chỗ, chỉ viết một message bỏ vào hộp thư của task lo việc đó.",
+      c: "while (__task_polling_table->id < AK_TASK_POLLING_EOT_ID) {\n    if (__task_polling_table->ability == AK_ENABLE) {\n        __task_polling_table->task_polling();        <i>/* ghé một chỗ: nút, dòng lệnh, RS485 */</i>\n    }\n    __task_polling_table++;\n}",
+      s: "src/kernel/src/task.c" },
+    { t: "Việc 4: hết việc thì ngủ",
+      p: "Không còn message nào thì chip ngủ để đỡ tốn điện. Một ngắt (đồng hồ, có chữ tới) đánh thức nó, và vòng lặp quay lại việc 1. Kit đứng yên ngủ gần hết thời gian: mỗi 50 ms chỉ thức một lúc để vẽ màn hình.",
+      c: "for (;;) {\n    if (task_run_once() == 0) {        <i>/* việc 1, 2, 3: không có message nào */</i>\n        ENTRY_CRITICAL();\n        if (task_ready == 0) {\n            ak_port_idle();            <i>/* ngủ, chờ ngắt */</i>\n        }\n        EXIT_CRITICAL();\n    }\n}",
+      s: "src/kernel/src/task.c" }
+  ];
+  var stages = $("loop").children, liveTimers = [];
+  function showStage(k) {
+    var s = STAGES[k];
+    press($("loop"), stages[k]);
+    $("stT").textContent = s.t;
+    $("stP").textContent = s.p;
+    $("stC").innerHTML = s.c.replace(/&/g, "&amp;").replace(/<(?!\/?i>)/g, "&lt;");
+    $("stS").innerHTML = link(s.s) + " · chú thích tiếng Việt là thêm vào để giải thích";
+  }
+  each(stages, function (b, k) { b.onclick = function () { showStage(k); }; });
+  showStage(0);
+  /* light the stages a message passed: [index, delay ms] */
+  function lightStages(list) {
+    liveTimers.forEach(clearTimeout);
+    liveTimers = [];
+    each(stages, function (s) { s.classList.remove("live"); });
+    list.forEach(function (k, n) {
+      liveTimers.push(setTimeout(function () { stages[k].classList.add("live"); }, n * 220));
+      liveTimers.push(setTimeout(function () { stages[k].classList.remove("live"); }, n * 220 + 700));
+    });
+  }
 
-  /* ------------------------------------------------------------------ 03: mailboxes */
-  (function () {
-    var boxes = $("boxes").children, q = [0, 0, 0], busy = -1, MAX = 9;
-    function draw() {
-      each(boxes, function (b, k) {
-        var holder = b.lastElementChild;
-        while (holder.children.length > q[k]) { holder.removeChild(holder.lastChild); }
-        while (holder.children.length < q[k]) { holder.appendChild(document.createElement("i")); }
-        b.classList.toggle("busy", k === busy);
-      });
-    }
-    each(boxes, function (b, k) { b.onclick = function () { if (q[k] < MAX) { q[k]++; draw(); } }; });
-    setInterval(function () { if (!document.hidden && q[2] < 3) { q[2]++; draw(); } }, 1700);      /* the frame timer */
-    setInterval(function () {
-      if (document.hidden) { return; }
-      busy = q[0] ? 0 : (q[1] ? 1 : (q[2] ? 2 : -1));
-      if (busy < 0) { $("now").textContent = "Đang rảnh: chip ngủ chờ việc."; draw(); return; }
-      q[busy]--;
-      $("now").innerHTML = "Đang làm: <b>" + boxes[busy].dataset.n + "</b>" + (busy < 2 && q[2] ? " · vẽ màn hình phải chờ" : "");
-      draw();
-    }, 800);
-    draw();
-  })();
+  /* ------------------------------------------------------------------ 3: from power-on */
+  var BOOT = [
+    ["Cấp điện: chip chạy bootloader trước", "Bootloader là một chương trình nhỏ 12 KB nằm ở đầu bộ nhớ. Nó luôn chạy đầu tiên, trước mọi thứ khác.", "src/boot/boot_main.c"],
+    ["Bootloader đọc tờ lệnh và kiểm bản firmware", "Có lệnh cài bản mới không? Bản đang nằm trong chip có nguyên vẹn không (tính lại tổng kiểm)? Tuỳ câu trả lời mà nó cài, quay lui, chờ nạp, hay cho chạy.", "src/boot/boot_core.c"],
+    ["Nhảy sang firmware chính", "Bootloader khởi động lại chip rồi nhảy thẳng sang firmware chính ngay từ đầu, khi chưa bật bộ phận nào. Firmware luôn bắt đầu từ một con chip sạch.", "src/port/stm32l151/startup.c"],
+    ["Firmware tự giới thiệu, đọc lại chuyện lần trước", "In ra phiên bản và tên kit. Nếu lần chạy trước kết thúc bằng một sự cố (treo, lỗi), nó chép thông tin đó vào sổ sự cố trước khi làm việc khác.", "src/app/main.c"],
+    ["Tạo các task và danh sách đi tuần", "Từ một bảng: mỗi dòng là một task, mức ưu tiên và hàm xử lý. Bảng thứ hai liệt kê những chỗ phải đi tuần. Thêm một task là thêm một dòng.", "src/app/task_list.c"],
+    ["Gửi những message đầu tiên", "Mỗi task nhận một message INIT để tự chuẩn bị: người gác đặt nhịp tim 1 giây, dòng lệnh in dấu nhắc, giao diện mở màn hình và đặt hẹn giờ vẽ khung đầu tiên.", "src/app/main.c"],
+    ["Vào vòng lặp chính, không bao giờ thoát", "Từ đây chỉ còn bốn việc của mục 1, quay mãi. Mọi thứ kit làm sau đó đều bắt đầu từ một message.", "src/kernel/src/task.c"]
+  ];
+  BOOT.forEach(function (b, k) {
+    var li = document.createElement("li"), btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = b[0];
+    btn.setAttribute("aria-pressed", "false");
+    btn.onclick = function () {
+      each($("steps").children, function (x, j) { x.firstChild.setAttribute("aria-pressed", j === k ? "true" : "false"); });
+      $("bT").textContent = b[0];
+      $("bP").textContent = b[1];
+      $("bS").innerHTML = link(b[2]);
+    };
+    li.appendChild(btn);
+    $("steps").appendChild(li);
+  });
+  $("steps").children[0].firstChild.click();
 
-  /* ------------------------------------------------------------------ 04: update */
+  /* ------------------------------------------------------------------ 4: update */
   (function () {
     var OLD = "bản cũ", NEW = "bản mới", st;
     function tank(id, cls, pct, text, run) {
@@ -92,14 +95,13 @@
       t.firstChild.style.width = pct + "%";
       t.lastChild.textContent = text;
     }
-    function say(html, zap) { $("say").className = "say" + (zap ? " zap" : ""); $("say").innerHTML = html; }
     function acts(list) {
       var box = $("acts");
       box.textContent = "";
       list.forEach(function (a) {
         var b = document.createElement("button");
         b.type = "button";
-        b.className = "act " + (a[2] || "");
+        b.className = "b " + (a[2] || "");
         b.textContent = a[0];
         b.onclick = a[1];
         box.appendChild(b);
@@ -114,21 +116,17 @@
       "Bản mới chạy, nhưng mới là <b>chạy thử</b>. Nó có 3 lần khởi động để chứng minh."
     ];
     var again = ["Làm lại", function () { reset(); }];
-    var zap = ["⚡ Rút điện", function () { pull(); }, "zap"];
-    function draw() {
+    var zap = ["Rút điện", function () { pull(); }];
+    function show(text) {
       var s = st.step;
       tank("tApp", s === 4 ? "half" : (st.app === NEW ? "new" : "old"), s === 4 ? 55 : 100,
            s === 4 ? "đang chép… chưa chạy được" : st.app + (st.trial ? " · chạy thử lần " + st.trial + " / 3" : " · đang chạy"), s !== 4);
       tank("tStg", st.stg === "" ? "" : (st.stg === "half" ? "half" : "new"), st.stg === "" ? 0 : (st.stg === "half" ? 60 : 100),
            st.stg === "" ? "trống" : (st.stg === "half" ? "đang nhận…" : NEW + (s >= 2 ? " · đã kiểm" : "")));
       tank("tBak", st.bak ? "old" : "", st.bak ? 100 : 0, st.bak ? OLD + " · cất giữ" : "trống");
-    }
-    function show(text, isZap) {
-      var s = st.step;
-      draw();
-      say(text, isZap);
+      $("say").innerHTML = text;
       if (s === 5) {
-        acts([["Chạy tốt 30 giây ✓", function () { st.step = 6; st.trial = 0; show("<b>Chốt.</b> Bản mới ở lại. Bản cũ vẫn nằm trong DỰ PHÒNG, phòng khi cần."); }, "go"],
+        acts([["Chạy tốt 30 giây", function () { st.step = 6; st.trial = 0; show("<b>Chốt.</b> Bản mới ở lại. Bản cũ vẫn nằm trong DỰ PHÒNG, phòng khi cần."); }, "go"],
               ["Bản mới bị treo", function () { hang(false); }], zap]);
       } else if (s >= 6) {
         acts([again]);
@@ -148,172 +146,229 @@
     function hang(isZap) {
       if (st.trial >= 3) {
         st.step = 7; st.app = OLD; st.trial = 0; st.stg = "";
-        show("Ba lần không xong. Bootloader <b>lấy lại bản cũ</b> từ DỰ PHÒNG và vứt bản hỏng đi. Kit vẫn sống.", isZap);
+        show("Ba lần không xong. Bootloader <b>lấy lại bản cũ</b> từ DỰ PHÒNG và vứt bản hỏng đi. Kit vẫn sống.");
         return;
       }
       st.trial++;
-      show((isZap ? "Bật lại: tính là một lần khởi động. " : "Treo, bị khởi động lại. ") + "Đây là <b>lần thử " + st.trial + " / 3</b>.", isZap);
+      show((isZap ? "Rút điện, bật lại: tính là một lần khởi động. " : "Treo, bị khởi động lại. ") + "Đây là <b>lần thử " + st.trial + " / 3</b>.");
     }
     function pull() {
-      var s = st.step, slots = $("slots");
-      slots.classList.remove("flash");
-      void slots.offsetWidth;
-      slots.classList.add("flash");
-      if (s === 0) { show("Bật lại: <b>bản cũ chạy</b>, chưa có gì thay đổi.", true); }
-      if (s === 1) { st.stg = ""; st.step = 0; show("Bật lại: <b>bản cũ chạy</b>. Phần nhận dở bị bỏ, gửi lại từ đầu.", true); }
-      if (s === 2) { st.step = 3; st.bak = true; show("Bật lại: tờ lệnh “cài” <b>vẫn còn</b>, nên bootloader làm tiếp: cất bản cũ sang DỰ PHÒNG.", true); }
-      if (s === 3) { show("Bật lại: bản cũ còn nguyên trong chip, nên bootloader <b>cất lại từ đầu</b>.", true); }
-      if (s === 4) { show("Bật lại: chỗ chạy chưa có tờ bìa nên không ai chạy nó. Bootloader <b>chép lại</b> từ ngăn CHỜ.", true); }
+      var s = st.step;
+      if (s === 0) { show("Rút điện, bật lại: <b>bản cũ chạy</b>, chưa có gì thay đổi."); }
+      if (s === 1) { st.stg = ""; st.step = 0; show("Rút điện, bật lại: <b>bản cũ chạy</b>. Phần nhận dở bị bỏ, gửi lại từ đầu."); }
+      if (s === 2) { st.step = 3; st.bak = true; show("Rút điện, bật lại: tờ lệnh “cài” <b>vẫn còn</b>, nên bootloader làm tiếp: cất bản cũ sang DỰ PHÒNG."); }
+      if (s === 3) { show("Rút điện, bật lại: bản cũ còn nguyên trong chip, nên bootloader <b>cất lại từ đầu</b>."); }
+      if (s === 4) { show("Rút điện, bật lại: chỗ chạy chưa có tờ bìa nên không ai chạy nó. Bootloader <b>chép lại</b> từ ngăn CHỜ."); }
       if (s === 5) { hang(true); }
     }
     reset();
   })();
 
-  /* ------------------------------------------------------------------ 07: another chip */
-  (function () {
-    var PORTS = [
-      ["Kit này", "STM32L151: chân, bộ nhớ, màn hình của kit", "3 705 dòng"],
-      ["Chip khác", "STM32G071: đã chạy trong trình giả lập, chưa có bo thật", "974 dòng"],
-      ["Máy tính", "bộ nhớ là file trên đĩa: thử cắt điện hàng chục nghìn lần", "881 dòng"],
-      ["Trình duyệt", "chính là kit trên trang này", "337 dòng"]
-    ];
-    function pick(b) {
-      var p = PORTS[+b.dataset.k], row = $("port");
-      press($("chips"), b);
-      $("portn").textContent = p[0]; $("portd").textContent = p[1]; $("portl").textContent = "viết lại · " + p[2];
-      row.classList.remove("pulse"); void row.offsetWidth; row.classList.add("pulse");
-    }
-    each($("chips").children, function (b) { b.onclick = function () { pick(b); }; });
-    pick($("chips").children[0]);
-  })();
+  /* ------------------------------------------------------------------ 5: folders */
+  [
+    ["src/app", "<b>Ứng dụng mẫu.</b> Người gác, dòng lệnh, nhận firmware mới. Dự án mới viết ở đây.", "1 170"],
+    ["src/demo", "<b>Bản demo.</b> 17 màn hình, game, nhạc, video, máy ảo cho kéo thả.", "6 541"],
+    ["src/services", "<b>Dịch vụ dùng chung.</b> Nạp firmware, Modbus, sổ sự cố, ghi log.", "2 458"],
+    ["src/kernel", "<b>Kernel AK.</b> Vòng lặp chính, hộp thư, message, hẹn giờ. Mục 1 và 2 ở trên.", "1 865"],
+    ["src/boot", "<b>Bootloader.</b> Kiểm, cài, quay lui. Mục 3 và 4 ở trên.", "535"],
+    ["src/hal", "<b>Danh sách việc chip phải làm.</b> Ghi bộ nhớ, gửi chữ, bật đèn, đọc đồng hồ.", "275"],
+    ["src/port", "<b>Phần riêng từng nơi chạy.</b> Kit STM32L151, chip STM32G071, máy tính, trình duyệt.", "5 560"],
+    ["tests", "<b>Bộ kiểm tự động.</b> Chạy trên máy tính, kể cả cắt điện giữa lúc ghi.", "5 018"],
+    ["tools", "<b>Công cụ trên máy tính.</b> Nạp qua USB và RS485, xem màn hình kit, tạo dự án mới.", ""]
+  ].forEach(function (r) {
+    var tr = document.createElement("tr");
+    tr.innerHTML = '<td><a href="' + GH.replace("/blob/", "/tree/") + r[0] + '">' + r[0] + "/</a></td><td>" + r[1] + "</td><td>" + r[2] + "</td>";
+    $("tree").appendChild(tr);
+  });
 
-  /* ------------------------------------------------------------------ 08: RAM */
-  (function () {
-    function pick(b) {
-      var n = +b.dataset.b, pct = Math.round(n * 100 / 16384);
-      press($("rams"), b);
-      $("ramv").textContent = String(n).replace(/\B(?=(\d{3})+$)/g, " ") + " / 16 384 byte · " + pct + " %";
-      $("ramb").style.width = pct + "%";
-      $("ramm").className = "meter" + (pct > 70 ? " hot" : "");
-    }
-    each($("rams").children, function (b) { b.onclick = function () { pick(b); }; });
-    pick($("rams").children[1]);
-  })();
-
-  /* ------------------------------------------------------------------ the kit: 01, 05, 06 */
-  var stops = $("path").children, timers = [];
-  function travel() {
-    timers.forEach(clearTimeout);
-    timers = [];
-    each(stops, function (s, k) {
-      s.classList.remove("on");
-      timers.push(setTimeout(function () { s.classList.add("on"); }, k * 150));
-      timers.push(setTimeout(function () { s.classList.remove("on"); }, k * 150 + 520));
-    });
-    $("nudge").textContent = "Mỗi lần bấm là một tờ phiếu đi hết năm chặng.";
-    $("nudge").className = "nudge done";
-  }
-  function markScreen(name) {
-    var hit = null;
-    each($("screens").children, function (b) { if (b.dataset.s === name) { hit = b; } });
-    press($("screens"), hit);
-    $("ms").textContent = hit ? hit.dataset.ms : "–";
-    $("msbar").style.width = (hit ? hit.dataset.p : 0) + "%";
-    $("msm").className = "meter" + (hit && +hit.dataset.p > 90 ? " hot" : "");
-  }
-  var MEANS = {
-    stat: function (t) { var m = /pure\s+(\d+)\s+(\d+)/.exec(t); return m ? "Đang có " + m[1] + " phiếu chờ. Lúc đông nhất từng có " + m[2] + " phiếu cùng lúc." : ""; },
-    crash: function (t) { return /empty/.test(t) ? "Chưa lần nào. Sổ sự cố trống." : "Có: mỗi dòng là một lần, kèm việc đang làm lúc đó."; },
-    ver: function (t) { var m = /app v([\d.]+)/.exec(t); return m ? "Bản " + m[1] + ", đúng mã nguồn trên GitHub." : ""; },
-    info: function (t) { return /app\s+0x\w+\s+\d+ B\s+no image/.test(t) ? "Trên trình duyệt các ngăn đều trống: firmware chạy thẳng, không qua nạp. Trên kit thật, mỗi dòng ghi bản đang nằm trong ngăn đó." : "Mỗi dòng là một ngăn nhớ và bản firmware đang nằm trong đó."; },
-    blk: function (t) { var m = /(\d+) of 768/.exec(t); return m && +m[1] ? "Đang giữ một chương trình " + m[1] + " byte." : "Chưa có. Chạy một chương trình ở mục 05 rồi hỏi lại."; }
-  };
-
+  /* ------------------------------------------------------------------ 2: the messages of the running firmware */
   AkKitUI.create($("kit"), { caption: "AK Base Kit", sound: true }).then(function (kit) {
-    var cells = $("pages").children, peak = 0, peakAt = 0;
-    var line = "", asking = null, got = [], askTimer = null;
+    var N = kit.names();
+    var IRQ = N.AK_TASK_INTERRUPT_ID, IDLE = N.AK_TASK_IDLE_ID;
+    var lanes = {}, counts = {};
+    var paused = false, queue = [], slept = 0, picked = null, lastShown = 0;
 
-    kit.element.querySelector(".akkit-buttons").addEventListener("pointerdown", travel);
-    document.addEventListener("keydown", function (e) { if (!e.repeat && (e.key === "1" || e.key === "2" || e.key === "3")) { travel(); } });
+    each($("board").querySelectorAll(".lane"), function (l) { lanes[N[l.dataset.id]] = l; counts[N[l.dataset.id]] = 0; });
 
-    function strip(n) {
-      var now = Date.now();
-      if (n >= peak || now - peakAt > 900) { peak = n; peakAt = now; }          /* hold a burst long enough to see */
-      $("sent").textContent = peak + " / 8 dải";
-      each(cells, function (c, k) { c.className = k < peak ? "on" : ""; });
+    /* what each (task, signal) means; routine = part of the background rhythm */
+    function sig(e) {
+      var d = e.des, s = e.sig;
+      if (s === N.AK_SIG_PING) { return { n: "ĐIỂM DANH", c: "AK_SIG_PING", f: "src/app/task_system.c", routine: true, p: "Người gác hỏi “còn sống không?”. Task không phải trả lời: chỉ cần nó nhận được message này là đủ biết nó còn được chạy." }; }
+      if (d === N.TASK_TIMER_TICK_ID && s === N.TIMER_TICK) { return { n: "TỚI GIỜ", c: "TIMER_TICK", f: "src/kernel/src/timer.c", routine: true, p: "Đồng hồ phần cứng báo: có một hẹn giờ vừa đến hạn. Task Hẹn giờ xem đó là hẹn giờ của ai rồi gửi message cho task ấy." }; }
+      if (d === N.TASK_SYSTEM_ID) {
+        if (s === N.SYSTEM_SIG_INIT) { return { n: "KHỞI ĐỘNG", c: "SYSTEM_SIG_INIT", f: "src/app/task_system.c", p: "Người gác bắt đầu làm việc: đặt nhịp tim 1 giây và điểm danh các task lần đầu." }; }
+        if (s === N.SYSTEM_SIG_HEARTBEAT) { return { n: "NHỊP TIM", c: "SYSTEM_SIG_HEARTBEAT", f: "src/app/task_system.c", routine: true, p: "Mỗi giây một lần: xem task nào im lặng quá lâu, báo cho bộ canh phần cứng là mọi thứ ổn, nháy đèn, rồi điểm danh lại." }; }
+        if (s === N.SYSTEM_SIG_CONFIRM) { return { n: "CHỐT BẢN MỚI", c: "SYSTEM_SIG_CONFIRM", f: "src/app/task_system.c", p: "Bản firmware mới đã chạy đủ lâu mà không sao: chốt, khỏi quay lui." }; }
+      }
+      if (d === N.TASK_CONSOLE_ID) {
+        if (s === N.CONSOLE_SIG_INIT) { return { n: "KHỞI ĐỘNG", c: "CONSOLE_SIG_INIT", f: "src/app/task_console.c", p: "Dòng lệnh sẵn sàng nhận chữ." }; }
+        if (s === N.CONSOLE_SIG_LINE) { return { n: "MỘT DÒNG LỆNH", c: "CONSOLE_SIG_LINE", f: "src/app/task_console.c", p: "Vòng đi tuần thấy có người gõ xong một dòng và bấm Enter. Nó không tự xử lý: gói cả dòng vào một message gửi cho task Dòng lệnh. Task này tra lệnh và làm, thường là bằng cách gửi message cho task khác." }; }
+      }
+      if (d === N.TASK_FW_ID) {
+        if (s === N.FW_SIG_RESET) { return { n: "XIN KHỞI ĐỘNG LẠI", c: "FW_SIG_RESET", f: "src/app/task_fw.c", p: "Có lệnh khởi động lại. Task không reset ngay: nó đặt một hẹn giờ ngắn để chữ đang in kịp gửi hết." }; }
+        if (s === N.FW_SIG_DO_RESET) { return { n: "KHỞI ĐỘNG LẠI", c: "FW_SIG_DO_RESET", f: "src/app/task_fw.c", p: "Hẹn giờ đến hạn: chip khởi động lại. Mọi thứ bắt đầu lại từ bước 1 của mục 3." }; }
+        if (s === N.FW_SIG_INSTALL) { return { n: "CÀI BẢN MỚI", c: "FW_SIG_INSTALL", f: "src/app/task_fw.c", p: "Bản mới đã nằm đủ trong ngăn CHỜ và đã kiểm: để lại tờ lệnh cho bootloader rồi khởi động lại." }; }
+      }
+      if (d === N.TASK_UI_ID) {
+        if (s === N.UI_SIG_INIT) { return { n: "KHỞI ĐỘNG", c: "UI_SIG_INIT", f: "src/demo/task_ui.c", p: "Giao diện bật màn hình, mở menu và đặt hẹn giờ cho khung hình đầu tiên." }; }
+        if (s === N.UI_SIG_FRAME) { return { n: "VẼ KHUNG", c: "UI_SIG_FRAME", f: "src/demo/task_ui.c", routine: true, p: "Vẽ một khung hình, gửi những dải màn hình đã đổi, rồi đặt hẹn giờ 50 ms cho khung sau. Không có vòng lặp chờ nào: giữa hai khung, task khác được chạy." }; }
+        if (s === N.UI_SIG_KEY_1 || s === N.UI_SIG_KEY_2 || s === N.UI_SIG_KEY_3) {
+          var k = s === N.UI_SIG_KEY_1 ? 1 : (s === N.UI_SIG_KEY_2 ? 2 : 3);
+          return { n: "PHÍM B" + k, c: "UI_SIG_KEY_" + k, f: "src/demo/task_ui.c", p: "Nút B" + k + " vừa được bấm. Giao diện đưa phím cho màn hình đang mở; màn hình đổi trạng thái và kêu bíp. Hình mới sẽ hiện ở lần VẼ KHUNG kế tiếp." };
+        }
+        if (s === N.UI_SIG_BACK) { return { n: "VỀ MENU", c: "UI_SIG_BACK", f: "src/demo/task_ui.c", p: "Nút B3 được giữ lâu: đóng màn hình đang mở, quay về menu." }; }
+        if (s === N.UI_SIG_BEEP_OFF) { return { n: "TẮT CÒI", c: "UI_SIG_BEEP_OFF", f: "src/demo/task_ui.c", p: "Lúc kêu bíp, giao diện bật còi rồi đặt một hẹn giờ. Bây giờ hẹn giờ đó đến hạn: tắt còi. Đây là cách “chờ” ở đây: không đứng đợi, nhận một message khi tới lúc." }; }
+        if (s === N.UI_SIG_NOTE) { return { n: "NỐT KẾ", c: "UI_SIG_NOTE", f: "src/demo/music.c", p: "Nốt nhạc đang phát đã đủ dài: chuyển sang nốt kế tiếp và đặt hẹn giờ cho nốt đó." }; }
+      }
+      return { n: "tín hiệu " + s, c: "sig " + s, f: "src/app/app.h", p: "Một message chưa có lời giải thích ở trang này." };
     }
-    function gotLine(s) {
-      var m = /(\d+) of \d+ pages sent/.exec(s);
-      s = s.replace(/^[> ]+/, "").trim();
-      if (m) { strip(+m[1]); return; }
-      if (!asking || !s || s === "ui" || s === asking) { return; }
-      got.push(s);
+    function who(id) {
+      var l = lanes[id];
+      return l ? l.querySelector("b").textContent : "task " + id;
     }
-    kit.onConsole = function (text) {
-      var parts = (line + text).split("\n");
-      line = parts.pop();
-      parts.forEach(gotLine);
-    };
-    setInterval(function () { if (!document.hidden && !asking) { kit.send("ui"); } }, 180);
+    /* the first messages are posted by app_init(), before the loop runs */
+    function atStart(e) {
+      return e.src === IDLE && ((e.des === N.TASK_SYSTEM_ID && e.sig === N.SYSTEM_SIG_INIT) ||
+        (e.des === N.TASK_CONSOLE_ID && e.sig === N.CONSOLE_SIG_INIT) || (e.des === N.TASK_UI_ID && e.sig === N.UI_SIG_INIT));
+    }
+    function from(e) { return atStart(e) ? "Lúc khởi động" : who(e.src); }
+    function clock(ms) {
+      var s = Math.floor(ms / 1000);
+      return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60) + "." + ("00" + (ms % 1000)).slice(-3);
+    }
+    function origin(e) {
+      if (atStart(e)) { return "Lúc khởi động, trước khi vòng lặp chạy, firmware bỏ sẵn message này vào hộp thư."; }
+      if (e.src === IRQ) { return "Một ngắt phần cứng sinh ra message này."; }
+      if (e.src === IDLE) { return "Vòng đi tuần sinh ra message này."; }
+      if (e.src === N.TASK_TIMER_TICK_ID) { return "Một hẹn giờ đến hạn, nên task Hẹn giờ gửi message này."; }
+      return "Task " + who(e.src) + " gửi message này trong lúc đang làm việc của nó.";
+    }
 
-    each($("asks").children, function (b) {
-      b.onclick = function () {
-        var cmd = b.dataset.c;
-        press($("asks"), b);
-        clearTimeout(askTimer);
-        asking = cmd; got = [];
-        $("tout").textContent = "> " + cmd;
-        $("tsay").textContent = "…";
-        kit.send(cmd);
-        askTimer = setTimeout(function () {
-          var text = got.join("\n");
-          $("tout").textContent = "> " + cmd + "\n" + (text || "(không trả lời)");
-          $("tsay").textContent = MEANS[cmd](text) || "Firmware đã trả lời ở trên.";
-          asking = null;
-        }, 450);
-      };
-    });
-
-    each($("screens").children, function (b) {
-      b.onclick = function () {
-        kit.open(b.dataset.s);
-        kit.autoplay(true);
-        markScreen(b.dataset.s);
-        press($("progs"), null);
-      };
-    });
-
-    ["counter", "ball", "clock", "blink"].forEach(function (id) {
-      var ex = examples.filter(function (x) { return x.id === id; })[0], b;
-      if (!ex) { return; }
-      b = document.createElement("button");
+    /* the arrow from the sender lane to the receiver lane */
+    function arc(e) {
+      var a = atStart(e) ? null : lanes[e.src], b = lanes[e.des], w = $("wire").clientWidth || 54, y1, y2, x = w - 6;
+      each($("board").querySelectorAll(".lane"), function (l) { l.classList.remove("from", "to"); });
+      if (b) { b.classList.add("to"); }
+      if (!a || !b) { $("arc").setAttribute("d", ""); return; }
+      a.classList.add("from");
+      b.classList.add("to");
+      y1 = a.offsetTop + a.offsetHeight / 2;
+      y2 = b.offsetTop + b.offsetHeight / 2;
+      if (a === b) { y1 -= 9; y2 += 9; }
+      $("arc").setAttribute("d", "M" + x + "," + y1 + " C" + (x - w + 4) + "," + y1 + " " + (x - w + 4) + "," + y2 + " " + (x - 4) + "," + y2);
+    }
+    function show(e, nap) {
+      var m = sig(e);
+      arc(e);
+      $("evT").textContent = from(e) + " → " + who(e.des) + ": " + m.n;
+      $("evP").textContent = (nap ? "Trước đó không có việc gì: chip ngủ " + nap + " ms. " : "") + origin(e) + " " + m.p;
+      $("evS").innerHTML = "Tên trong mã: <code>" + m.c + "</code> · " + link(m.f).replace("Trong mã nguồn: ", "xử lý ở ");
+      lightStages((nap ? [3] : []).concat(e.src === IDLE && !atStart(e) ? [2, 0, 1] : [0, 1]));
+    }
+    function count(e) {
+      var l = lanes[e.des], m = sig(e);
+      counts[e.des] = (counts[e.des] || 0) + 1;
+      if (l) {
+        l.querySelector(".cnt").textContent = counts[e.des];
+        l.querySelector(".last").textContent = m.n + (atStart(e) ? " · lúc khởi động" : " · từ " + who(e.src));
+      }
+    }
+    function logLine(e, nap) {
+      var m = sig(e), li = document.createElement("li"), b = document.createElement("button"), box = $("log");
       b.type = "button";
-      b.className = "chip";
-      b.textContent = ex.name;
       b.setAttribute("aria-pressed", "false");
+      b.innerHTML = "<time>" + clock(e.t) + "</time><span>" + from(e) + " → " + who(e.des) + " · " + m.n + "</span>";
       b.onclick = function () {
-        var r = AkBlocks.compile(ex.workspace), box = $("hex");
-        if (!r.ok) { return; }
-        press($("progs"), b);
-        $("nbytes").textContent = r.bytes.length;
-        box.textContent = "";
-        each(r.bytes, function (v, k) {
-          var c = document.createElement("i");
-          c.textContent = (v < 16 ? "0" : "") + v.toString(16).toUpperCase();
-          c.style.background = COLORS[v % COLORS.length];
-          c.style.animationDelay = Math.min(k * 6, 600) + "ms";
-          box.appendChild(c);
-        });
-        $("about").textContent = ex.about;
-        $("edit").href = "blocks.html?ex=" + ex.id;
-        $("edit").textContent = "Tự kéo thả chương trình này →";
-        kit.runBlocks(r.bytes);
-        markScreen("");
+        each(box.querySelectorAll("button"), function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+        picked = e;
+        show(e, nap);
       };
-      $("progs").appendChild(b);
-    });
+      li.appendChild(b);
+      box.insertBefore(li, box.firstChild);
+      while (box.children.length > 60) { box.removeChild(box.lastChild); }
+    }
+
+    /* running: take what the firmware did since the last look */
+    function poll() {
+      var evs, quiet = $("quiet").checked, shown = null, now = Date.now();
+      if (paused) { return; }
+      evs = kit.trace();
+      evs.forEach(function (e) {
+        var r = sig(e).routine;
+        count(e);
+        if (!r || !quiet) { logLine(e, 0); }
+        if (!r) { shown = e; }
+      });
+      if (shown) { picked = null; lastShown = now; show(shown, 0); }
+      else if (evs.length && !picked && now - lastShown > 1500) { lastShown = now - 900; show(evs[evs.length - 1], 0); }
+    }
+    setInterval(poll, 120);
+
+    function setPaused(on) {
+      paused = on;
+      kit.pause(on);
+      queue = [];
+      slept = 0;
+      picked = null;
+      $("run").setAttribute("aria-pressed", on ? "false" : "true");
+      $("stop").setAttribute("aria-pressed", on ? "true" : "false");
+      $("step").disabled = !on;
+      if (on) {
+        kit.trace().forEach(count);
+        $("evT").textContent = "Firmware đang dừng.";
+        $("evP").textContent = "Thời gian của nó đứng yên: màn hình kit không đổi nữa. Bấm Bước tiếp để nó chạy tới message kế tiếp rồi dừng lại.";
+        $("evS").textContent = "";
+        lightStages([]);
+      }
+    }
+    $("run").onclick = function () { setPaused(false); };
+    $("stop").onclick = function () { setPaused(true); };
+    $("step").onclick = function () {
+      var e, nap = 0, tries = 0, quiet = $("quiet").checked;
+      for (;;) {
+        if (!queue.length) {
+          slept += kit.step();
+          queue = kit.trace();
+          if (!queue.length) { break; }                 /* half a second and nothing: show the pause */
+        }
+        e = queue.shift();
+        count(e);
+        if (!quiet || !sig(e).routine) { break; }
+        e = null;
+        if (++tries > 80) { break; }
+      }
+      if (!e) {
+        $("evT").textContent = "Chưa có việc gì mới.";
+        $("evP").textContent = "Firmware đã chạy thêm " + slept + " ms mà không có message nào ngoài việc lặp lại. Tạo một việc ở dưới, hoặc bỏ dấu “Ẩn việc lặp lại”.";
+        $("evS").textContent = "";
+        slept = 0;
+        return;
+      }
+      nap = queue.length || quiet ? 0 : Math.max(0, slept - 1);
+      logLine(e, nap);
+      show(e, nap);
+      slept = 0;
+    };
+
+    each(document.querySelectorAll("[data-cmd]"), function (b) { b.onclick = function () { kit.send(b.dataset.cmd); note(); }; });
+    each(document.querySelectorAll("[data-open]"), function (b) { b.onclick = function () { kit.open(b.dataset.open); note(); }; });
+    function note() {
+      if (paused) {
+        $("evT").textContent = "Đã tạo việc. Firmware vẫn đang dừng.";
+        $("evP").textContent = "Việc vừa tạo đang nằm chờ. Bấm Bước tiếp để xem nó được xử lý thế nào.";
+        $("evS").textContent = "";
+      }
+    }
+    $("reboot").onclick = function () {
+      setPaused(true);
+      $("quiet").checked = false;
+      kit.send("reboot");
+      $("evT").textContent = "Đã gửi lệnh khởi động lại. Firmware đang dừng.";
+      $("evP").textContent = "Bấm Bước tiếp nhiều lần: dòng lệnh nhận lệnh, task Nạp firmware đặt hẹn giờ, chip khởi động lại, rồi các message KHỞI ĐỘNG đầu tiên lần lượt hiện ra.";
+      $("evS").textContent = "";
+      $("msg").scrollIntoView({ behavior: "smooth" });
+    };
 
     kit.open("clock");
-    markScreen("clock");
   });
 })();

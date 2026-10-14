@@ -15,6 +15,10 @@
  *          onRs485(bytes) / rs485In(bytes)   the RS485 wires
  *          runBlocks(bytes)      run a block program (see blocks.html)
  *          loadClip(bytes), testFatal(), module (the WebAssembly instance)
+ *          pause(on)             stop / continue the firmware's clock
+ *          step()                paused: run until a task got a message; returns the milliseconds that passed
+ *          trace()               the messages handed to tasks since the last call: [{t, des, src, sig, exe}]
+ *          names()               {NAME: number} of the task ids and signals in a trace
  *
  * A page may hold several kits; each one is its own firmware.
  */
@@ -110,7 +114,7 @@ var AkKitUI = (function () {
     var ctx = canvas.getContext("2d");
     var image = ctx.createImageData(W, H);
     var m = null, panel = 0, io = 0, timer = 0;
-    var mask = 0, last = 0, lastPanel = new Uint8Array(W * 8), downAt = {};
+    var mask = 0, last = 0, paused = false, lastPanel = new Uint8Array(W * 8), downAt = {};
     var osc = null, gain = null, soundOn = false, lastHz = -1, testUntil = 0;
     var pendingRx = [];
     var tourList = null, tourAt = 0, tourNext = 0;
@@ -146,6 +150,33 @@ var AkKitUI = (function () {
         return "";
       },
       testFatal: function () { m._web_test_fatal(); },
+      pause: function (on) {
+        paused = !!on;
+        last = performance.now();
+        state.textContent = paused ? "tạm dừng" : "đang chạy";
+      },
+      step: function () {
+        var ms;
+        m._web_buttons(mask);
+        ms = m._web_step();
+        after();
+        return ms;
+      },
+      trace: function () {
+        var n = m._web_trace(), out = [], v = new DataView(m.HEAPU8.buffer, io, n * 8), k;
+        for (k = 0; k < n; k++) {
+          out.push({ t: v.getUint32(k * 8, true), des: v.getUint8(k * 8 + 4), src: v.getUint8(k * 8 + 5), sig: v.getUint8(k * 8 + 6), exe: v.getUint8(k * 8 + 7) });
+        }
+        return out;
+      },
+      names: function () {
+        var n = m._web_trace_names(), out = {};
+        new TextDecoder().decode(m.HEAPU8.subarray(io, io + n)).split(";").forEach(function (p) {
+          var kv = p.split("=");
+          if (kv.length === 2) { out[kv[0]] = +kv[1]; }
+        });
+        return out;
+      },
       tour: function (list) {
         tourList = list;
         tourAt = -1;
@@ -209,8 +240,8 @@ var AkKitUI = (function () {
     function tick() {
       var now = performance.now();
       var dt = Math.min(200, Math.max(0, Math.round(now - last)));
-      var n;
       if (dt < 1) { return; }
+      if (paused) { last = now; return; }
       last += dt;
       if (now - last > 400) { last = now; }       /* the tab slept: do not replay the gap */
       while (pendingRx.length) {
@@ -227,7 +258,12 @@ var AkKitUI = (function () {
         fail("Firmware dừng vì lỗi WebAssembly: " + err + ". Tải lại trang để chạy lại.");
         return;
       }
-      n = m._web_console_out();
+      after();
+    }
+
+    /* what the firmware left for the page after it ran */
+    function after() {
+      var n = m._web_console_out();
       if (n && kit.onConsole) { kit.onConsole(new TextDecoder().decode(m.HEAPU8.subarray(io, io + n)).replace(/\r/g, "")); }
       n = m._web_rs485_out();
       if (n && kit.onRs485) { kit.onRs485(m.HEAPU8.slice(io, io + n)); }

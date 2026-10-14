@@ -17,6 +17,7 @@
 **/
 
 #include <setjmp.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
@@ -25,12 +26,14 @@
 
 #include "ak.h"
 #include "task.h"
+#include "timer.h"
 #include "xprintf.h"
 
 #include "hal.h"
 #include "port_host.h"
 
 #include "app.h"
+#include "task_list.h"
 #include "kit.h"
 #include "ui.h"
 #include "blk_vm.h"
@@ -253,6 +256,68 @@ EMSCRIPTEN_KEEPALIVE void web_tick(uint32_t elapsed_ms) {
 		for (uint8_t i = 0; i < 20 && task_run_once(); i++) {
 		}
 	}
+}
+
+/*----------------------------------------------------------------------------
+ * message trace (inside.html): every message the kernel hands to a task
+ *--------------------------------------------------------------------------*/
+#define TRACE_N		(96)
+
+typedef struct {
+	uint32_t t_ms;			/* firmware time when the handler returned */
+	uint8_t  des;			/* task that got the message */
+	uint8_t  src;			/* who posted it: a task, AK_TASK_INTERRUPT_ID or AK_TASK_IDLE_ID (polling) */
+	uint8_t  sig;
+	uint8_t  exe_ms;		/* handler run time, 255 = longer */
+} trace_t;
+
+static trace_t trace[TRACE_N];
+static uint8_t trace_n;
+static uint32_t trace_total;
+
+/* the kernel calls this after each handler (AK_TASK_TRACE_ENABLE) */
+void ak_task_trace_hook(const ak_msg_t* msg, uint32_t exe_ms) {
+	trace_total++;
+	if (trace_n < TRACE_N) {
+		trace_t* r = &trace[trace_n++];
+
+		r->t_ms = hal_millis();
+		r->des = msg->des_task_id;
+		r->src = msg->src_task_id;
+		r->sig = msg->sig;
+		r->exe_ms = exe_ms > 255 ? 255 : (uint8_t)exe_ms;
+	}
+}
+
+/* Moves the collected records (8 bytes each) into the io buffer; returns how many. */
+EMSCRIPTEN_KEEPALIVE uint32_t web_trace(void) {
+	uint32_t n = trace_n;
+
+	memcpy(io, trace, n * sizeof(trace_t));
+	trace_n = 0;
+	return n;
+}
+
+/* Runs the firmware one millisecond at a time until a task got a message
+ * (at most half a second); returns the milliseconds that passed. */
+EMSCRIPTEN_KEEPALIVE uint32_t web_step(void) {
+	uint32_t before = trace_total, ms = 0;
+
+	while (trace_total == before && ms < 500) {
+		web_tick(1);
+		ms++;
+	}
+	return ms;
+}
+
+/* "NAME=number;" for every id and signal the page shows, so it never has to
+ * repeat the numbers of the enums. Returns the length of the text in io. */
+#define TRACE_NAMES(X) 	X(TASK_TIMER_TICK_ID) X(TASK_SYSTEM_ID) X(TASK_CONSOLE_ID) X(TASK_FW_ID) X(TASK_UI_ID) 	X(AK_TASK_INTERRUPT_ID) X(AK_TASK_IDLE_ID) X(TIMER_TICK) X(AK_SIG_PING) 	X(SYSTEM_SIG_INIT) X(SYSTEM_SIG_HEARTBEAT) X(SYSTEM_SIG_CONFIRM) 	X(CONSOLE_SIG_INIT) X(CONSOLE_SIG_LINE) 	X(FW_SIG_INSTALL) X(FW_SIG_LOADER) X(FW_SIG_ROLLBACK) X(FW_SIG_RESET) X(FW_SIG_DO_RESET) 	X(UI_SIG_INIT) X(UI_SIG_FRAME) X(UI_SIG_KEY_1) X(UI_SIG_KEY_2) X(UI_SIG_KEY_3) X(UI_SIG_BACK) 	X(UI_SIG_BEEP_OFF) X(UI_SIG_NOTE)
+#define TRACE_FMT(x)	#x "=%d;"
+#define TRACE_VAL(x)	, (int)(x)
+
+EMSCRIPTEN_KEEPALIVE uint32_t web_trace_names(void) {
+	return (uint32_t)snprintf((char*)io, IO_SIZE, TRACE_NAMES(TRACE_FMT) TRACE_NAMES(TRACE_VAL));
 }
 
 /* The next tick ends in a FATAL, as a firmware bug would. */

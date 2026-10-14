@@ -115,6 +115,9 @@ Thêm lệnh shell: một dòng trong `shell_cmds[]` của `src/app/task_console
 - Lập trình kéo thả: trang `src/port/web/blocks*.js` dịch khối thành bytecode, máy ảo `src/demo/blk_vm.c` chạy nó
   (bảng lệnh ở đầu `blk_vm.h`). Thêm một khối = thêm lệnh ở **ba** chỗ: `blk_vm.c`, `blocks-compiler.js`, định nghĩa
   khối trong `blocks.js`; rồi `node tests/test_blocks.js --write` để sinh lại `tests/blk_fixtures.h`.
+- Trang `docs/play/inside.html` hiện message thật của firmware web (`web_trace()` trong `src/port/web/web_main.c`). Thêm
+  task hoặc signal mới thì thêm tên vào `TRACE_NAMES` ở đó và lời giải thích vào hàm `sig()` của `src/port/web/inside.js`;
+  thiếu thì trang chỉ hiện "tín hiệu <số>".
 - Xem màn hình kit từ xa: `python tools/ak_screen.py --port COMx shot x.png`; mở thẳng một màn hình: lệnh `ui open <tên>`.
 - Console TX của app đi qua ring + ngắt; dòng lệnh dồn nhanh hơn tốc độ xử lý thì bị bỏ, không FATAL.
 
