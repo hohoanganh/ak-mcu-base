@@ -15,6 +15,18 @@ target_compile_options(test_kernel PRIVATE ${HOST_WARN} -fsanitize=address,undef
 target_link_options(test_kernel PRIVATE -fsanitize=address,undefined)
 add_test(NAME kernel COMMAND test_kernel)
 
+# the same tests on a kernel without dynamic messages (no malloc/free linked)
+add_executable(test_kernel_nodyn
+	${ROOT}/tests/test_kernel.c
+	${KERNEL_SRC} ${COMMON_SRC}
+	${HOST_DIR}/port_host.c
+)
+target_include_directories(test_kernel_nodyn PRIVATE ${ROOT}/tests/kernel ${ROOT}/tests ${BASE_INC} ${HOST_DIR})
+target_compile_definitions(test_kernel_nodyn PRIVATE AK_DYNAMIC_MSG_POOL_SIZE=0)
+target_compile_options(test_kernel_nodyn PRIVATE ${HOST_WARN} -fsanitize=address,undefined -g)
+target_link_options(test_kernel_nodyn PRIVATE -fsanitize=address,undefined)
+add_test(NAME kernel_nodyn COMMAND test_kernel_nodyn)
+
 # --- firmware update + bootloader tests ---
 # p256-m (vendor, no warning set): test_fw checks signed images
 add_library(p256m_host STATIC ${P256M_SRC})
@@ -36,6 +48,12 @@ target_link_libraries(test_fw PRIVATE p256m_host)
 target_compile_options(test_fw PRIVATE ${HOST_WARN} -fsanitize=address,undefined -g)
 target_link_options(test_fw PRIVATE -fsanitize=address,undefined)
 add_test(NAME fw COMMAND test_fw)
+# the same with the power cut tests sampled (every 7th flash operation): only
+# for make test-fast. Label "full" = left out of test-fast, "fast_only" = left
+# out of make test and CI
+add_test(NAME fw_fast COMMAND test_fw)
+set_tests_properties(fw PROPERTIES LABELS full)
+set_tests_properties(fw_fast PROPERTIES LABELS fast_only ENVIRONMENT AK_TEST_FAST=1)
 
 # --- Modbus services (vendor library built without our warning set) ---
 add_library(nanomodbus_host STATIC ${ROOT}/third_party/nanomodbus/nanomodbus.c)

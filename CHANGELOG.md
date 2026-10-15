@@ -17,6 +17,24 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 - Bản web bật `AK_TASK_TRACE_ENABLE` (móc theo dõi có sẵn của kernel) và thêm `web_trace()`, `web_step()`,
   `web_trace_names()` trong `port/web/web_main.c`; `kit-ui.js` thêm `pause()`, `step()`, `trace()`, `names()`. Firmware
   cho kit không đổi. Trong bản web thời gian là ảo nên thời gian chạy của từng handler luôn là 0 và trang không hiện nó.
+- **OLED chỉ gửi đoạn cột đã đổi.** `kit_lcd_write(page, x, data, n)` thay `kit_lcd_write_page()` (port STM32, web,
+  `test_demo`); `gfx_flush()` gửi trong mỗi trang đổi từ cột đổi đầu tới cột đổi cuối, `gfx_flush_bytes()`, lệnh `ui`
+  in số byte. Tính trên khung của `test_demo`: thời gian bus giảm 36 – 91 % tuỳ màn hình (pong 9,2 → 1,6 ms/khung).
+  Các khung hiện ra không đổi (16 cảnh ghi lại giống từng byte). **Chưa đo trên kit.**
+- **Modbus slave không chặn.** HAL RS485 thêm `hal_rs485_send()` (gửi bằng ngắt TXE, ngắt TC nhả chân hướng),
+  `hal_rs485_tx_busy()`, `hal_rs485_rx_idle_ms()`; `hal_rs485_write()` giữ nguyên cách dùng. `mb_slave_poll()` chỉ gọi
+  nanoMODBUS khi đường dây đã im t3.5 (5 ms ở 9600) và không đang gửi, nên không còn giữ CPU 146 – 266 ms mỗi khung.
+  COMMIT của OTA: `task_fw` cài và reset sau khi câu trả lời ra hết. Master và gateway không đổi. **Chưa chạy trên kit:
+  phải thử lại đọc/ghi và OTA qua RS485 trước khi phát hành.**
+- **Kernel:** `task_post_pure_msg_try()`, `task_post_common_msg_try()` (pool đầy trả 0 thay vì FATAL);
+  `AK_DYNAMIC_MSG_POOL_SIZE=0` bỏ message động cùng `malloc/free`. App của base build với 0 (`APP_KERNEL_DEFS`,
+  `platformio.ini`): app −328 B flash, +148 B RAM trống. Test: `test_kernel` thêm 2 ca, `test_kernel_nodyn`.
+- **Demo:** `ui_scratch()`, 320 B dùng chung cho bộ đệm lớn của màn hình đang mở (thân rắn của Snake, lưới Life và
+  sao của Saver): −376 B RAM.
+- **Build và CI:** CMake `-DAK_APP=demo|kit_tools|remote` (lấy cả thư mục `src/demo`, `src/remote`; remote kiểm vừa
+  52K), `make stm32-mbmaster/-demo/-kit-tools/-remote/-all`. CI build mọi bản và chặn khi RAM còn cho heap + stack
+  dưới 3 KB; tải lên thêm `app.img` của demo. `make test-fast`: test cắt điện lấy mẫu mỗi 7 thao tác (18 s thay cho
+  76 s); `make test` và CI vẫn chạy đủ.
 - **Tài liệu `docs/huong-toi-uu-sau-v1.3.9.md`**: hướng tối ưu dựa trên số đo của chính base (kích thước mọi bản build,
   thời gian bus OLED tính từ khung của `test_demo`, chỗ chặn của Modbus RTU, RAM của từng màn hình demo). Công cụ
   `tools/oled_bus_cost.py` tính thời gian bus OLED mỗi khung từ file `test_demo <thư mục> record`. Firmware không đổi.

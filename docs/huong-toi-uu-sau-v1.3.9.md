@@ -5,6 +5,24 @@ Lập ngày 15/10/2026. Khác hai tài liệu trước ([huong-toi-uu-tiep.md](h
 build lại mọi biến thể, đọc bảng ký hiệu, ghi khung hình của demo rồi tính. Mỗi hướng ghi bằng chứng, cách làm, cỡ
 việc (S = vài giờ, M = một hai ngày, L = nhiều ngày) và rủi ro. Số nào chưa đo trên kit thì ghi "chưa kiểm chứng".
 
+## Đã làm (15/10/2026, chưa phát hành, chưa chạy trên kit)
+
+| Mục | Kết quả | Kiểm bằng |
+|---|---|---|
+| 1. OLED gửi đoạn cột đổi | `kit_lcd_write(page, x, data, n)`; `gfx_flush()` gửi từ cột đổi đầu tới cột đổi cuối; `ui` in số byte | `test_demo` (test mới), 16 cảnh ghi lại giống từng byte bản cũ, bản web dựng lại |
+| 2. Modbus slave không chặn | Chờ đường dây im t3.5 rồi mới đưa khung cho nanoMODBUS; trả lời gửi bằng ngắt TXE/TC (`hal_rs485_send`); COMMIT của OTA chỉ cài sau khi câu trả lời ra hết | `test_modbus` (2 test mới: khung đến dần, trả lời không chặn) |
+| 3. Vùng nhớ chung màn hình | `ui_scratch()` 320 B: thân rắn (Snake), lưới Life và sao (Saver) | `test_demo`, khung giống từng byte |
+| 5. Kernel | `task_post_pure_msg_try()` / `task_post_common_msg_try()`; `AK_DYNAMIC_MSG_POOL_SIZE=0` bỏ hẳn message động và malloc/free, các app của base dùng nó | `test_kernel` (2 test mới), `test_kernel_nodyn` (cùng test, không message động) |
+| 7. CI và vòng test | `AK_APP=demo/kit_tools/remote` trong CMake, `make stm32-all`, CI build tất cả và kiểm RAM heap + stack ≥ 3 KB; `make test-fast` (18 s thay cho 76 s) | build sạch `-Werror` mọi bản |
+
+Số mới (gcc 13.2.1): app 21.056 B flash (−12 B dù thêm mã RS485, nhờ bỏ malloc/free), RAM heap + stack của
+demo 8.724 B (trước 8.236), kit_tools 4.060 B (trước 3.572), remote 11.104 B.
+
+Chưa làm và vì sao: I2C OLED 400 kHz (cần máy phân tích logic và kit), gửi RS485 bằng DMA (đã dùng ngắt TXE thay
+vì DMA: ở 9600 baud chỉ khoảng 1.000 ngắt/giây, khỏi phải kiểm bảng kênh DMA trên kit), master/gateway thành máy
+trạng thái, vào bằng sự kiện → tickless → Stop, nén/delta OTA, gom ba danh sách file về một (CMake đã tự lấy cả thư
+mục `src/demo`, `src/remote`; `src/app` và `build.py` vẫn khai tay).
+
 Cách đo:
 
 - arm-none-eabi-gcc 13.2.1 (xPack), cờ y như `platformio.ini` / `port.cmake` (`-Os`, LTO, newlib-nano).
@@ -60,11 +78,11 @@ Bảng đủ 16 cảnh: chạy lại `tools/oled_bus_cost.py`. Khung tệ nhất
 
 **Cách làm.**
 
-- `kit_lcd_write_page(page, x0, n, data)`: SSD1309 ở chế độ page addressing đã nhận cột bắt đầu bằng hai lệnh
+- `kit_lcd_write(page, x0, data, n)` (đã làm, thay `kit_lcd_write_page`): SSD1309 ở chế độ page addressing đã nhận cột bắt đầu bằng hai lệnh
   `0x00 | thấp`, `0x10 | cao` (đang gửi sẵn trong `pos[]`), chỉ cần cộng `x0` vào `KIT_LCD_COL_OFFSET` và gửi `n` byte.
 - `gfx_flush()` tìm `x0`, `x1` của từng trang khi so với `shown[]` (vẫn một lượt `memcmp` theo byte), chép đúng đoạn
   đó vào `shown[]`.
-- Sửa cùng lúc ba bản cài đặt của `kit_lcd_write_page`: `port/stm32l151/kit.c`, `port/web/web_main.c`,
+- Sửa cùng lúc ba bản cài đặt của hàm ghi: `port/stm32l151/kit.c`, `port/web/web_main.c`,
   `tests/test_demo.c` (bản `remote` dùng chung `kit.c`). Thêm test: khung chỉ đổi một điểm thì bus nhận 7 + 1 byte.
 - Không bỏ được `shown[]` (1 KB): màn hình nào cũng `gfx_clear()` rồi vẽ lại cả khung, nên đánh dấu "bẩn" trong các
   hàm vẽ sẽ coi mọi thứ là đổi. So với bản sao vẫn là cách rẻ nhất.

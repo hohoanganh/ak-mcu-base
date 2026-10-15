@@ -98,6 +98,14 @@ extern void ui_led_release(void);
 extern void ui_music_play(const char* rtttl);
 extern void ui_music_stop(void);
 extern uint32_t ui_rand(void);
+
+/* RAM shared by the screens for their big buffers (snake body, saver
+ * fields): only one screen is open at a time. Valid from the enter() of the
+ * open screen to its leave(); after another screen ran it holds that screen's
+ * data, so enter() sets it up again. Not for anything that must outlive the
+ * screen (high scores, background jobs). 8-byte aligned. */
+#define UI_SCRATCH_SIZE		(320)
+extern void* ui_scratch(void);
 /* 127 * sin / cos of an angle in 1/256 of a turn (table, no floating point) */
 extern int ui_sin(uint8_t a);
 extern int ui_cos(uint8_t a);

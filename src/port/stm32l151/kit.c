@@ -175,11 +175,11 @@ uint8_t kit_bus_probe(uint8_t bus, uint8_t a) {
 	return ok;
 }
 
-uint8_t kit_lcd_write_page(uint8_t page, const uint8_t* data) {
+uint8_t kit_lcd_write(uint8_t page, uint8_t x, const uint8_t* data, uint8_t n) {
 	/* page, first column. KIT_LCD_COL_OFFSET = 2 for an SH1106 (132 columns
 	 * of RAM, the glass shows 2..129); 0 for an SSD1306 / SSD1309 */
-	uint8_t pos[3] = { (uint8_t)(0xB0 | (page & 7)), (uint8_t)(KIT_LCD_COL_OFFSET & 0x0F),
-					   (uint8_t)(0x10 | (KIT_LCD_COL_OFFSET >> 4)) };
+	uint8_t col = (uint8_t)(KIT_LCD_COL_OFFSET + x);
+	uint8_t pos[3] = { (uint8_t)(0xB0 | (page & 7)), (uint8_t)(col & 0x0F), (uint8_t)(0x10 | (col >> 4)) };
 	uint8_t ok;
 
 	if (!lcd_cmds(pos, sizeof(pos))) {
@@ -188,8 +188,8 @@ uint8_t kit_lcd_write_page(uint8_t page, const uint8_t* data) {
 	i2c_start(&bus_lcd);
 	ok = i2c_tx(&bus_lcd, LCD_ADDR << 1);
 	ok &= i2c_tx(&bus_lcd, 0x40);		/* control byte: data follows */
-	for (uint8_t x = 0; x < KIT_LCD_W; x++) {
-		ok &= i2c_tx(&bus_lcd, data[x]);
+	while (n--) {
+		ok &= i2c_tx(&bus_lcd, *data++);
 	}
 	i2c_stop(&bus_lcd);
 	return ok;

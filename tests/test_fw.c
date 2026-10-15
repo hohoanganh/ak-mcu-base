@@ -3,6 +3,7 @@
  * protocol, boot_decide, boot_install, power cut at EVERY flash operation.
  */
 #include <string.h>
+#include <stdlib.h>
 #include <setjmp.h>
 
 #include "hal.h"
@@ -149,6 +150,11 @@ static void on_reset(void) {
 }
 
 static jmp_buf cut_jmp;
+
+/* Power cut tests try every flash operation (k += 1). AK_TEST_FAST in the
+ * environment tries every 7th one instead, for the quick loop of make
+ * test-fast; CI and make test always run them all. */
+static uint32_t cut_stride = 1;
 static jmp_buf fatal_jmp;
 
 static int run_boot(uint32_t power_cut_after) {
@@ -721,7 +727,7 @@ static void test_boot_rollback_power_cut_everywhere(void) {
 	CHECK_EQ(part_version(FLASH_PART_APP, &e), 1);
 	CHECK(total_ops > 50);
 
-	for (k = 1; k <= total_ops; k++) {
+	for (k = 1; k <= total_ops; k += cut_stride) {
 		int r, boots = 0;
 
 		setup(0xFF);
@@ -771,7 +777,7 @@ static void test_boot_power_cut_everywhere(void) {
 	}
 	CHECK(total_ops > 100);
 
-	for (k = 1; k <= total_ops; k++) {
+	for (k = 1; k <= total_ops; k += cut_stride) {
 		int r, boots = 0;
 
 		setup(0xFF);
@@ -1021,7 +1027,7 @@ static void test_boot_recover_power_cut_everywhere(void) {
 		total_ops = host_flash_ops() - before;
 	}
 
-	for (k = 1; k <= total_ops; k++) {
+	for (k = 1; k <= total_ops; k += cut_stride) {
 		int r, boots = 0;
 
 		setup(0xFF);
@@ -1196,7 +1202,7 @@ static void test_flog_power_cut_everywhere(void) {
 	total_ops = fl_ops;
 	CHECK(total_ops > 100);
 
-	for (k = 1; k <= total_ops; k++) {
+	for (k = 1; k <= total_ops; k += cut_stride) {
 		uint32_t before;
 
 		memcpy(fl_mem, snapshot, sizeof(fl_mem));
@@ -1366,6 +1372,10 @@ static void test_image_signature(void) {
 }
 
 TT_MAIN_BEGIN("test_fw")
+	if (getenv("AK_TEST_FAST")) {
+		cut_stride = 7;
+		printf(" AK_TEST_FAST: power cut at every 7th flash operation only\n");
+	}
 	RUN_TEST(test_crc);
 	RUN_TEST(test_sha256);
 	RUN_TEST(test_image_signature);

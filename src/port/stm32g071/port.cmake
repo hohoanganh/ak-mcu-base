@@ -66,6 +66,7 @@ ak_firmware(app app.ld
 		${PORT_DIR}/startup.c ${PORT_DIR}/port_stm32g071.c ${PORT_DIR}/fw_header.c
 		${KERNEL_SRC} ${COMMON_SRC} ${FW_SRC} ${SYS_SRC} ${APP_SRC}
 	INCS ${SRC}/app
+	DEFS ${APP_KERNEL_DEFS}
 )
 add_custom_command(TARGET app POST_BUILD
 	COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:app> ${CMAKE_CURRENT_BINARY_DIR}/app.bin

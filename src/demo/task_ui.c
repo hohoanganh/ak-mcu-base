@@ -204,9 +204,9 @@ void cmd_ui(const char* args) {
 		xprintf("autoplay %s\n", ui_autoplay ? "on: open a game, it plays itself" : "off");
 	}
 	else {
-		xprintf("display %s, screen: %s, last frame %d ms, %d of %d pages sent, buttons 0x%02X\n",
+		xprintf("display %s, screen: %s, last frame %d ms, %d of %d pages sent (%u bytes), buttons 0x%02X\n",
 				lcd_ok ? "ok" : "NOT ANSWERING", current ? current->name : "menu",
-				ui_last_frame_ms, ui_last_pages, KIT_LCD_PAGES, kit_buttons());
+				ui_last_frame_ms, ui_last_pages, KIT_LCD_PAGES, (unsigned)gfx_flush_bytes(), kit_buttons());
 	}
 }
 

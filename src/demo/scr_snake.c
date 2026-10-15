@@ -17,7 +17,9 @@ typedef struct {
 	int8_t x, y;
 } cell_t;
 
-static cell_t body[MAX_LEN];	/* ring buffer, head at body[head] */
+static cell_t* body;				/* ring buffer, head at body[head]; in ui_scratch() */
+
+typedef char snake_body_fits[(MAX_LEN * sizeof(cell_t) <= UI_SCRATCH_SIZE) ? 1 : -1];
 static uint16_t head, len;
 static int8_t dx, dy;
 static int8_t turn;				/* -1 left, +1 right, applied at the next step */
@@ -48,6 +50,7 @@ static void place_food(void) {
 }
 
 static void snake_enter(void) {
+	body = (cell_t*)ui_scratch();
 	head = 2;
 	len = 3;
 	for (uint8_t i = 0; i < 3; i++) {

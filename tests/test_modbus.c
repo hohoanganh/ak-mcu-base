@@ -41,6 +41,12 @@ static int32_t peer_read(uint8_t* buf, uint16_t count, int32_t timeout_ms, void*
 	(void)timeout_ms;
 	(void)arg;
 	if (!peer_is_server) {
+		/* a real master hears the whole answer, then the bus is silent
+		 * for t3.5 before the slave takes the request (5 ms at 9600) */
+		while (hal_rs485_tx_busy()) {
+			host_advance_ms(1);
+		}
+		host_advance_ms(5);
 		mb_slave_poll();
 	}
 	n = host_rs485_take_tx(buf, count);
@@ -154,6 +160,92 @@ static void test_slave_write(void) {
 	CHECK_EQ(status_regs[0], 0x0102);
 	CHECK_EQ(nmbs_write_single_register(&peer, 300, 9), NMBS_EXCEPTION_ILLEGAL_DATA_ADDRESS);
 	CHECK_EQ(write_calls, 2);
+}
+
+/* CRC of Modbus RTU, low byte first on the wire */
+static uint16_t rtu_crc(const uint8_t* p, uint32_t n) {
+	uint16_t crc = 0xFFFF;
+
+	while (n--) {
+		crc ^= *p++;
+		for (int i = 0; i < 8; i++) {
+			crc = (crc & 1) ? (uint16_t)((crc >> 1) ^ 0xA001) : (uint16_t)(crc >> 1);
+		}
+	}
+	return crc;
+}
+
+/* FC 03, unit 1, registers 0..2 */
+static void read_req(uint8_t* f) {
+	uint16_t crc;
+
+	f[0] = 1; f[1] = 3; f[2] = 0; f[3] = 0; f[4] = 0; f[5] = 3;
+	crc = rtu_crc(f, 6);
+	f[6] = (uint8_t)crc;
+	f[7] = (uint8_t)(crc >> 8);
+}
+
+/* the slave takes a request only after t3.5 of silence: it never waits for
+ * the rest of a frame inside mb_slave_poll() */
+static void test_slave_waits_for_frame_end(void) {
+	uint8_t f[8], rsp[16];
+	uint32_t t;
+
+	setup_slave(0);
+	read_req(f);
+	host_rs485_inject(f, 4);				/* first half of the request */
+	host_advance_ms(2);
+	t = hal_millis();
+	mb_slave_poll();
+	CHECK_EQ(hal_millis(), t);				/* did not wait for the rest */
+	CHECK_EQ(host_rs485_take_tx(rsp, sizeof(rsp)), 0);
+	host_advance_ms(1);
+	host_rs485_inject(f + 4, 4);			/* the rest */
+	mb_slave_poll();						/* bus not silent yet */
+	CHECK_EQ(host_rs485_take_tx(rsp, sizeof(rsp)), 0);
+	host_advance_ms(4);
+	mb_slave_poll();						/* 4 ms < t3.5 at 9600 (4.01 ms) */
+	CHECK_EQ(host_rs485_take_tx(rsp, sizeof(rsp)), 0);
+	CHECK_EQ(mb_slave_request_count(), 0);
+
+	/* silence long enough: the whole frame is in the ring, answered at once */
+	host_advance_ms(1);
+	t = hal_millis();
+	mb_slave_poll();
+	CHECK_EQ(hal_millis(), t);
+	CHECK_EQ(host_rs485_take_tx(rsp, sizeof(rsp)), 3 + 6 + 2);
+	CHECK_EQ(rsp[0], 1);
+	CHECK_EQ(rsp[1], 3);
+	CHECK_EQ(rsp[2], 6);
+	CHECK_EQ(mb_slave_request_count(), 1);
+}
+
+/* the answer goes out in the background: mb_slave_poll() returns while it is
+ * on the wire, and takes no new request before the bus is released */
+static void test_slave_answer_does_not_block(void) {
+	uint8_t f[8], rsp[16];
+	uint32_t t;
+
+	setup_slave(0);
+	read_req(f);
+	host_rs485_inject(f, sizeof(f));
+	host_advance_ms(5);
+	t = hal_millis();
+	mb_slave_poll();
+	CHECK_EQ(hal_millis(), t);
+	CHECK(hal_rs485_tx_busy());				/* 11 bytes = 11.5 ms at 9600 */
+	CHECK_EQ(host_rs485_take_tx(rsp, sizeof(rsp)), 11);
+
+	host_rs485_inject(f, sizeof(f));		/* a master that does not wait */
+	host_advance_ms(6);
+	mb_slave_poll();						/* still sending: not taken */
+	CHECK(hal_rs485_tx_busy());
+	CHECK_EQ(mb_slave_request_count(), 1);
+	host_advance_ms(6);
+	CHECK(!hal_rs485_tx_busy());
+	mb_slave_poll();
+	CHECK_EQ(mb_slave_request_count(), 2);
+	CHECK_EQ(host_rs485_take_tx(rsp, sizeof(rsp)), 11);
 }
 
 static void test_slave_other_unit(void) {
@@ -349,8 +441,10 @@ static void test_ota_broadcast_blocked(void) {
 	total = make_image(img_buf, 2000, hal_board_name(), 4);
 	make_client(0);		/* RTU broadcast: no answer expected */
 	ota_header(total, MB_OTA_PSK_IMG);
+	host_advance_ms(5);
 	mb_slave_poll();	/* a broadcast gets no answer: nobody else runs the slave */
 	nmbs_write_single_register(&peer, MB_OTA_REG_CMD, MB_OTA_CMD_BEGIN);
+	host_advance_ms(5);
 	mb_slave_poll();
 	make_client(1);
 	CHECK_EQ(ota_reg(MB_OTA_REG_STATUS), MB_OTA_ST_IDLE);
@@ -643,6 +737,8 @@ static void test_gateway_no_chip(void) {
 TT_MAIN_BEGIN("test_modbus")
 	RUN_TEST(test_slave_read);
 	RUN_TEST(test_slave_write);
+	RUN_TEST(test_slave_waits_for_frame_end);
+	RUN_TEST(test_slave_answer_does_not_block);
 	RUN_TEST(test_slave_other_unit);
 	RUN_TEST(test_ota_full_flow);
 	RUN_TEST(test_ota_rejects);

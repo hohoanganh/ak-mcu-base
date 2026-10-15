@@ -99,6 +99,37 @@ else()
 	message(FATAL_ERROR "Unknown AK_MODBUS: ${AK_MODBUS}")
 endif()
 
+# What the app image carries on top of the sample app (stm32l151 only; the
+# PlatformIO envs of the same name build the same thing):
+#   base       the sample app alone
+#   demo       AK Base Kit demo (src/demo, OLED + buttons + buzzer)
+#   kit_tools  demo + SPI sniffer and nRF24 bench tools
+#   remote     AK Base Kit 2.1 bench remote (src/remote), must fit 52K
+set(AK_APP "base" CACHE STRING "App variant: base | demo | kit_tools | remote")
+# src/demo is a folder of screens that grows; PlatformIO takes the whole
+# folder too, so the list cannot drift between the two builds
+file(GLOB DEMO_SRC CONFIGURE_DEPENDS ${SRC}/demo/*.c)
+file(GLOB REMOTE_SRC CONFIGURE_DEPENDS ${SRC}/remote/*.c)
+if(AK_APP STREQUAL "base")
+	set(VARIANT_DEFS "")
+elseif(AK_APP STREQUAL "demo")
+	set(VARIANT_DEFS APP_KIT_DEMO)
+elseif(AK_APP STREQUAL "kit_tools")
+	set(VARIANT_DEFS APP_KIT_DEMO APP_KIT_SPI_SNIFF APP_RF_TEST)
+elseif(AK_APP STREQUAL "remote")
+	set(VARIANT_DEFS APP_RF_TEST APP_REMOTE KIT_LCD_SSD1306)
+else()
+	message(FATAL_ERROR "Unknown AK_APP: ${AK_APP}")
+endif()
+if(NOT AK_APP STREQUAL "base" AND NOT AK_MODBUS STREQUAL "slave")
+	message(FATAL_ERROR "AK_APP=${AK_APP} runs on the Modbus slave app (AK_MODBUS=slave)")
+endif()
+
+# Kernel configuration of the firmware apps: no app of the base posts dynamic
+# messages, and without them malloc/free stay out (-232 B flash, -200 B RAM).
+# A project that wants them removes this (message.h default: 8).
+set(APP_KERNEL_DEFS AK_DYNAMIC_MSG_POOL_SIZE=0)
+
 set(BOOT_SRC
 	${SRC}/boot/boot_core.c
 	${SRC}/boot/boot_main.c

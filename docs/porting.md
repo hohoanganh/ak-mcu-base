@@ -28,6 +28,16 @@ ISR), `ak_port_millis`, `ak_port_fatal` (không trả về), `ak_port_idle`.
 
 **`hal_flash.h`** — `hal_flash_info/erase/write/read` theo partition BOOT / APP / STAGING.
 
+**`hal_rs485.h`** (chỉ khi có Modbus) — `hal_rs485_init/getc/write/rx_bytes`, và cho slave không chặn:
+`hal_rs485_send` (bắt đầu gửi rồi trả về, nhả chân hướng sau bit stop cuối), `hal_rs485_tx_busy`,
+`hal_rs485_rx_idle_ms` (ms từ byte nhận cuối, ghi trong ngắt RX). Port không có ngắt TX thì `send` có thể gửi
+chờ như `write` và `tx_busy` luôn trả 0.
+
+**Cấu hình kernel của app:** các app của base build với `AK_DYNAMIC_MSG_POOL_SIZE=0` (`APP_KERNEL_DEFS` trong
+`CMakeLists.txt`, `app_flags` trong `platformio.ini`): không có message động nên `malloc/free` không vào ảnh. Dự
+án cần `task_post_dynamic_msg()` thì bỏ cờ đó. Cỡ các pool khác (`AK_PURE_MSG_POOL_SIZE`,
+`AK_COMMON_MSG_POOL_SIZE`, `AK_TIMER_POOL_SIZE`) đặt cùng chỗ, chọn theo cột `max` của lệnh `stat` khi chạy thật.
+
 ## Những điểm cần chú ý
 
 - **Giá trị flash sau khi xóa:** STM32L1 là `0x00`, đa số chip khác là `0xFF`. Khai đúng

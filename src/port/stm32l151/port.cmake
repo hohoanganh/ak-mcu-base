@@ -50,6 +50,21 @@ else()
 	set(GW_SRC "")
 endif()
 
+# app variant (AK_APP): sources and include folders on top of the sample app
+if(AK_APP STREQUAL "demo" OR AK_APP STREQUAL "kit_tools")
+	set(VARIANT_SRC ${DEMO_SRC} ${PORT_DIR}/kit.c ${PORT_DIR}/rf_test.c)
+	set(VARIANT_INC ${SRC}/demo)
+elseif(AK_APP STREQUAL "remote")
+	set(VARIANT_SRC ${SRC}/demo/gfx.c ${REMOTE_SRC} ${PORT_DIR}/kit.c ${PORT_DIR}/rf_test.c)
+	set(VARIANT_INC ${SRC}/demo ${SRC}/remote)
+	# AK Base Kit 2.1 has an STM32L151C8 (64K): the app must end below 64K
+	set(APP_PART_SIZE 0xD000)
+else()
+	set(VARIANT_SRC "")
+	set(VARIANT_INC "")
+endif()
+message(STATUS "App variant: ${AK_APP}")
+
 set(SPL_DIR ${STM32L1_LIB_DIR}/STM32L1xx_StdPeriph_Driver)
 set(SPL_SRC
 	${SPL_DIR}/src/misc.c
@@ -137,8 +152,9 @@ ak_firmware(app app.ld
 		${PORT_DIR}/startup.c ${PORT_DIR}/port_stm32l151.c ${PORT_DIR}/system_stm32l1xx.c
 		${PORT_DIR}/fw_header.c ${STAGING_SRC}
 		${KERNEL_SRC} ${COMMON_SRC} ${FW_SRC} ${SYS_SRC} ${APP_SRC}
-		${MB_SRC} ${PORT_DIR}/rs485.c ${GW_SRC}
-	INCS ${SRC}/app ${MB_INC}
+		${MB_SRC} ${PORT_DIR}/rs485.c ${GW_SRC} ${VARIANT_SRC}
+	INCS ${SRC}/app ${MB_INC} ${VARIANT_INC}
+	DEFS ${VARIANT_DEFS} ${APP_KERNEL_DEFS}
 )
 target_link_libraries(app PRIVATE nanomodbus)
 # Fill header CRC/size into app.bin -> app.img, and patch .fw_header in app.elf

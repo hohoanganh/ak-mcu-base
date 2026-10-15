@@ -42,7 +42,14 @@ extern void task_create(task_t* task_tbl);
 extern void task_post(task_id_t des_task_id, ak_msg_t* msg);
 extern void task_post_pure_msg(task_id_t des_task_id, uint8_t sig);
 extern void task_post_common_msg(task_id_t des_task_id, uint8_t sig, uint8_t* data, uint8_t len);
+/* only with AK_DYNAMIC_MSG_POOL_SIZE > 0 (message.h) */
 extern void task_post_dynamic_msg(task_id_t des_task_id, uint8_t sig, uint8_t* data, uint32_t len);
+/* Same as task_post_pure_msg() / task_post_common_msg(), but a full pool
+ * returns 0 instead of FATAL: for messages made from outside data (UART
+ * lines, network frames) that may come faster than they are handled.
+ * Returns 1 when posted. */
+extern uint8_t task_post_pure_msg_try(task_id_t des_task_id, uint8_t sig);
+extern uint8_t task_post_common_msg_try(task_id_t des_task_id, uint8_t sig, uint8_t* data, uint8_t len);
 extern uint8_t task_remove_msg(task_id_t task_id, uint8_t sig); /* return numbers message's removed */
 extern int task_init();
 extern int task_run(); /* endless loop: task_run_once() + ak_port_idle() */

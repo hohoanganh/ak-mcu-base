@@ -187,6 +187,8 @@ extern void ak_free(void*);
  * message only contain the task signal.
  */
 extern ak_msg_t* get_pure_msg();
+/* AK_MSG_NULL when the pool is empty (get_pure_msg() is FATAL then) */
+extern ak_msg_t* get_pure_msg_try();
 extern uint32_t get_pure_msg_pool_used();
 extern uint32_t get_pure_msg_pool_used_max();
 
@@ -194,6 +196,8 @@ extern uint32_t get_pure_msg_pool_used_max();
  * message contain a continue block memory with size = AK_COMMON_MSG_DATA_SIZE.
  */
 extern ak_msg_t* get_common_msg();
+/* AK_MSG_NULL when the pool is empty (get_common_msg() is FATAL then) */
+extern ak_msg_t* get_common_msg_try();
 extern uint32_t get_common_msg_pool_used();
 extern uint32_t get_common_msg_pool_used_max();
 extern uint8_t set_data_common_msg(ak_msg_t* msg, uint8_t* data, uint8_t size);
@@ -201,14 +205,17 @@ extern uint8_t* get_data_common_msg(ak_msg_t* msg);
 extern uint8_t get_data_len_common_msg(ak_msg_t* msg);
 
 /* dynmic message
- * message contain a link list block memory.
+ * message contain a link list block memory. Only with
+ * AK_DYNAMIC_MSG_POOL_SIZE > 0 (0: no dynamic messages, no malloc/free).
  */
+#if AK_DYNAMIC_MSG_POOL_SIZE > 0
 extern ak_msg_t* get_dynamic_msg();
 extern uint32_t get_dynamic_msg_pool_used();
 extern uint32_t get_dynamic_msg_pool_used_max();
 extern uint8_t set_data_dynamic_msg(ak_msg_t* msg, uint8_t* data, uint32_t size);
 extern uint8_t* get_data_dynamic_msg(ak_msg_t* msg);
 extern uint32_t get_data_len_dynamic_msg(ak_msg_t* msg);
+#endif
 
 /*****************************************************************************
  * DEFINITION: debug message

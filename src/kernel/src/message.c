@@ -22,24 +22,30 @@ static ak_msg_t* free_list_common_msg_pool;
 static uint32_t free_list_common_used;
 static uint32_t free_list_common_used_max;
 
-/* dynamic pool memory */
+/* dynamic pool memory. AK_DYNAMIC_MSG_POOL_SIZE = 0 leaves dynamic messages
+ * out, and with them malloc/free of the C library. */
+#if AK_DYNAMIC_MSG_POOL_SIZE > 0
 static ak_msg_dynamic_t msg_dynamic_pool[AK_DYNAMIC_MSG_POOL_SIZE];
 static ak_msg_t* free_list_dynamic_msg_pool;
 static uint32_t free_list_dynamic_used;
 static uint32_t free_list_dynamic_used_max;
 
+static void dynamic_msg_pool_init();
+static void free_dynamic_msg(ak_msg_t* msg);
+#endif
+
 static void pure_msg_pool_init();
 static void common_msg_pool_init();
-static void dynamic_msg_pool_init();
 
 static void free_pure_msg(ak_msg_t* msg);
 static void free_common_msg(ak_msg_t* msg);
-static void free_dynamic_msg(ak_msg_t* msg);
 
 void msg_init() {
 	pure_msg_pool_init();
 	common_msg_pool_init();
+#if AK_DYNAMIC_MSG_POOL_SIZE > 0
 	dynamic_msg_pool_init();
+#endif
 }
 
 void msg_free(ak_msg_t* msg) {
@@ -60,9 +66,11 @@ void msg_free(ak_msg_t* msg) {
 			free_pure_msg(msg);
 			break;
 
+#if AK_DYNAMIC_MSG_POOL_SIZE > 0
 		case DYNAMIC_MSG_TYPE:
 			free_dynamic_msg(msg);
 			break;
+#endif
 
 		default:
 			FATAL("MF", 0x20);
@@ -83,9 +91,11 @@ void msg_force_free(ak_msg_t* msg) {
 		free_pure_msg(msg);
 		break;
 
+#if AK_DYNAMIC_MSG_POOL_SIZE > 0
 	case DYNAMIC_MSG_TYPE:
 		free_dynamic_msg(msg);
 		break;
+#endif
 
 	default:
 		FATAL("MF", 0x27);
@@ -111,6 +121,7 @@ void msg_dec_ref_count(ak_msg_t* msg) {
 	}
 }
 
+#if AK_DYNAMIC_MSG_POOL_SIZE > 0
 /* Allocator for dynamic messages. The original checked __heap_end__ from the
  * linker script; here malloc() (newlib _sbrk / host libc) reports exhaustion
  * and NULL is fatal. */
@@ -127,6 +138,7 @@ void* ak_malloc(size_t size) {
 void ak_free(void* ptr) {
 	free(ptr);
 }
+#endif
 
 /*****************************************************************************
  * pure message function define.
@@ -162,31 +174,38 @@ uint32_t get_pure_msg_pool_used_max() {
 	return free_list_pure_used_max;
 }
 
-ak_msg_t* get_pure_msg() {
+ak_msg_t* get_pure_msg_try() {
 	ak_msg_t* allocate_message;
 
 	ENTRY_CRITICAL();
 
 	allocate_message = free_list_pure_msg_pool;
 
-	if (allocate_message == AK_MSG_NULL) {
-		FATAL("MF", 0x31);
-	}
-	else {
+	if (allocate_message != AK_MSG_NULL) {
 		free_list_pure_msg_pool = allocate_message->next;
 
 		free_list_pure_used++;
 		if (free_list_pure_used >= free_list_pure_used_max) {
 			free_list_pure_used_max = free_list_pure_used;
 		}
+
+		reset_msg_ref_count(allocate_message);
+
+		allocate_message->ref_count++;
+		allocate_message->src_task_id = get_current_task_id();
 	}
 
-	reset_msg_ref_count(allocate_message);
-
-	allocate_message->ref_count++;
-	allocate_message->src_task_id = get_current_task_id();
-
 	EXIT_CRITICAL();
+
+	return allocate_message;
+}
+
+ak_msg_t* get_pure_msg() {
+	ak_msg_t* allocate_message = get_pure_msg_try();
+
+	if (allocate_message == AK_MSG_NULL) {
+		FATAL("MF", 0x31);
+	}
 
 	return allocate_message;
 }
@@ -237,33 +256,40 @@ uint32_t get_common_msg_pool_used_max() {
 	return free_list_common_used_max;
 }
 
-ak_msg_t* get_common_msg() {
+ak_msg_t* get_common_msg_try() {
 	ak_msg_t* allocate_message;
 
 	ENTRY_CRITICAL();
 
 	allocate_message = free_list_common_msg_pool;
 
-	if (allocate_message == AK_MSG_NULL) {
-		FATAL("MF", 0x21);
-	}
-	else {
+	if (allocate_message != AK_MSG_NULL) {
 		free_list_common_msg_pool = allocate_message->next;
 
 		free_list_common_used++;
 		if (free_list_common_used >= free_list_common_used_max) {
 			free_list_common_used_max = free_list_common_used;
 		}
+
+		reset_msg_ref_count(allocate_message);
+
+		allocate_message->ref_count++;
+		allocate_message->src_task_id = get_current_task_id();
+
+		((ak_msg_common_t*)allocate_message)->len = 0;
 	}
 
-	reset_msg_ref_count(allocate_message);
-
-	allocate_message->ref_count++;
-	allocate_message->src_task_id = get_current_task_id();
-
-	((ak_msg_common_t*)allocate_message)->len = 0;
-
 	EXIT_CRITICAL();
+
+	return allocate_message;
+}
+
+ak_msg_t* get_common_msg() {
+	ak_msg_t* allocate_message = get_common_msg_try();
+
+	if (allocate_message == AK_MSG_NULL) {
+		FATAL("MF", 0x21);
+	}
 
 	return allocate_message;
 }
@@ -316,6 +342,7 @@ uint8_t get_data_len_common_msg(ak_msg_t* msg) {
 /*****************************************************************************
  * dynamic message function define.
  *****************************************************************************/
+#if AK_DYNAMIC_MSG_POOL_SIZE > 0
 void dynamic_msg_pool_init() {
 	uint32_t index;
 
@@ -416,6 +443,7 @@ uint8_t* get_data_dynamic_msg(ak_msg_t* msg) {
 uint32_t get_data_len_dynamic_msg(ak_msg_t* msg) {
 	return ((ak_msg_dynamic_t*)msg)->len;
 }
+#endif /* AK_DYNAMIC_MSG_POOL_SIZE > 0 */
 
 /*****************************************************************************
  * debug message function define.
