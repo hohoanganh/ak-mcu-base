@@ -17,6 +17,9 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 - Bản web bật `AK_TASK_TRACE_ENABLE` (móc theo dõi có sẵn của kernel) và thêm `web_trace()`, `web_step()`,
   `web_trace_names()` trong `port/web/web_main.c`; `kit-ui.js` thêm `pause()`, `step()`, `trace()`, `names()`. Firmware
   cho kit không đổi. Trong bản web thời gian là ảo nên thời gian chạy của từng handler luôn là 0 và trang không hiện nó.
+- **Tài liệu `docs/huong-toi-uu-sau-v1.3.9.md`**: hướng tối ưu dựa trên số đo của chính base (kích thước mọi bản build,
+  thời gian bus OLED tính từ khung của `test_demo`, chỗ chặn của Modbus RTU, RAM của từng màn hình demo). Công cụ
+  `tools/oled_bus_cost.py` tính thời gian bus OLED mỗi khung từ file `test_demo <thư mục> record`. Firmware không đổi.
 
 ## ak-mcu-base v1.3.9 — 13/10/2026
 

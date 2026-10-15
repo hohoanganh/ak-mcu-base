@@ -4,6 +4,9 @@ Lập ngày 06/10/2026 từ một lượt tra cứu tài liệu công khai. Mỗ
 Số liệu nào **chưa đối chiếu được với trang nguồn** đều ghi rõ "chưa kiểm chứng": phải đo lại trên board trước
 khi dựa vào.
 
+> Cập nhật 15/10/2026: mục 1 (xác nhận và quay lui) và mục 3 (ký số ảnh) đã làm trong v1.3.9. Các hướng tiếp theo,
+> dựa trên số đo của chính base: [huong-toi-uu-sau-v1.3.9.md](huong-toi-uu-sau-v1.3.9.md).
+
 ## Đã làm trong v1.2.0
 
 | Việc | Ghi chú | Nguồn tham khảo |
