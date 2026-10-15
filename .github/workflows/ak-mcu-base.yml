@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Toolchain
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi
-      - name: Build (every STM32L151 variant: staging, signed, Modbus roles, demo, kit_tools, remote)
+      - name: Build every STM32L151 variant (staging, signed, Modbus roles, demo, kit_tools, remote)
         run: |
           arm-none-eabi-gcc --version | head -1
           pip install cryptography
