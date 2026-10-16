@@ -7,7 +7,9 @@ console lúc khởi động).
 Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 [docs/tinh-nang-moi-v1.2-v1.3.md](legacy/docs/tinh-nang-moi-v1.2-v1.3.md).
 
-## Chưa phát hành
+## ak-mcu-base v1.3.10 — 16/10/2026
+
+App **1.3.10**, bootloader **1.3.0** (không đổi). Nâng cấp từ v1.3.9 qua OTA (UART hoặc RS485) được, không cần ST-Link.
 
 - **Trang "Bên trong firmware"** (`docs/play/inside.html`): cho người không lập trình xem mã nguồn chạy thế nào, trên chính
   firmware chạy trong trang. (1) Bốn việc của vòng lặp chính, kèm đoạn mã thật của `kernel/src/task.c`. (2) **Mọi message
