@@ -73,10 +73,13 @@ static const mb_slave_map_t reg_map = {
 	on_write,
 };
 
-/* A verified image is in STAGING. The answer to COMMIT goes out when the
- * poll returns; task_fw then asks the bootloader to install and resets. */
+/* A verified image is in STAGING. The answer to COMMIT leaves in the
+ * background once the poll returns; task_poll_modbus() lets task_fw install
+ * and reset only after it is out on the wire. */
+static uint8_t install_pending;
+
 static void on_ota_commit(void) {
-	task_post_pure_msg(TASK_FW_ID, FW_SIG_INSTALL);
+	install_pending = 1;
 }
 
 void app_modbus_init(void) {
@@ -103,6 +106,10 @@ void task_poll_modbus(void) {
 		info_regs[3] = crash_log_count();
 	}
 	mb_slave_poll();
+	if (install_pending && !hal_rs485_tx_busy()) {
+		install_pending = 0;
+		task_post_pure_msg(TASK_FW_ID, FW_SIG_INSTALL);
+	}
 }
 
 void cmd_mb(const char* args) {

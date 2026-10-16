@@ -8,12 +8,14 @@
 #include "mb_port.h"
 #include "hal_rs485.h"
 
-/* a frame is dropped when the gap between two bytes exceeds this */
+/* a frame is dropped when the gap between two bytes exceeds this (only a
+ * broken frame waits for it: whole frames are in the ring before the poll) */
 #define MB_SLAVE_BYTE_TIMEOUT_MS	(20)
 
 static nmbs_t server;
 static const mb_slave_map_t* reg_map;
 static uint32_t request_count;
+static uint32_t frame_gap_ms;		/* t3.5 rounded up to the next ms */
 
 /* Block that holds the whole range [address, address + quantity), or NULL. */
 static const mb_reg_block_t* find_block(const mb_reg_block_t* blocks, uint8_t num,
@@ -103,7 +105,12 @@ int mb_slave_init(uint8_t unit_id, uint32_t baudrate, const mb_slave_map_t* map)
 	mb_ota_init(0);
 
 	hal_rs485_init(baudrate);
-	mb_port_conf(&conf);
+	mb_port_conf_send(&conf);
+
+	/* end of frame: 3.5 characters of 11 bits, above 19200 baud fixed at
+	 * 1.75 ms by the spec. Counted in whole ms and rounded up (5 ms at 9600).
+	 * Polling a little early only costs a short wait in port_read(). */
+	frame_gap_ms = baudrate > 19200U ? 2U : 38500U / baudrate + 1U;
 
 	nmbs_callbacks_create(&cb);
 	cb.read_holding_registers = cb_read_holding;
@@ -123,10 +130,15 @@ void mb_slave_enable_ota(void (*on_commit)(void)) {
 	mb_ota_init(on_commit);
 }
 
+/* Only a whole frame goes to nanoMODBUS: once the bus has been silent for
+ * t3.5 every byte of the request is in the RX ring and port_read() takes it
+ * without waiting. The answer leaves in the background (hal_rs485_send);
+ * nanoMODBUS's buffer holds it, so no new poll before the bus is released. */
 void mb_slave_poll(void) {
-	if (reg_map) {
-		nmbs_server_poll(&server);
+	if (!reg_map || hal_rs485_tx_busy() || hal_rs485_rx_idle_ms() < frame_gap_ms) {
+		return;
 	}
+	nmbs_server_poll(&server);
 }
 
 uint32_t mb_slave_request_count(void) {

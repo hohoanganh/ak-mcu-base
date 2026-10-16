@@ -44,14 +44,16 @@ Trong tài liệu và chú thích mã, đường dẫn kiểu `port/stm32l151`, 
 
 ```bash
 # test trên máy tính (Linux / WSL), có ASan + UBSan
-make test                      # hoặc: cmake -S . -B build/host && cmake --build build/host -j && ctest --test-dir build/host
+make test                      # hoặc: cmake -S . -B build/host && cmake --build build/host -j && ctest --test-dir build/host -LE fast_only
+make test-fast                 # vài giây: test cắt điện chỉ lấy mẫu (mỗi 7 thao tác); trước commit vẫn chạy make test
 make sim                       # bộ giả lập: bootloader + app, gõ help
 
 # firmware
 pio run -e boot -e app -e app_mbmaster -e app_gateway -e demo   # .pio/build/<env>/app.img, boot: firmware.bin
 pio run -e kit_tools                               # demo + lệnh spi (bắt SPI trên J6) và rf (nRF24)
 pio run -e remote                                  # kit 2.1 (64K): tay điều khiển thử nghiệm, OLED + 3 nút + nRF24 (src/remote)
-make stm32 stm32-internal stm32-sign stm32-gateway # cùng mã, build bằng CMake (CI dùng cách này); -sign: ảnh ký số
+make stm32-all                                     # mọi bản STM32L151 bằng CMake như CI: stm32, -internal, -sign,
+                                                   # -gateway, -mbmaster, -demo, -kit-tools, -remote (AK_APP=...)
 make stm32g0 renode                                # port STM32G071, rồi chạy trong Renode (tests/renode)
 
 # bản chạy trên trình duyệt, ghi vào docs/play/ (cần Emscripten)
@@ -64,8 +66,9 @@ python src/port/web/build.py
 - Linker script: section NOLOAD (`.bss`, `._heap`) phải có `AT > RAM`, không thì Renode nạp số 0 đè lên flash.
 - gcc 9 với ASan trong WSL treo vô hạn nếu không chạy qua `setarch x86_64 -R`.
 - PlatformIO và CMake build cùng một danh sách file: thêm file nguồn thì sửa **cả** `platformio.ini` **và**
-  `CMakeLists.txt` / `src/port/*/port.cmake`. File trong `src/app`, `src/demo` tự vào build của PlatformIO, nhưng CMake
-  và `src/port/web/build.py` thì phải khai.
+  `CMakeLists.txt` / `src/port/*/port.cmake`. File trong `src/app`, `src/demo` tự vào build của PlatformIO; `src/demo`
+  và `src/remote` cũng tự vào CMake (`file(GLOB)`, `AK_APP`), còn `src/app` trong CMake và `src/port/web/build.py` thì
+  phải khai.
 - Trong `platformio.ini`: `-I…` tính từ gốc repo (`-Isrc/kernel/inc`), còn `build_src_filter` tính từ `src_dir = src`.
 
 ## 4. Kernel AK: luật không được phá

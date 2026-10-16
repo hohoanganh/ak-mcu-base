@@ -61,8 +61,8 @@ uint8_t kit_init(void) {
 	return 1;
 }
 
-uint8_t kit_lcd_write_page(uint8_t page, const uint8_t* data) {
-	memcpy(panel[page], data, KIT_LCD_W);
+uint8_t kit_lcd_write(uint8_t page, uint8_t x, const uint8_t* data, uint8_t n) {
+	memcpy(&panel[page][x], data, n);
 	return 1;
 }
 

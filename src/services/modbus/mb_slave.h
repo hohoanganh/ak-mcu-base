@@ -18,9 +18,11 @@
  *  codes served: 03, 04, 06, 16. The firmware-update block 0xF000 (mb_ota.h)
  *  is answered here too once mb_slave_enable_ota() was called.
  *
- *  mb_slave_poll() returns at once while the bus is idle. When a frame has
- *  started it stays until the frame is complete and answered (about 1 ms per
- *  byte at 9600 baud).
+ *  mb_slave_poll() never waits for the bus: it takes a request only after
+ *  the bus has been silent for 3.5 characters (5 ms at 9600 baud), when the
+ *  whole frame is already in the RX ring, and the answer goes out in the
+ *  background (hal_rs485_send). A frame that stops in the middle still waits
+ *  up to MB_SLAVE_BYTE_TIMEOUT_MS for its missing bytes.
  ******************************************************************************
 **/
 

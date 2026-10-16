@@ -28,7 +28,7 @@ static uint32_t tick;
 #define LIFE_EVERY		(2)			/* frames per generation */
 #define LIFE_MAX_GEN	(900)
 
-static uint64_t life[LIFE_H];
+static uint64_t* life;				/* LIFE_H rows, in ui_scratch() */
 static uint16_t life_gen;
 static uint16_t life_pop, life_same;	/* population, generations it has not changed */
 
@@ -75,7 +75,7 @@ static void life_step(void) {
 			pop++;
 		}
 	}
-	memcpy(life, next, sizeof(life));
+	memcpy(life, next, sizeof(next));
 	life_gen++;
 	life_same = (pop == life_pop) ? (uint16_t)(life_same + 1) : 0;
 	life_pop = pop;
@@ -115,7 +115,11 @@ typedef struct {
 	uint8_t z;				/* distance, STAR_FAR .. 1 */
 } star_t;
 
-static star_t stars[STAR_NUM];
+static star_t* stars;				/* STAR_NUM, in ui_scratch(), shared with life:
+									 * saver_start() seeds the effect it switches to */
+
+typedef char saver_fits[(LIFE_H * sizeof(uint64_t) <= UI_SCRATCH_SIZE &&
+						 STAR_NUM * sizeof(star_t) <= UI_SCRATCH_SIZE) ? 1 : -1];
 static uint8_t star_speed = 3;
 
 static void star_new(star_t* s, uint8_t z) {
@@ -207,6 +211,8 @@ static void saver_start(void) {
 }
 
 static void saver_enter(void) {
+	life = (uint64_t*)ui_scratch();
+	stars = (star_t*)ui_scratch();
 	tick = 0;
 	saver_start();
 }

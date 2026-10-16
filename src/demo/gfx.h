@@ -2,9 +2,10 @@
  ******************************************************************************
  * @brief:  Tiny monochrome graphics for the 128x64 display of the demo.
  *
- *  Everything draws into a frame buffer in RAM. gfx_flush() sends only the
- *  display pages whose content changed since the last flush, so a clock that
- *  changes a few digits costs one or two pages instead of the whole screen.
+ *  Everything draws into a frame buffer in RAM. gfx_flush() sends only what
+ *  changed since the last flush (per page, the span of changed columns), so a
+ *  clock that changes a few digits costs a few dozen bytes instead of the
+ *  whole screen.
  ******************************************************************************
 **/
 
@@ -58,9 +59,12 @@ extern void gfx_digit7(int x, int y, int w, int h, int t, uint8_t digit);
  * Returns buf. */
 extern char* gfx_utoa(char* buf, uint32_t v, uint8_t min_digits);
 
-/* Send the pages that changed. Returns the number of pages written; force = 1
- * sends everything (first frame, display re-initialised). */
+/* Send what changed: in each changed page, the columns from the first to the
+ * last changed one. Returns the number of pages written; force = 1 sends
+ * everything (first frame, display re-initialised). */
 extern uint8_t gfx_flush(uint8_t force);
+/* Display data bytes the last gfx_flush() sent (8 * 128 = everything). */
+extern uint16_t gfx_flush_bytes(void);
 /* Pages the last gfx_flush() found changed: bit n = page n. */
 extern uint8_t gfx_changed(void);
 

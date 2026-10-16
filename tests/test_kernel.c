@@ -1,6 +1,9 @@
 /**
  * Portable AK kernel tests on host: priority order, FIFO, message pools,
  * timers, remove, src_task_id, FATAL.
+ *
+ * Built twice: test_kernel (defaults) and test_kernel_nodyn with
+ * AK_DYNAMIC_MSG_POOL_SIZE=0 (no dynamic messages, no malloc/free).
  */
 #include <string.h>
 #include <setjmp.h>
@@ -41,10 +44,12 @@ static void rec(uint8_t task, ak_msg_t* m) {
 			log_buf[log_n].len = get_data_len_common_msg(m);
 			log_buf[log_n].data0 = get_data_common_msg(m)[0];
 		}
+#if AK_DYNAMIC_MSG_POOL_SIZE > 0
 		else if (get_msg_type(m) == DYNAMIC_MSG_TYPE) {
 			log_buf[log_n].len = (uint8_t)get_data_len_dynamic_msg(m);
 			log_buf[log_n].data0 = get_data_dynamic_msg(m)[0];
 		}
+#endif
 		log_n++;
 	}
 }
@@ -133,24 +138,93 @@ static void test_fifo_same_task(void) {
 
 static void test_msg_types_and_pools(void) {
 	uint8_t d[5] = { 0x42, 1, 2, 3, 4 };
-	uint8_t big[200];
 
 	setup();
-	memset(big, 0x77, sizeof(big));
 	task_post_common_msg(TASK_LOW_ID, SIG_A, d, sizeof(d));
-	task_post_dynamic_msg(TASK_LOW_ID, SIG_B, big, sizeof(big));
 	CHECK_EQ(get_common_msg_pool_used(), 1);
+#if AK_DYNAMIC_MSG_POOL_SIZE > 0
+	uint8_t big[200];
+
+	memset(big, 0x77, sizeof(big));
+	task_post_dynamic_msg(TASK_LOW_ID, SIG_B, big, sizeof(big));
 	CHECK_EQ(get_dynamic_msg_pool_used(), 1);
+#endif
 	run_all();
-	CHECK_EQ(log_n, 2);
 	CHECK_EQ(log_buf[0].len, 5);
 	CHECK_EQ(log_buf[0].data0, 0x42);
+#if AK_DYNAMIC_MSG_POOL_SIZE > 0
+	CHECK_EQ(log_n, 2);
 	CHECK_EQ(log_buf[1].len, 200);
 	CHECK_EQ(log_buf[1].data0, 0x77);
+	CHECK_EQ(get_dynamic_msg_pool_used(), 0);
+#else
+	CHECK_EQ(log_n, 1);
+#endif
 	/* no pool leak */
 	CHECK_EQ(get_common_msg_pool_used(), 0);
-	CHECK_EQ(get_dynamic_msg_pool_used(), 0);
 	CHECK_EQ(get_pure_msg_pool_used(), 0);
+}
+
+/* _try posts: a full pool is an answer (0), not a FATAL; the caller drops or
+ * retries later. Everything posted still arrives, in order. */
+static void test_post_try(void) {
+	jmp_buf j;
+	uint8_t d[3] = { 7, 8, 9 };
+	int n;
+
+	setup();
+	host_fatal_jmp = &j;
+	if (setjmp(j) != 0) {
+		CHECK(0);			/* no FATAL on this path */
+		host_fatal_jmp = 0;
+		return;
+	}
+	for (n = 0; task_post_pure_msg_try(TASK_LOW_ID, SIG_A); n++) {
+	}
+	CHECK_EQ(n, AK_PURE_MSG_POOL_SIZE);
+	CHECK_EQ(get_pure_msg_pool_used(), AK_PURE_MSG_POOL_SIZE);
+	CHECK_EQ(task_post_pure_msg_try(TASK_LOW_ID, SIG_A), 0);
+
+	for (n = 0; task_post_common_msg_try(TASK_MID_ID, SIG_B, d, sizeof(d)); n++) {
+	}
+	CHECK_EQ(n, AK_COMMON_MSG_POOL_SIZE);
+	CHECK_EQ(task_post_common_msg_try(TASK_MID_ID, SIG_B, d, sizeof(d)), 0);
+
+	run_all();
+	CHECK_EQ(log_n, AK_PURE_MSG_POOL_SIZE + AK_COMMON_MSG_POOL_SIZE);
+	CHECK_EQ(log_buf[0].task, TASK_MID_ID);		/* higher priority first */
+	CHECK_EQ(log_buf[0].len, 3);
+	CHECK_EQ(log_buf[0].data0, 7);
+	CHECK_EQ(log_buf[log_n - 1].task, TASK_LOW_ID);
+	CHECK_EQ(log_buf[log_n - 1].src, AK_TASK_IDLE_ID);
+	CHECK_EQ(get_pure_msg_pool_used(), 0);
+	CHECK_EQ(get_common_msg_pool_used(), 0);
+
+	/* room again: posts go through */
+	CHECK_EQ(task_post_pure_msg_try(TASK_HIGH_ID, SIG_C), 1);
+	run_all();
+	CHECK_EQ(log_buf[log_n - 1].task, TASK_HIGH_ID);
+	host_fatal_jmp = 0;
+}
+
+/* data longer than a common message is a programming error: FATAL even on
+ * the _try path */
+static void test_post_try_oversize_is_fatal(void) {
+	jmp_buf j;
+	uint8_t big[AK_COMMON_MSG_DATA_SIZE + 1];
+
+	setup();
+	memset(big, 0, sizeof(big));
+	host_fatal_jmp = &j;
+	if (setjmp(j) == 0) {
+		task_post_common_msg_try(TASK_LOW_ID, SIG_A, big, sizeof(big));
+		CHECK(0);
+	}
+	else {
+		CHECK_EQ(host_fatal_code, 0x24);
+	}
+	host_fatal_jmp = 0;
+	CHECK_EQ(get_common_msg_pool_used(), 0);	/* nothing taken from the pool */
 }
 
 static void test_src_task_id(void) {
@@ -490,6 +564,8 @@ TT_MAIN_BEGIN("test_kernel")
 	RUN_TEST(test_priority_order);
 	RUN_TEST(test_fifo_same_task);
 	RUN_TEST(test_msg_types_and_pools);
+	RUN_TEST(test_post_try);
+	RUN_TEST(test_post_try_oversize_is_fatal);
 	RUN_TEST(test_src_task_id);
 	RUN_TEST(test_timer_one_shot);
 	RUN_TEST(test_timer_periodic_and_remove);

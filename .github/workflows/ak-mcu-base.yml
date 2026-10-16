@@ -22,7 +22,7 @@ jobs:
       - name: Build
         run: cmake -S . -B build/host && cmake --build build/host -j
       - name: Unit tests + simulator OTA
-        run: ctest --test-dir build/host --output-on-failure
+        run: ctest --test-dir build/host --output-on-failure -LE fast_only
 
   # the firmware as WebAssembly (docs/play): only checks that it still builds;
   # the published copy in docs/play is built locally and committed
@@ -43,12 +43,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Toolchain
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi
-      - name: Build (external + internal staging, signed images)
+      - name: Build every STM32L151 variant (staging, signed, Modbus roles, demo, kit_tools, remote)
         run: |
           arm-none-eabi-gcc --version | head -1
           pip install cryptography
           python3 tools/ak_sign.py devkey
-          make stm32 stm32-internal stm32-sign stm32-gateway
+          make stm32-all
       - name: Size budget
         run: |
           cd build
@@ -61,6 +61,14 @@ jobs:
           s=$(stat -c %s stm32l151-sign/boot.bin); echo "stm32l151-sign/boot.bin: $s B"
           [ "$s" -le 14336 ] || { echo "signed bootloader over the 14336 B budget"; exit 1; }
           python3 ../tools/mkimage.py info stm32l151-sign/app.img --pub ../tools/keys/dev_pub.pem
+          # RAM: what .data/.bss leave for heap + stack (the linker already keeps
+          # 2K of stack); below 3K a deeper call chain overwrites the heap
+          for d in stm32l151 stm32l151-internal stm32l151-sign stm32l151-gateway stm32l151-mbmaster \
+                   stm32l151-demo stm32l151-kit_tools stm32l151-remote; do
+            heap=$(arm-none-eabi-size -A $d/app.elf | awk '$1 == "._heap" { print $2 }')
+            free=$((heap + 2048)); echo "$d/app.elf: $free B for heap + stack"
+            [ "$free" -ge 3072 ] || { echo "$d: less than 3072 B of RAM left for heap + stack"; exit 1; }
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: ak-mcu-base-stm32l151
@@ -68,6 +76,8 @@ jobs:
             build/stm32l151/boot.bin
             build/stm32l151/app.img
             build/stm32l151/*.elf
+            build/stm32l151-demo/app.img
+            build/stm32l151-demo/app.elf
 
   # second port: STM32G071 built with the same toolchain, then the real .elf
   # files run in the Renode emulator (bootloader -> app -> shell)

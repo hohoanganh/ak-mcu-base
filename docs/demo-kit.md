@@ -369,7 +369,7 @@ Không cần đứng cạnh kit vẫn thử được:
 
 ```
 > ui
-display ok, screen: Snake, last frame 20 ms, 3 of 8 pages sent, buttons 0x00
+display ok, screen: Snake, last frame 4 ms, 2 of 8 pages sent (9 bytes), buttons 0x00
 > ui 1        (bấm B1; ui 2, ui 3 tương tự)
 > ui back     (giữ B3: về menu)
 > ui open tetris   (mở thẳng một màn hình theo một phần tên trong menu; ui open menu để về menu)
@@ -410,6 +410,12 @@ một chút thay vì bỏ khung. 15 khung/giây là mức an toàn.
 1. Tạo `demo/scr_ten.c`, khai một `ui_screen_t` với các hàm `enter`, `key`, `frame` và `leave` (để 0 nếu không cần dọn gì khi rời màn hình).
 2. Thêm `extern const ui_screen_t scr_ten;` vào `demo/ui.h` và một dòng vào `menu_items[]` trong `demo/ui_common.c`.
 3. Trong `frame()`: cập nhật trạng thái, `gfx_clear()`, vẽ lại. Không gọi gì chờ đợi; cần thời gian thì đếm khung.
+4. Bộ đệm lớn (vài trăm byte) chỉ dùng khi màn hình đang mở: lấy từ `ui_scratch()` trong `enter()` (`UI_SCRATCH_SIZE`
+   byte, dùng chung cho mọi màn hình, như thân rắn của Snake hay lưới Life của Saver) thay cho mảng `static`.
+   Điểm cao và việc chạy nền thì vẫn để biến riêng.
+
+`gfx_flush()` chỉ gửi đoạn cột đã đổi của mỗi trang (từ cột đổi đầu tới cột đổi cuối), nên một quả bóng di chuyển
+chỉ tốn vài chục byte trên I2C thay vì cả trang 128 byte (khoảng 5,5 ms). Lệnh `ui` in số byte của khung trước.
 
 Mã màn hình không đụng tới chip (`demo/kit.h` là ranh giới), nên thêm một ca trong `tests/test_demo.c` là xem được
 ảnh trên máy tính trước khi nạp.

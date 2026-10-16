@@ -251,12 +251,23 @@ static uint8_t rs_tx[2048];
 static uint32_t rs_tx_len;
 static uint32_t rs_baud;
 static uint32_t rs_rx_bytes;
+static uint32_t rs_rx_last_ms;
+static uint32_t rs_tx_end_ms;		/* a hal_rs485_send() is on the wire until then */
 
 void hal_rs485_init(uint32_t baudrate) {
 	rs_baud = baudrate;
 	rs_rx_head = rs_rx_tail = 0;
 	rs_tx_len = 0;
 	rs_rx_bytes = 0;
+	rs_rx_last_ms = rs_tx_end_ms = hal_millis();
+}
+
+uint8_t hal_rs485_tx_busy(void) {
+	return (int32_t)(hal_millis() - rs_tx_end_ms) < 0;
+}
+
+uint32_t hal_rs485_rx_idle_ms(void) {
+	return hal_millis() - rs_rx_last_ms;
 }
 
 uint32_t hal_rs485_rx_bytes(void) {
@@ -270,10 +281,20 @@ int hal_rs485_getc(void) {
 	return rs_rx[rs_rx_tail++ % sizeof(rs_rx)];
 }
 
+/* the bytes are on the other side at once; with virtual time a blocking
+ * write cannot wait for the clock, so only send() keeps the bus busy */
 void hal_rs485_write(const uint8_t* data, uint32_t len) {
 	while (len-- && rs_tx_len < sizeof(rs_tx)) {
 		rs_tx[rs_tx_len++] = *data++;
 	}
+}
+
+/* busy for the transmit time: 10 bits per byte, rounded up to a ms */
+void hal_rs485_send(const uint8_t* data, uint32_t len) {
+	uint32_t ms = rs_baud ? (len * 10000U + rs_baud - 1) / rs_baud : 0;
+
+	hal_rs485_write(data, len);
+	rs_tx_end_ms = hal_millis() + ms;
 }
 
 void host_rs485_inject(const uint8_t* data, uint32_t len) {
@@ -281,6 +302,7 @@ void host_rs485_inject(const uint8_t* data, uint32_t len) {
 		rs_rx[rs_rx_head++ % sizeof(rs_rx)] = *data++;
 		rs_rx_bytes++;
 	}
+	rs_rx_last_ms = hal_millis();
 }
 
 uint32_t host_rs485_take_tx(uint8_t* out, uint32_t max) {

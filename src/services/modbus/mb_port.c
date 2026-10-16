@@ -37,9 +37,23 @@ static int32_t port_write(const uint8_t* buf, uint16_t count, int32_t timeout_ms
 	return count;
 }
 
+/* nanoMODBUS keeps the frame in its own buffer until the next poll, which the
+ * slave does not start while hal_rs485_tx_busy(): the buffer stays valid */
+static int32_t port_send(const uint8_t* buf, uint16_t count, int32_t timeout_ms, void* arg) {
+	(void)timeout_ms;
+	(void)arg;
+	hal_rs485_send(buf, count);
+	return count;
+}
+
 void mb_port_conf(nmbs_platform_conf* conf) {
 	nmbs_platform_conf_create(conf);
 	conf->transport = NMBS_TRANSPORT_RTU;
 	conf->read = port_read;
 	conf->write = port_write;
+}
+
+void mb_port_conf_send(nmbs_platform_conf* conf) {
+	mb_port_conf(conf);
+	conf->write = port_send;
 }

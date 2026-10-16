@@ -46,9 +46,13 @@ static uint8_t held_buttons;
 uint8_t kit_buttons(void) { return held_buttons; }
 void kit_buzzer(uint16_t freq_hz) { buzzer_hz = freq_hz; }
 
-uint8_t kit_lcd_write_page(uint8_t page, const uint8_t* data) {
-	memcpy(panel[page], data, KIT_LCD_W);
+static int bytes_written;			/* display data bytes, without the addressing */
+
+uint8_t kit_lcd_write(uint8_t page, uint8_t x, const uint8_t* data, uint8_t n) {
+	CHECK(page < KIT_LCD_PAGES && n > 0 && x + n <= KIT_LCD_W);
+	memcpy(&panel[page][x], data, n);
 	pages_written++;
+	bytes_written += n;
 	return 1;
 }
 
@@ -662,6 +666,23 @@ static void test_gfx_flush_only_changes(void) {
 	CHECK_EQ(pages_written, 2);
 	CHECK_EQ(lit_pixels(), 2);
 	CHECK_EQ(gfx_flush(0), 0);
+	/* only the changed columns of a page go out */
+	bytes_written = 0;
+	gfx_pixel(10, 0, 1);
+	gfx_pixel(13, 3, 1);					/* page 0, columns 10..13 */
+	gfx_pixel(127, 40, 1);					/* page 5, last column */
+	gfx_pixel(0, 48, 1);					/* page 6, first column */
+	CHECK_EQ(gfx_flush(0), 3);
+	CHECK_EQ(bytes_written, 4 + 1 + 1);
+	CHECK_EQ(gfx_flush_bytes(), 6);
+	CHECK_EQ(lit_pixels(), 6);
+	gfx_pixel(13, 3, 0);
+	gfx_pixel(10, 0, 0);					/* both ends of the span change back */
+	CHECK_EQ(gfx_flush(0), 1);
+	CHECK_EQ(bytes_written, 6 + 4);
+	CHECK_EQ(lit_pixels(), 4);
+	gfx_flush(1);							/* force: every page, whole */
+	CHECK_EQ(gfx_flush_bytes(), KIT_LCD_PAGES * KIT_LCD_W);
 	/* outside the screen: ignored, no memory touched */
 	gfx_pixel(-1, 0, 1); gfx_pixel(128, 0, 1); gfx_pixel(0, 64, 1); gfx_fill(120, 60, 20, 20, 1);
 	CHECK_EQ(gfx_get(127, 63), 1);

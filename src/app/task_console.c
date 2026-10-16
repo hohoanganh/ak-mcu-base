@@ -151,7 +151,9 @@ static void cmd_stat(const char* args) {
 	xprintf("pool      used  max\n");
 	xprintf("pure     %4u %4u\n", get_pure_msg_pool_used(), get_pure_msg_pool_used_max());
 	xprintf("common   %4u %4u\n", get_common_msg_pool_used(), get_common_msg_pool_used_max());
+#if AK_DYNAMIC_MSG_POOL_SIZE > 0
 	xprintf("dynamic  %4u %4u\n", get_dynamic_msg_pool_used(), get_dynamic_msg_pool_used_max());
+#endif
 	xprintf("timer    %4u %4u\n", get_timer_msg_pool_used(), get_timer_msg_pool_used_max());
 	xprintf("stack: %u B never used, crash log: %d record(s)\n", hal_stack_unused(), crash_log_count());
 }

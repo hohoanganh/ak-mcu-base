@@ -30,9 +30,10 @@ extern "C"
  * display answered on its bus. */
 extern uint8_t kit_init(void);
 
-/* One display page: 128 bytes, one per column, bit 0 = top pixel of the page.
- * Returns 0 if the display did not acknowledge. */
-extern uint8_t kit_lcd_write_page(uint8_t page, const uint8_t* data);
+/* Part of one display page: n bytes for columns x .. x + n - 1, one byte per
+ * column, bit 0 = top pixel of the page. Returns 0 if the display did not
+ * acknowledge. */
+extern uint8_t kit_lcd_write(uint8_t page, uint8_t x, const uint8_t* data, uint8_t n);
 
 /* Does address a acknowledge? bus 0 = display pins, 1 = display pins swapped,
  * 2 = I2C1 header, 3 = I2C1 swapped (stm32l151 port only: a diagnosis for a

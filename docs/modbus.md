@@ -6,7 +6,7 @@ Một cổng RS485, một vai trò, chọn lúc build:
 | Vai trò | PlatformIO | CMake | Cờ |
 |---|---|---|---|
 | Slave (mặc định) | `pio run -e app` | `-DAK_MODBUS=slave` | `APP_MODBUS_SLAVE` |
-| Master | `pio run -e app_mbmaster` | `-DAK_MODBUS=master` | `APP_MODBUS_MASTER` |
+| Master | `pio run -e app_mbmaster` | `-DAK_MODBUS=master` (`make stm32-mbmaster`) | `APP_MODBUS_MASTER` |
 | Gateway TCP ↔ RTU | `pio run -e app_gateway` | `-DAK_MODBUS=gateway` (`make stm32-gateway`) | `APP_MODBUS_GATEWAY` |
 | Không dùng | — | `-DAK_MODBUS=none` | — |
 
@@ -39,8 +39,13 @@ mb_slave_enable_ota(on_ota_commit);  /* cho phép cập nhật firmware qua RS48
 - Mã hàm: 03, 04, 06, 16.
 - Yêu cầu phải nằm trọn trong một khối, nếu không trả exception 2. Ghi vào khối chỉ đọc cũng trả exception 2.
 - `on_write(address, quantity)` được gọi sau khi master ghi xong.
-- `mb_slave_poll()` trả về ngay khi đường truyền rảnh; khi một khung đã bắt đầu thì nó ở lại tới lúc trả lời xong
-  (khoảng 1 ms mỗi byte ở 9600).
+- `mb_slave_poll()` không bao giờ đứng chờ đường dây. Nó chỉ nhận yêu cầu khi đường dây đã im 3,5 ký tự (5 ms ở
+  9600 baud, 2 ms trên 19200), lúc đó cả khung đã nằm trong vòng đệm RX; câu trả lời đi ra bằng ngắt
+  (`hal_rs485_send()`), chân hướng nhả khi bit stop cuối ra khỏi dây. Trước bản này, trả lời 125 thanh ghi giữ CPU
+  266 ms và nhận một khung OTA giữ khoảng 146 ms. Khung đứt giữa chừng vẫn chờ tối đa 20 ms cho byte còn thiếu.
+- Lệnh COMMIT của OTA: app chỉ cho `task_fw` cài và reset sau khi câu trả lời đã ra hết khỏi dây.
+- Master và gateway vẫn chờ câu trả lời trong handler (`APP_MB_RESPONSE_TIMEOUT_MS`); đổi sang máy trạng thái là
+  việc còn lại (`docs/huong-toi-uu-sau-v1.3.9.md` mục 2).
 
 Bảng thanh ghi của app mẫu:
 

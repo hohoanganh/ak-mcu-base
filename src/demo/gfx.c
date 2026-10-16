@@ -267,23 +267,47 @@ char* gfx_utoa(char* buf, uint32_t v, uint8_t min_digits) {
 }
 
 static uint8_t changed_mask;
+static uint16_t flush_bytes;
 
 uint8_t gfx_changed(void) {
 	return changed_mask;
 }
 
+uint16_t gfx_flush_bytes(void) {
+	return flush_bytes;
+}
+
+/* Only the columns from the first to the last changed one go out: on the
+ * bit-banged I2C of the kit a whole page costs some 5.5 ms, and most frames
+ * change a few columns of a page (a ball, a digit, a snake's head). */
 uint8_t gfx_flush(uint8_t force) {
 	uint8_t written = 0;
 
 	changed_mask = 0;
+	flush_bytes = 0;
 	for (uint8_t p = 0; p < KIT_LCD_PAGES; p++) {
-		if (force || memcmp(fb[p], shown[p], GFX_W) != 0) {
-			if (kit_lcd_write_page(p, fb[p])) {
-				memcpy(shown[p], fb[p], GFX_W);
+		const uint8_t* a = fb[p];
+		uint8_t* b = shown[p];
+		uint8_t x0 = 0;
+		uint8_t x1 = GFX_W - 1;
+
+		if (!force) {
+			while (x0 < GFX_W && a[x0] == b[x0]) {
+				x0++;
 			}
-			written++;
-			changed_mask |= (uint8_t)(1 << p);
+			if (x0 == GFX_W) {
+				continue;
+			}
+			while (a[x1] == b[x1]) {
+				x1--;
+			}
 		}
+		if (kit_lcd_write(p, x0, a + x0, (uint8_t)(x1 - x0 + 1))) {
+			memcpy(b + x0, a + x0, (size_t)(x1 - x0 + 1));
+		}
+		written++;
+		flush_bytes = (uint16_t)(flush_bytes + x1 - x0 + 1);
+		changed_mask |= (uint8_t)(1 << p);
 	}
 	return written;
 }

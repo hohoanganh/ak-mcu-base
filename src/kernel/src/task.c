@@ -212,11 +212,42 @@ void task_post_common_msg(task_id_t des_task_id, uint8_t sig, uint8_t* data, uin
 	task_post(des_task_id, s_msg);
 }
 
+#if AK_DYNAMIC_MSG_POOL_SIZE > 0
 void task_post_dynamic_msg(task_id_t des_task_id, uint8_t sig, uint8_t* data, uint32_t len) {
 	ak_msg_t* s_msg = get_dynamic_msg();
 	set_msg_sig(s_msg, sig);
 	set_data_dynamic_msg(s_msg, data, len);
 	task_post(des_task_id, s_msg);
+}
+#endif
+
+uint8_t task_post_pure_msg_try(task_id_t des_task_id, uint8_t sig) {
+	ak_msg_t* s_msg = get_pure_msg_try();
+
+	if (s_msg == AK_MSG_NULL) {
+		return 0;
+	}
+	set_msg_sig(s_msg, sig);
+	task_post(des_task_id, s_msg);
+	return 1;
+}
+
+uint8_t task_post_common_msg_try(task_id_t des_task_id, uint8_t sig, uint8_t* data, uint8_t len) {
+	ak_msg_t* s_msg;
+
+	/* checked before taking a message: an oversized post is a bug, not a
+	 * full pool, and must not leak the message it took */
+	if (len > AK_COMMON_MSG_DATA_SIZE) {
+		FATAL("MF", 0x24);
+	}
+	s_msg = get_common_msg_try();
+	if (s_msg == AK_MSG_NULL) {
+		return 0;
+	}
+	set_msg_sig(s_msg, sig);
+	set_data_common_msg(s_msg, data, len);
+	task_post(des_task_id, s_msg);
+	return 1;
 }
 
 void task_entry_interrupt() {

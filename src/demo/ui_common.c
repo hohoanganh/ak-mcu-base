@@ -12,6 +12,12 @@ uint8_t ui_autoplay;
 
 static uint32_t rng_state = 0x2545F491UL;
 
+static uint64_t scratch[UI_SCRATCH_SIZE / 8];
+
+void* ui_scratch(void) {
+	return scratch;
+}
+
 uint32_t ui_rand(void) {
 	/* xorshift32 */
 	rng_state ^= rng_state << 13;

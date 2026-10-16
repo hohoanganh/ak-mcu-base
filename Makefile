@@ -1,11 +1,17 @@
 # Shortcuts around CMake.
 #   make test     host unit tests + simulator end-to-end test
+#   make test-fast  the same with the power cut tests sampled (seconds, not a minute)
 #   make sim      build and run the simulator (bootloader + app)
 #   make stm32    build boot.elf/.bin, app.elf/.bin, app.img for STM32L151
 #                 (OTA staging on external SPI flash, APP 116K)
 #   make stm32-gateway    app as Modbus TCP (W5500 on J6) -> RS485 gateway
 #   make stm32-sign       same, images must carry an ECDSA P-256 signature (BOOT 16K)
 #   make stm32-internal   same, staging in internal flash (APP 58K)
+#   make stm32-mbmaster   app as Modbus RTU master (shell: mb read / mb write)
+#   make stm32-demo       AK Base Kit demo (PlatformIO env demo)
+#   make stm32-kit-tools  demo + SPI sniffer + nRF24 tools (env kit_tools)
+#   make stm32-remote     AK Base Kit 2.1 bench remote, below 52K (env remote)
+#   make stm32-all        every STM32L151 build above, as CI builds them
 #   make stm32g0          boot + app for STM32G071RB (NUCLEO-G071RB)
 #   make renode           run the STM32G071 build in the Renode emulator (tests/renode)
 #   make clean
@@ -13,7 +19,8 @@
 BUILD_HOST  := build/host
 BUILD_STM32 := build/stm32l151
 
-.PHONY: all host test sim stm32 stm32-gateway stm32-sign stm32-internal stm32g0 renode clean
+.PHONY: all host test test-fast sim stm32 stm32-gateway stm32-sign stm32-internal stm32-mbmaster stm32-demo \
+	stm32-kit-tools stm32-remote stm32-all stm32g0 renode clean
 
 all: test stm32
 
@@ -22,7 +29,11 @@ host:
 	cmake --build $(BUILD_HOST) -j
 
 test: host
-	cd $(BUILD_HOST) && ctest --output-on-failure
+	cd $(BUILD_HOST) && ctest --output-on-failure -LE fast_only
+
+# a few seconds instead of a minute: power cut tests sampled; make test before a commit
+test-fast: host
+	cd $(BUILD_HOST) && ctest --output-on-failure -LE full
 
 sim: host
 	$(BUILD_HOST)/ak_sim --flash $(BUILD_HOST)/ak_sim_flash.bin
@@ -52,6 +63,26 @@ renode: stm32g0
 stm32-internal:
 	cmake -S . -B $(BUILD_STM32)-internal -DAK_PORT=stm32l151 -DAK_STAGING=internal -DCMAKE_TOOLCHAIN_FILE=src/port/stm32l151/arm-none-eabi.cmake
 	cmake --build $(BUILD_STM32)-internal -j
+
+STM32_TC := -DAK_PORT=stm32l151 -DAK_STAGING=external -DCMAKE_TOOLCHAIN_FILE=src/port/stm32l151/arm-none-eabi.cmake
+
+stm32-mbmaster:
+	cmake -S . -B $(BUILD_STM32)-mbmaster $(STM32_TC) -DAK_MODBUS=master
+	cmake --build $(BUILD_STM32)-mbmaster -j
+
+stm32-demo:
+	cmake -S . -B $(BUILD_STM32)-demo $(STM32_TC) -DAK_APP=demo
+	cmake --build $(BUILD_STM32)-demo -j
+
+stm32-kit-tools:
+	cmake -S . -B $(BUILD_STM32)-kit_tools $(STM32_TC) -DAK_APP=kit_tools
+	cmake --build $(BUILD_STM32)-kit_tools -j
+
+stm32-remote:
+	cmake -S . -B $(BUILD_STM32)-remote $(STM32_TC) -DAK_APP=remote
+	cmake --build $(BUILD_STM32)-remote -j
+
+stm32-all: stm32 stm32-internal stm32-sign stm32-gateway stm32-mbmaster stm32-demo stm32-kit-tools stm32-remote
 
 clean:
 	rm -rf build .pio
