@@ -5,7 +5,7 @@ Lập ngày 15/10/2026. Khác hai tài liệu trước ([huong-toi-uu-tiep.md](h
 build lại mọi biến thể, đọc bảng ký hiệu, ghi khung hình của demo rồi tính. Mỗi hướng ghi bằng chứng, cách làm, cỡ
 việc (S = vài giờ, M = một hai ngày, L = nhiều ngày) và rủi ro. Số nào chưa đo trên kit thì ghi "chưa kiểm chứng".
 
-## Đã làm (15/10/2026, chưa phát hành, chưa chạy trên kit)
+## Đã làm (15/10/2026, chưa phát hành; thử trên kit 16/10/2026, xem cuối mục)
 
 | Mục | Kết quả | Kiểm bằng |
 |---|---|---|
@@ -17,6 +17,33 @@ việc (S = vài giờ, M = một hai ngày, L = nhiều ngày) và rủi ro. S�
 
 Số mới (gcc 13.2.1): app 21.056 B flash (−12 B dù thêm mã RS485, nhờ bỏ malloc/free), RAM heap + stack của
 demo 8.724 B (trước 8.236), kit_tools 4.060 B (trước 3.572), remote 11.104 B.
+
+### Thử trên kit (16/10/2026)
+
+AK Base Kit, bản `demo` của commit `6dc035a`, nạp qua UART (`ak_fw.py`). Thời gian khung do lệnh `ui` báo (thời gian
+vẽ và gửi một khung), trung bình 20 mẫu cách nhau 0,25 s, màn hình tự chơi; bản cũ là bản `main` trước đó (tự báo 1.3.8,
+gửi cả trang):
+
+| Màn hình | Bản cũ (ms) | Bản mới (ms) | Byte gửi mỗi khung (mới) |
+|---|---|---|---|
+| Snake | 3,8 | 1,4 | 5 |
+| Tetris | 15,4 | 3,8 | 15 |
+| Breakout | 8,8 | 1,6 | 4 |
+| Invaders | 15,5 | 3,7 | 32 |
+| Flappy | 35,0 | 16,9 | 360 |
+| Dino | 21,4 | 9,5 | 186 |
+| Pong RS485 | 13,8 | 2,6 | 29 |
+| Khối 3D | 28,6 | 8,9 | 107 |
+| Mê cung 3D | 31,8 | 19,4 | 381 |
+| System monitor | 15,7 | 8,3 | 73 |
+
+Modbus slave và OTA qua RS485 (bộ chuyển USB–RS485, 9600 baud): đọc/ghi và exception 2 đúng; master hỏi liên tục
+(ghi rồi đọc 4 thanh ghi, khoảng 70 ms một cặp) trong 30 s ở Tetris và 30 s ở khối 3D: 841 cặp, 0 lỗi, thời gian khung
+như khi không có tải (3,7 → 3,9 ms; 8,9 → 8,7 ms). OTA 58 KB qua RS485 mất 78 s, kit tự khởi động lại vào ảnh mới;
+ngắt giữa chừng thì firmware cũ chạy tiếp. Pong với `tools/pong_peer.py` chơi được. Nhật ký sự cố trống sau toàn bộ
+lượt thử, mức stack còn trống 7,7 KB. Lệnh `ui` không tính thời gian `mb_slave_poll()` nên chưa đo trực tiếp được phần
+CPU mà Modbus trả lại; số trên chỉ cho thấy tải Modbus không làm chậm khung. Bản `app` (không demo) và `app_mbmaster`
+chưa thử trên kit.
 
 Chưa làm và vì sao: I2C OLED 400 kHz (cần máy phân tích logic và kit), gửi RS485 bằng DMA (đã dùng ngắt TXE thay
 vì DMA: ở 9600 baud chỉ khoảng 1.000 ngắt/giây, khỏi phải kiểm bảng kênh DMA trên kit), master/gateway thành máy

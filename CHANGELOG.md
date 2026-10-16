@@ -20,12 +20,18 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 - **OLED chỉ gửi đoạn cột đã đổi.** `kit_lcd_write(page, x, data, n)` thay `kit_lcd_write_page()` (port STM32, web,
   `test_demo`); `gfx_flush()` gửi trong mỗi trang đổi từ cột đổi đầu tới cột đổi cuối, `gfx_flush_bytes()`, lệnh `ui`
   in số byte. Tính trên khung của `test_demo`: thời gian bus giảm 36 – 91 % tuỳ màn hình (pong 9,2 → 1,6 ms/khung).
-  Các khung hiện ra không đổi (16 cảnh ghi lại giống từng byte). **Chưa đo trên kit.**
+  Các khung hiện ra không đổi (16 cảnh ghi lại giống từng byte). Trên kit 16/10/2026 (bản `demo`, tự chơi, 20 mẫu
+  `ui` mỗi màn hình): thời gian khung Tetris 15,4 → 3,8 ms, Pong 13,8 → 2,6, Flappy 35,0 → 16,9, khối 3D 28,6 → 8,9,
+  mê cung 31,8 → 19,4 ms; bảng đủ trong `docs/huong-toi-uu-sau-v1.3.9.md`.
 - **Modbus slave không chặn.** HAL RS485 thêm `hal_rs485_send()` (gửi bằng ngắt TXE, ngắt TC nhả chân hướng),
   `hal_rs485_tx_busy()`, `hal_rs485_rx_idle_ms()`; `hal_rs485_write()` giữ nguyên cách dùng. `mb_slave_poll()` chỉ gọi
   nanoMODBUS khi đường dây đã im t3.5 (5 ms ở 9600) và không đang gửi, nên không còn giữ CPU 146 – 266 ms mỗi khung.
-  COMMIT của OTA: `task_fw` cài và reset sau khi câu trả lời ra hết. Master và gateway không đổi. **Chưa chạy trên kit:
-  phải thử lại đọc/ghi và OTA qua RS485 trước khi phát hành.**
+  COMMIT của OTA: `task_fw` cài và reset sau khi câu trả lời ra hết. Master và gateway không đổi. Thử trên kit
+  16/10/2026 (bản `demo`, bộ chuyển USB–RS485, 9600 baud): đọc/ghi 16..19 đúng, exception 2 khi vắt hai khối, thanh
+  ghi không có, ghi vùng chỉ đọc; 841 cặp ghi + đọc liên tục trong 60 s không lỗi, không sai dữ liệu, thời gian khung
+  không đổi; OTA `ak_mb.py flash` 58 KB trong 78 s, kit tự chạy lại; ngắt OTA giữa chừng thì firmware đang chạy không
+  bị đụng; Pong qua RS485 (`hal_rs485_write()` nay gửi bằng ngắt) chơi được với `pong_peer.py`. Bản `app` và master
+  chưa thử trên kit.
 - **Kernel:** `task_post_pure_msg_try()`, `task_post_common_msg_try()` (pool đầy trả 0 thay vì FATAL);
   `AK_DYNAMIC_MSG_POOL_SIZE=0` bỏ message động cùng `malloc/free`. App của base build với 0 (`APP_KERNEL_DEFS`,
   `platformio.ini`): app −328 B flash, +148 B RAM trống. Test: `test_kernel` thêm 2 ca, `test_kernel_nodyn`.
