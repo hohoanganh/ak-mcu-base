@@ -116,6 +116,7 @@ File `.img` và `.bin` của mọi bản: [Releases](https://github.com/hohoanga
 | Modbus RTU trên RS485: slave, master, OTA | [docs/modbus.md](docs/modbus.md) |
 | Port sang chip khác; port thứ hai STM32G071 chạy trong Renode | [docs/porting.md](docs/porting.md) |
 | Hướng phát triển tiếp: rollback, ký số, Modbus TCP, log flash, chip thứ hai | [docs/huong-phat-trien.md](docs/huong-phat-trien.md) · [tối ưu nền](docs/huong-toi-uu-tiep.md) · [tối ưu theo số đo, sau v1.3.9](docs/huong-toi-uu-sau-v1.3.9.md) |
+| Phương án dùng base làm tay điều khiển drone và FC cho drone chổi than cỡ nhỏ | [docs/drone-ak-mcu.md](docs/drone-ak-mcu.md) |
 | Biết bản nào sửa lỗi gì | [CHANGELOG.md](CHANGELOG.md) |
 | Cho AI assistant tra tài liệu kernel AK | [docs/ak-mcp-docs-server.md](docs/ak-mcp-docs-server.md) — repo có sẵn [.mcp.json](.mcp.json) |
 
