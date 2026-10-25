@@ -61,6 +61,8 @@ extern uint8_t kit_sht_read(int16_t* t10, uint16_t* rh10);
  * len bytes starting at register reg, 1 on success. */
 extern uint8_t kit_i2c_probe(uint8_t addr);
 extern uint8_t kit_i2c_read(uint8_t addr, uint8_t reg, uint8_t* buf, uint8_t len);
+/* one register write, 1 if acknowledged (stm32l151 port only: fcb imu) */
+extern uint8_t kit_i2c_write(uint8_t addr, uint8_t reg, uint8_t val);
 /* Releases both lines and samples them n times: how often each was high and
  * how many times it changed. */
 extern void kit_i2c_watch(uint32_t n, uint32_t* scl_high, uint32_t* sda_high, uint32_t* scl_edges,

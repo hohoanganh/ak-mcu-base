@@ -362,6 +362,17 @@ uint8_t kit_i2c_read(uint8_t addr, uint8_t reg, uint8_t* buf, uint8_t len) {
 	return 1;
 }
 
+uint8_t kit_i2c_write(uint8_t addr, uint8_t reg, uint8_t val) {
+	uint8_t ok;
+
+	i2c_start(&bus_rtc);
+	ok = i2c_tx(&bus_rtc, (uint8_t)(addr << 1));
+	ok &= i2c_tx(&bus_rtc, reg);
+	ok &= i2c_tx(&bus_rtc, val);
+	i2c_stop(&bus_rtc);
+	return ok;
+}
+
 /* releases both lines and samples them n times: how often each one was high
  * and how many times it changed. A poor man's logic probe. */
 void kit_i2c_watch(uint32_t n, uint32_t* scl_high, uint32_t* sda_high, uint32_t* scl_edges, uint32_t* sda_edges) {

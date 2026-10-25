@@ -240,6 +240,9 @@ static void cmd_loader(const char* args) {
 	task_post_pure_msg(TASK_FW_ID, FW_SIG_LOADER);
 }
 
+#if defined(APP_FC_BENCH)
+extern void cmd_fcb(const char* args);		/* port/stm32l151/fc_bench.c */
+#endif
 #if defined(APP_RF_TEST)
 extern void cmd_rf(const char* args);		/* port/stm32l151/rf_test.c */
 #endif
@@ -272,6 +275,9 @@ static const shell_cmd_t shell_cmds[] = {
 #endif
 #if defined(APP_RF_TEST)
 	{ "rf",		"nRF24 listen: rf | rf <ch> <rate> [crc]",	cmd_rf	},
+#endif
+#if defined(APP_FC_BENCH)
+	{ "fcb",	"flight control bench: fcb | fcb imu | fcb jit <s> [load]",	cmd_fcb	},
 #endif
 #if defined(APP_REMOTE)
 	{ "rc",		"remote: rc | rc 1|2|3|h | rc go <n> | rc on|off | rc p <hex> | rc wd <ms>",	cmd_rc	},

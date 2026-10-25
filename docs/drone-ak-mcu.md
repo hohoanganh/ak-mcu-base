@@ -155,6 +155,25 @@ chiều. Sau đó bản web có thể vẽ drone 3D bay theo đúng mã FC, như
 | **P3** | Bo FC riêng 1S cho khung 65–75 mm (L151 hoặc G071, IMU SPI, nRF24, 4 FET); bay acro rồi angle | L | Treo lơ lửng ổn định trong nhà |
 | **P4** | Telemetry đầy đủ, chỉnh PID từ tay điều khiển, nhận CRSF (ELRS), log bay vào flash | M | |
 
+### 6.1 P0: mã đo đã có (25/10/2026), chưa chạy trên kit
+
+- **Thuật toán** ở `src/fc/fc_ctrl.c`, C thuần, không libm: lọc gyro PT1 90 Hz, Mahony, PID góc và tốc độ góc (D trên
+  phép đo, lọc D 100 Hz, chặn I), trộn QUADX theo thứ tự Betaflight. Hai bản: float (`fc_f_step`, acro hoặc angle) và
+  Q16.16 (`fc_q_step`, acro). `tests/test_fc.c` kiểm chiều trộn, Mahony hội tụ đúng góc và quay đúng chiều gyro, chế
+  độ angle kéo về thăng bằng, ga 0 thì tắt động cơ, bản Q16 lệch bản float tối đa 1‰ trên 20.000 bước.
+- **Lệnh `fcb`** trong bản `kit_tools` (`port/stm32l151/fc_bench.c`):
+
+| Lệnh | Đo gì | Qua P0 khi |
+|---|---|---|
+| `fcb` | Chu kỳ CPU của một bước (DWT->CYCCNT), 500 lần mỗi bản: float angle, float acro, Q16 acro | float angle trung bình ≤ 12.800 chu kỳ (40 % của 1 ms) |
+| `fcb imu` | Tìm IMU ở 0x68/0x69 trên I2C1 (J7/J9), nhận MPU-6050/6500/9250, ICM-20602/20689, ICM-42688-P; đo 200 lần đọc 14 byte qua I2C bit-bang của kit | Chỉ để biết: FC thật dùng I2C phần cứng hoặc SPI (lệnh in thời gian ước tính) |
+| `fcb jit <s> [load]` | Ngắt TIM6 1 kHz ưu tiên cao nhất chạy `s` giây trong lúc demo vẫn chạy; `load` chạy luôn bước float angle trong ngắt. `fcb jit` in kết quả: chu kỳ ngắn nhất/dài nhất, số chu kỳ lệch > 10/50/100 µs, thời gian ngắt dài nhất | chu kỳ dài nhất − 1000 ≤ 50 µs |
+
+Cách thử: nạp bản `kit_tools` (OTA: `ak_fw.py --port COMx flash .../app.img`), rồi trong console: `fcb`; cắm IMU vào J7
+(nếu có) rồi `fcb imu`; mở một màn hình game, `fcb jit 30 load`, chờ 30 s, `fcb jit`. Tiện thêm: `ui stream` trong lúc đo
+để console cũng bận. Ngắt TIM6 không post message, chỉ ghi biến đếm riêng. RAM của `kit_tools` còn 3.616 B cho
+heap + stack (ngân sách CI 3.072 B).
+
 ## 7. Nguồn
 
 - Silverware cho H8 mini bo xanh — STM32F030, XN297L, `LOOPTIME 1000`, PWM 16 kHz, giao thức Bayang:

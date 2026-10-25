@@ -7,6 +7,14 @@ console lúc khởi động).
 Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 [docs/tinh-nang-moi-v1.2-v1.3.md](legacy/docs/tinh-nang-moi-v1.2-v1.3.md).
 
+## Chưa phát hành
+
+- **Đo khả năng làm bộ điều khiển bay (P0 của `docs/drone-ak-mcu.md`).** Lõi điều khiển `src/fc/fc_ctrl.c` (lọc gyro,
+  Mahony, PID góc và tốc độ góc, trộn QUADX; bản float và Q16, không libm), test `tests/test_fc.c` (9 ca). Lệnh shell
+  `fcb` trong bản `kit_tools` (`port/stm32l151/fc_bench.c`): chu kỳ CPU của một bước, đọc IMU trên I2C1, độ đều của ngắt
+  TIM6 1 kHz khi demo đang chạy. `kit_i2c_write()` mới trong `kit.c`; vector TIM6 trong `startup.c`. Bản `kit_tools`
+  +6,7 KB flash, RAM còn 3.616 B cho heap + stack. **Chưa chạy trên kit.**
+
 ## ak-mcu-base v1.3.10 — 16/10/2026
 
 App **1.3.10**, bootloader **1.3.0** (không đổi). Nâng cấp từ v1.3.9 qua OTA (UART hoặc RS485) được, không cần ST-Link.

@@ -51,9 +51,12 @@ else()
 endif()
 
 # app variant (AK_APP): sources and include folders on top of the sample app
-if(AK_APP STREQUAL "demo" OR AK_APP STREQUAL "kit_tools")
+if(AK_APP STREQUAL "demo")
 	set(VARIANT_SRC ${DEMO_SRC} ${PORT_DIR}/kit.c ${PORT_DIR}/rf_test.c)
 	set(VARIANT_INC ${SRC}/demo)
+elseif(AK_APP STREQUAL "kit_tools")
+	set(VARIANT_SRC ${DEMO_SRC} ${PORT_DIR}/kit.c ${PORT_DIR}/rf_test.c ${FC_SRC} ${PORT_DIR}/fc_bench.c)
+	set(VARIANT_INC ${SRC}/demo ${SRC}/fc)
 elseif(AK_APP STREQUAL "remote")
 	set(VARIANT_SRC ${SRC}/demo/gfx.c ${REMOTE_SRC} ${PORT_DIR}/kit.c ${PORT_DIR}/rf_test.c)
 	set(VARIANT_INC ${SRC}/demo ${SRC}/remote)

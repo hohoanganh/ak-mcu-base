@@ -55,6 +55,14 @@ add_test(NAME fw_fast COMMAND test_fw)
 set_tests_properties(fw PROPERTIES LABELS full)
 set_tests_properties(fw_fast PROPERTIES LABELS fast_only ENVIRONMENT AK_TEST_FAST=1)
 
+# --- flight control core (src/fc): algorithms only, timing is measured on the kit ---
+add_executable(test_fc ${ROOT}/tests/test_fc.c ${FC_SRC})
+target_include_directories(test_fc PRIVATE ${ROOT}/tests ${SRC}/fc)
+target_compile_options(test_fc PRIVATE ${HOST_WARN} -Wdouble-promotion -fsanitize=address,undefined -g)
+target_link_options(test_fc PRIVATE -fsanitize=address,undefined)
+target_link_libraries(test_fc PRIVATE m)
+add_test(NAME fc COMMAND test_fc)
+
 # --- Modbus services (vendor library built without our warning set) ---
 add_library(nanomodbus_host STATIC ${ROOT}/third_party/nanomodbus/nanomodbus.c)
 target_include_directories(nanomodbus_host PUBLIC ${ROOT}/third_party/nanomodbus)

@@ -103,19 +103,21 @@ endif()
 # PlatformIO envs of the same name build the same thing):
 #   base       the sample app alone
 #   demo       AK Base Kit demo (src/demo, OLED + buttons + buzzer)
-#   kit_tools  demo + SPI sniffer and nRF24 bench tools
+#   kit_tools  demo + SPI sniffer, nRF24 and flight control bench tools
 #   remote     AK Base Kit 2.1 bench remote (src/remote), must fit 52K
 set(AK_APP "base" CACHE STRING "App variant: base | demo | kit_tools | remote")
 # src/demo is a folder of screens that grows; PlatformIO takes the whole
 # folder too, so the list cannot drift between the two builds
 file(GLOB DEMO_SRC CONFIGURE_DEPENDS ${SRC}/demo/*.c)
 file(GLOB REMOTE_SRC CONFIGURE_DEPENDS ${SRC}/remote/*.c)
+# flight control core (docs/drone-ak-mcu.md): kit_tools measures it, test_fc checks it
+file(GLOB FC_SRC CONFIGURE_DEPENDS ${SRC}/fc/*.c)
 if(AK_APP STREQUAL "base")
 	set(VARIANT_DEFS "")
 elseif(AK_APP STREQUAL "demo")
 	set(VARIANT_DEFS APP_KIT_DEMO)
 elseif(AK_APP STREQUAL "kit_tools")
-	set(VARIANT_DEFS APP_KIT_DEMO APP_KIT_SPI_SNIFF APP_RF_TEST)
+	set(VARIANT_DEFS APP_KIT_DEMO APP_KIT_SPI_SNIFF APP_RF_TEST APP_FC_BENCH)
 elseif(AK_APP STREQUAL "remote")
 	set(VARIANT_DEFS APP_RF_TEST APP_REMOTE KIT_LCD_SSD1306)
 else()
