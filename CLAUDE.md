@@ -53,7 +53,7 @@ pio run -e boot -e app -e app_mbmaster -e app_gateway -e demo   # .pio/build/<en
 pio run -e kit_tools                               # demo + lệnh spi (bắt SPI trên J6) và rf (nRF24)
 pio run -e remote                                  # kit 2.1 (64K): tay điều khiển thử nghiệm, OLED + 3 nút + nRF24 (src/remote)
 make stm32-all                                     # mọi bản STM32L151 bằng CMake như CI: stm32, -internal, -sign,
-                                                   # -gateway, -mbmaster, -demo, -kit-tools, -remote, -rc-tx, -rc-rx
+                                                   # -gateway, -mbmaster, -demo, -kit-tools, -remote, -rc-tx, -rc-rx, -fc
 make stm32g0 renode                                # port STM32G071, rồi chạy trong Renode (tests/renode)
 
 # bản chạy trên trình duyệt, ghi vào docs/play/ (cần Emscripten)

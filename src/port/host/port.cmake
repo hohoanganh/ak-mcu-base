@@ -57,11 +57,22 @@ set_tests_properties(fw_fast PROPERTIES LABELS fast_only ENVIRONMENT AK_TEST_FAS
 
 # --- flight control core (src/fc): algorithms only, timing is measured on the kit ---
 add_executable(test_fc ${ROOT}/tests/test_fc.c ${FC_SRC})
-target_include_directories(test_fc PRIVATE ${ROOT}/tests ${SRC}/fc)
+target_include_directories(test_fc PRIVATE ${ROOT}/tests ${SRC}/fc ${SRC}/rc)
 target_compile_options(test_fc PRIVATE ${HOST_WARN} -Wdouble-promotion -fsanitize=address,undefined -g)
 target_link_options(test_fc PRIVATE -fsanitize=address,undefined)
 target_link_libraries(test_fc PRIVATE m)
 add_test(NAME fc COMMAND test_fc)
+
+# the controller flown in a simulated quadcopter, at 1 kHz and at the 500 Hz of the fc build
+foreach(hz 1000 500)
+	add_executable(test_fc_sim_${hz} ${ROOT}/tests/test_fc_sim.c ${FC_SRC})
+	target_include_directories(test_fc_sim_${hz} PRIVATE ${ROOT}/tests ${SRC}/fc ${SRC}/rc)
+	target_compile_definitions(test_fc_sim_${hz} PRIVATE FC_LOOP_HZ=${hz})
+	target_compile_options(test_fc_sim_${hz} PRIVATE ${HOST_WARN} -fsanitize=address,undefined -g)
+	target_link_options(test_fc_sim_${hz} PRIVATE -fsanitize=address,undefined)
+	target_link_libraries(test_fc_sim_${hz} PRIVATE m)
+	add_test(NAME fc_sim_${hz} COMMAND test_fc_sim_${hz})
+endforeach()
 
 # --- radio link of the remote (src/rc): packets, hopping, arming, sticks ---
 add_executable(test_rc ${ROOT}/tests/test_rc.c ${RC_SRC} ${SRC}/common/crc.c)

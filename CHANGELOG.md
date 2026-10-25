@@ -21,6 +21,11 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
   ShockBurst với telemetry trong ACK. Cần gạt từ ADS1115 trên J7 hoặc lệnh `link stick` (`tools/rc_pc_sticks.py`).
   `gfx_flush_step()` đẩy OLED từng mẩu nhỏ; `kit_i2c_write_n()`. **Chưa chạy trên kit; bản PlatformIO chưa build được
   trong môi trường này (CMake build sạch).**
+- **FC trên bàn (P2).** Bản `fc` (`pio run -e fc`, `make stm32-fc`, `AK_APP=fc`): `rc_rx` + ngắt TIM6 500 Hz ưu tiên 0 đọc
+  MPU-6050 (I2C1), chạy `src/fc/fc_loop.c` (xoay trục IMU, hiệu chỉnh gyro lúc đứng yên, cổng an toàn arm/gói cuối
+  < 200 ms/IMU/gyro ngay trong ngắt, giới hạn công suất), xuất PWM 16 kHz ở PA0, PB10, PB11, PB9 (`port/stm32l151/fc_hw.c`).
+  Lệnh `fc` (trạng thái, thử từng động cơ, giới hạn, hiệu chỉnh lại). `tests/test_fc_sim.c` bay vòng điều khiển trong một
+  quad 65 mm mô phỏng ở 1 kHz và 500 Hz. `FC_LOOP_HZ` cấu hình được, `fc_f_reset_pid()`. **Chưa chạy trên kit.**
 
 ## ak-mcu-base v1.3.10 — 16/10/2026
 

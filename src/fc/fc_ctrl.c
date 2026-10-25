@@ -8,8 +8,10 @@
 #define GYRO_RAD_PER_LSB	(0.0010642f)	/* (pi / 180) / 16.4 */
 #define STICK_RATE			(0.02f)			/* rad/s per stick unit: 500 -> 10 rad/s */
 #define STICK_ANGLE			(0.0012f)		/* rad per stick unit: 500 -> 0.6 rad (34 deg) */
-#define GYRO_ALPHA			(0.3612f)		/* PT1 at 90 Hz, 1 kHz */
-#define DTERM_ALPHA			(0.3859f)		/* PT1 at 100 Hz, 1 kHz */
+/* first order low pass at fc Hz for the loop rate (0.361 for 90 Hz at 1 kHz) */
+#define PT1_ALPHA(fc)		(FC_DT / (1.0f / (6.2831853f * (fc)) + FC_DT))
+#define GYRO_ALPHA			PT1_ALPHA(90.0f)
+#define DTERM_ALPHA			PT1_ALPHA(100.0f)
 #define I_LIMIT				(200.0f)		/* permille */
 #define PID_LIMIT			(400.0f)		/* permille */
 #define MAHONY_TWO_KP		(1.0f)
@@ -71,6 +73,14 @@ void fc_f_init(fc_f_t* s) {
 		s->rate[a].kd = pid_gains[a][2];
 	}
 	s->angle_kp = ANGLE_KP;
+}
+
+void fc_f_reset_pid(fc_f_t* s) {
+	for (int a = 0; a < 3; a++) {
+		s->rate[a].i = 0.0f;
+		s->rate[a].d_lpf = 0.0f;
+		s->rate[a].prev_meas = s->gyro[a];
+	}
 }
 
 /* Mahony (Madgwick's formulation): gyro integration corrected towards the
