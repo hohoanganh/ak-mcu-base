@@ -103,21 +103,31 @@ endif()
 # PlatformIO envs of the same name build the same thing):
 #   base       the sample app alone
 #   demo       AK Base Kit demo (src/demo, OLED + buttons + buzzer)
-#   kit_tools  demo + SPI sniffer and nRF24 bench tools
+#   kit_tools  demo + SPI sniffer, nRF24 and flight control bench tools
 #   remote     AK Base Kit 2.1 bench remote (src/remote), must fit 52K
-set(AK_APP "base" CACHE STRING "App variant: base | demo | kit_tools | remote")
+#   rc_tx      remote with sticks for the ak-mcu receiver (src/rc, nRF24 in J6)
+#   rc_rx      that receiver, the radio half of the future flight controller
+set(AK_APP "base" CACHE STRING "App variant: base | demo | kit_tools | remote | rc_tx | rc_rx")
 # src/demo is a folder of screens that grows; PlatformIO takes the whole
 # folder too, so the list cannot drift between the two builds
 file(GLOB DEMO_SRC CONFIGURE_DEPENDS ${SRC}/demo/*.c)
 file(GLOB REMOTE_SRC CONFIGURE_DEPENDS ${SRC}/remote/*.c)
+# flight control core (docs/drone-ak-mcu.md): kit_tools measures it, test_fc checks it
+file(GLOB FC_SRC CONFIGURE_DEPENDS ${SRC}/fc/*.c)
+# radio link of the remote (docs/drone-ak-mcu.md, P1): rc_tx / rc_rx builds, test_rc
+file(GLOB RC_SRC CONFIGURE_DEPENDS ${SRC}/rc/*.c)
 if(AK_APP STREQUAL "base")
 	set(VARIANT_DEFS "")
 elseif(AK_APP STREQUAL "demo")
 	set(VARIANT_DEFS APP_KIT_DEMO)
 elseif(AK_APP STREQUAL "kit_tools")
-	set(VARIANT_DEFS APP_KIT_DEMO APP_KIT_SPI_SNIFF APP_RF_TEST)
+	set(VARIANT_DEFS APP_KIT_DEMO APP_KIT_SPI_SNIFF APP_RF_TEST APP_FC_BENCH)
 elseif(AK_APP STREQUAL "remote")
 	set(VARIANT_DEFS APP_RF_TEST APP_REMOTE KIT_LCD_SSD1306)
+elseif(AK_APP STREQUAL "rc_tx")
+	set(VARIANT_DEFS APP_RC_TX)
+elseif(AK_APP STREQUAL "rc_rx")
+	set(VARIANT_DEFS APP_RC_RX)
 else()
 	message(FATAL_ERROR "Unknown AK_APP: ${AK_APP}")
 endif()

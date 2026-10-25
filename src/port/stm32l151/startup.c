@@ -37,6 +37,7 @@ void debug_mon_handler(void)	__attribute__((weak, alias("default_handler")));
 void pendsv_handler(void)		__attribute__((weak, alias("default_handler")));
 void usart2_irq_handler(void)	__attribute__((weak, alias("default_handler")));	/* rs485.c, if built */
 void exti4_irq_handler(void)	__attribute__((weak, alias("default_handler")));	/* kit.c SPI sniffer, if built */
+void tim6_irq_handler(void)		__attribute__((weak, alias("default_handler")));	/* fc_bench.c, if built */
 
 port_noinit_t port_noinit __attribute__((section(".noinit")));
 
@@ -100,7 +101,7 @@ void (* const isr_vector[])(void) = {
 	default_handler,	/* 40 EXTI15_10 */
 	default_handler,	/* 41 RTC_Alarm */
 	default_handler,	/* 42 USB_FS_WKUP */
-	default_handler,	/* 43 TIM6 */
+	tim6_irq_handler,	/* 43 TIM6 */
 	default_handler,	/* 44 TIM7 */
 };
 

@@ -266,8 +266,9 @@ liệu: hỏi xem trên bus có gì, nghe hai con chip nói gì với nhau, rồ
 | `i2c` | Quét cổng I2C1 (J7, J9), đọc thanh ghi | mọi bản demo |
 | `spi` | Bắt gói SPI trên các chân của J6 | `pio run -e kit_tools` |
 | `rf` | Nghe và phát bằng mô-đun nRF24L01+ cắm ở J6 | `pio run -e kit_tools` |
+| `fcb` | Đo khả năng làm bộ điều khiển bay: thời gian một bước điều khiển, đọc IMU, độ đều của ngắt 1 kHz ([drone-ak-mcu.md](drone-ak-mcu.md), mục 6.1) | `pio run -e kit_tools` |
 
-Bản `kit_tools` là bản demo cộng hai công cụ sau. Chúng tách riêng vì bộ đệm bắt SPI chiếm 5,6 KB trong 16 KB RAM
+Bản `kit_tools` là bản demo cộng các công cụ sau. Chúng tách riêng vì bộ đệm bắt SPI chiếm 5,6 KB trong 16 KB RAM
 (bản demo dùng 7,6 KB, bản `kit_tools` 12,3 KB).
 
 ### `i2c`: trên bus có gì

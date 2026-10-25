@@ -11,6 +11,8 @@
 #   make stm32-demo       AK Base Kit demo (PlatformIO env demo)
 #   make stm32-kit-tools  demo + SPI sniffer + nRF24 tools (env kit_tools)
 #   make stm32-remote     AK Base Kit 2.1 bench remote, below 52K (env remote)
+#   make stm32-rc-tx      remote with sticks + nRF24 in J6 (env rc_tx, docs/drone-ak-mcu.md P1)
+#   make stm32-rc-rx      its receiver, radio half of the future flight controller (env rc_rx)
 #   make stm32-all        every STM32L151 build above, as CI builds them
 #   make stm32g0          boot + app for STM32G071RB (NUCLEO-G071RB)
 #   make renode           run the STM32G071 build in the Renode emulator (tests/renode)
@@ -20,7 +22,7 @@ BUILD_HOST  := build/host
 BUILD_STM32 := build/stm32l151
 
 .PHONY: all host test test-fast sim stm32 stm32-gateway stm32-sign stm32-internal stm32-mbmaster stm32-demo \
-	stm32-kit-tools stm32-remote stm32-all stm32g0 renode clean
+	stm32-kit-tools stm32-remote stm32-rc-tx stm32-rc-rx stm32-all stm32g0 renode clean
 
 all: test stm32
 
@@ -82,7 +84,16 @@ stm32-remote:
 	cmake -S . -B $(BUILD_STM32)-remote $(STM32_TC) -DAK_APP=remote
 	cmake --build $(BUILD_STM32)-remote -j
 
-stm32-all: stm32 stm32-internal stm32-sign stm32-gateway stm32-mbmaster stm32-demo stm32-kit-tools stm32-remote
+stm32-rc-tx:
+	cmake -S . -B $(BUILD_STM32)-rc_tx $(STM32_TC) -DAK_APP=rc_tx
+	cmake --build $(BUILD_STM32)-rc_tx -j
+
+stm32-rc-rx:
+	cmake -S . -B $(BUILD_STM32)-rc_rx $(STM32_TC) -DAK_APP=rc_rx
+	cmake --build $(BUILD_STM32)-rc_rx -j
+
+stm32-all: stm32 stm32-internal stm32-sign stm32-gateway stm32-mbmaster stm32-demo stm32-kit-tools stm32-remote \
+	stm32-rc-tx stm32-rc-rx
 
 clean:
 	rm -rf build .pio
