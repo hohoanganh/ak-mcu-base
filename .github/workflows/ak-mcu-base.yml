@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Toolchain
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi
-      - name: Build every STM32L151 variant (staging, signed, Modbus roles, demo, kit_tools, remote, rc_tx, rc_rx)
+      - name: Build every STM32L151 variant (staging, signed, Modbus roles, demo, kit_tools, remote, rc_tx, rc_rx, fc)
         run: |
           arm-none-eabi-gcc --version | head -1
           pip install cryptography
@@ -64,7 +64,7 @@ jobs:
           # RAM: what .data/.bss leave for heap + stack (the linker already keeps
           # 2K of stack); below 3K a deeper call chain overwrites the heap
           for d in stm32l151 stm32l151-internal stm32l151-sign stm32l151-gateway stm32l151-mbmaster \
-                   stm32l151-demo stm32l151-kit_tools stm32l151-remote stm32l151-rc_tx stm32l151-rc_rx; do
+                   stm32l151-demo stm32l151-kit_tools stm32l151-remote stm32l151-rc_tx stm32l151-rc_rx stm32l151-fc; do
             heap=$(arm-none-eabi-size -A $d/app.elf | awk '$1 == "._heap" { print $2 }')
             free=$((heap + 2048)); echo "$d/app.elf: $free B for heap + stack"
             [ "$free" -ge 3072 ] || { echo "$d: less than 3072 B of RAM left for heap + stack"; exit 1; }

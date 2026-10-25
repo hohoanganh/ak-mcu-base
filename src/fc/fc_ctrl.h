@@ -28,7 +28,9 @@ extern "C"
 
 #include <stdint.h>
 
-#define FC_LOOP_HZ			(1000)
+#ifndef FC_LOOP_HZ
+#define FC_LOOP_HZ			(1000)	/* the fc build runs 500: the IMU is read over bit-banged I2C */
+#endif
 #define FC_MOTOR_MAX		(1000)
 
 typedef struct {
@@ -74,8 +76,11 @@ typedef struct {
 } fc_q_t;
 
 extern void fc_f_init(fc_f_t* s);
-/* one 1 ms step; angle = 1: sticks are angles (self level), 0: rates (acro) */
+/* one step of 1 / FC_LOOP_HZ s; angle = 1: sticks are angles (self level), 0: rates (acro) */
 extern void fc_f_step(fc_f_t* s, const fc_imu_t* imu, const fc_rc_t* rc, uint8_t angle, uint16_t motor[4]);
+
+/* integrators and D history to zero, attitude kept (disarmed, throttle 0) */
+extern void fc_f_reset_pid(fc_f_t* s);
 
 extern void fc_q_init(fc_q_t* s);
 extern void fc_q_step(fc_q_t* s, const fc_imu_t* imu, const fc_rc_t* rc, uint16_t motor[4]);

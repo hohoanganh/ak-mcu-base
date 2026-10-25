@@ -226,6 +226,56 @@ nối 3V3 và GND.
 
 **Phím của bên thu:** B3 giữ 1 s: bind.
 
+### 6.3 P2: FC trên bàn (25/10/2026), chưa chạy trên kit
+
+**P2 là gì.** Biến bên thu `rc_rx` thành bộ điều khiển bay thật nhưng chưa bay. Bên thu nhận lệnh từ tay điều khiển P1. Một
+ngắt timer 500 Hz đọc IMU, ước lượng góc, chạy PID và xuất PWM ra 4 động cơ **không lắp cánh quạt**. Qua P2 khi:
+nghiêng kit bằng tay thì động cơ phía bị hạ quay nhanh lên; tắt tay điều khiển thì động cơ dừng trong 200 ms; mô phỏng trên
+máy tính cho thấy vòng điều khiển ổn định.
+
+**Bản build `fc`** (`pio run -e fc` / `make stm32-fc`): `rc_rx` + ngắt điều khiển. 33,7 KB flash, RAM còn 10,8 KB.
+
+| Phần | File | Việc |
+|---|---|---|
+| Một chu kỳ điều khiển | `src/fc/fc_loop.c` | Xoay trục IMU về thân máy; đo độ lệch gyro lúc đứng yên (gyro và gia tốc kế không đổi trong 1 s, độ lệch < 30°/s); cổng an toàn chạy **trong ngắt**: động cơ chỉ quay khi đã arm, gói cuối < 200 ms, IMU trả lời, gyro đã hiệu chỉnh; xoá tích phân khi ga 0; giới hạn công suất |
+| Phần cứng | `port/stm32l151/fc_hw.c` | PWM 16 kHz (2.000 bước) ở PA0, PB10, PB11 (TIM2) và PB9 (TIM4); MPU-6050 qua I2C1; ngắt TIM6 500 Hz ưu tiên 0; đếm thời gian ngắt và số lần vượt chu kỳ; `fc_hw_watch()` tắt PWM nếu ngắt ngừng 20 ms |
+| Shell | `src/fc/fc_shell.c` | `fc`, `fc cal`, `fc limit <n>`, `fc motor <1-4> <n>` |
+| Mô phỏng | `tests/test_fc_sim.c` | Quad 65 mm, 30 g, 4 × 0,12 N, trễ động cơ 20 ms, nhiễu và độ lệch gyro; chạy ở 1 kHz và 500 Hz |
+
+**Kết quả mô phỏng** (500 Hz; 1 kHz gần như y hệt):
+- Treo lơ lửng, một cú giật 6 rad/s (roll) và 4 rad/s (pitch): sau 1 s lệch còn −0,034 / 0,028 rad, sau 3 s còn
+  −0,010 / 0,008 rad.
+- Cần gạt angle 0,3 / −0,15 rad: đạt 0,297 / −0,137 rad.
+- Acro: roll 3 rad/s → 3,12 rad/s; yaw 2 rad/s → 2,07 rad/s.
+- Hiệu chỉnh gyro đo đúng độ lệch (±2 count).
+- Mô phỏng đã bắt một lỗi: quay đều trong lúc hiệu chỉnh từng bị nhận nhầm là đứng yên (gyro đọc không đổi). Giờ
+  gia tốc kế cũng phải đứng yên.
+
+**Đấu nối trên bàn** (kit 3.0, kèm nRF24 ở J6 như P1):
+
+| Thứ | Chân | Ghi chú |
+|---|---|---|
+| IMU MPU-6050 (GY-521) | J7 / J9: 3V3, GND, SDA PB7, SCL PB6 | Mũi tên X của mô-đun chỉ về phía trước, chip ngửa lên (`FC_ORIENT_DEFAULT`) |
+| Động cơ RR (sau phải) | PA0 (J13) | Mỗi động cơ: MOSFET kênh N mức logic (AO3400, Si2302), cổng qua 100 Ω, điện trở kéo xuống 10 kΩ, diode ngược song song động cơ |
+| Động cơ FR (trước phải) | PB10 (J4) | Nguồn động cơ lấy từ pin 1S riêng, **chung GND với kit** |
+| Động cơ RL (sau trái) | PB11 (J4) | Chưa có động cơ: nối LED + điện trở để xem độ sáng |
+| Động cơ FL (trước trái) | PB9 (J13) | |
+
+Chân và chức năng thay thế lấy từ bảng của STM32L151 (AF1 = TIM2, AF2 = TIM4): **đối chiếu datasheet trước khi đấu**.
+PB10/PB11 là UART3 ở J4, dùng cho PWM thì mất UART3.
+
+**Thử, theo thứ tự, không lắp cánh quạt:**
+1. Nạp bản `fc` vào kit B (thay `rc_rx`), để yên 1 s cho gyro. `fc` phải báo `off`, `IMU ok`, `gyro calibrated`.
+2. `fc` khi nghiêng kit: nghiêng phải thì `roll` dương, chúi mũi thì `pitch` dương. Nếu sai thì phải sửa `FC_ORIENT_DEFAULT`
+   trong `src/fc/fc_loop.h`.
+3. `fc motor 1 200` … `fc motor 4 200`: đúng động cơ quay (1 RR, 2 FR, 3 RL, 4 FL), chiều quay đúng sơ đồ khung.
+4. Arm từ tay điều khiển (ga thấp nhất, giữ B3), chế độ angle, ga khoảng 30 %. Nghiêng kit sang phải: thanh RL/FL trên
+   OLED tăng, RR/FR giảm. Chúi mũi: RR/RL tăng.
+5. Tắt tay điều khiển: `fc` báo `stopped: failsafe`, mọi động cơ về 0 trong 200 ms.
+6. Ghi `fc` sau 1 phút chạy: `longest … us` của ngắt và `overruns` (mong muốn 0).
+
+`fc limit` mặc định 300 ‰: động cơ không vượt 30 % công suất cho tới khi đổi.
+
 ## 7. Nguồn
 
 - Silverware cho H8 mini bo xanh — STM32F030, XN297L, `LOOPTIME 1000`, PWM 16 kHz, giao thức Bayang:

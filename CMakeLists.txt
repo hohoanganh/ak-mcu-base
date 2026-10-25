@@ -107,7 +107,8 @@ endif()
 #   remote     AK Base Kit 2.1 bench remote (src/remote), must fit 52K
 #   rc_tx      remote with sticks for the ak-mcu receiver (src/rc, nRF24 in J6)
 #   rc_rx      that receiver, the radio half of the future flight controller
-set(AK_APP "base" CACHE STRING "App variant: base | demo | kit_tools | remote | rc_tx | rc_rx")
+#   fc         rc_rx + flight controller on the bench (IMU on J7, 4 motor PWM)
+set(AK_APP "base" CACHE STRING "App variant: base | demo | kit_tools | remote | rc_tx | rc_rx | fc")
 # src/demo is a folder of screens that grows; PlatformIO takes the whole
 # folder too, so the list cannot drift between the two builds
 file(GLOB DEMO_SRC CONFIGURE_DEPENDS ${SRC}/demo/*.c)
@@ -128,6 +129,9 @@ elseif(AK_APP STREQUAL "rc_tx")
 	set(VARIANT_DEFS APP_RC_TX)
 elseif(AK_APP STREQUAL "rc_rx")
 	set(VARIANT_DEFS APP_RC_RX)
+elseif(AK_APP STREQUAL "fc")
+	# 500 Hz: the IMU is read over the bit-banged I2C of the kit (~0.75 ms)
+	set(VARIANT_DEFS APP_RC_RX APP_FC FC_LOOP_HZ=500)
 else()
 	message(FATAL_ERROR "Unknown AK_APP: ${AK_APP}")
 endif()

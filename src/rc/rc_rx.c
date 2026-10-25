@@ -24,6 +24,9 @@
 #include "rc_app.h"
 #include "rc_radio.h"
 #include "task_list.h"
+#if defined(APP_FC)
+#include "fc_hw.h"
+#endif
 
 static rc_status_t st;
 static rc_rx_t rx;
@@ -103,6 +106,9 @@ void task_poll_rc(void) {
 	uint32_t now = hal_millis();
 
 	rc_buttons_poll();
+#if defined(APP_FC)
+	fc_hw_watch();
+#endif
 	if (!st.radio_ok) {
 		return;
 	}
@@ -142,6 +148,10 @@ void task_poll_rc(void) {
 		st.armed = rx.armed;
 		st.failsafe = rx.failsafe;
 		st.link_ok = (uint8_t)!rx.failsafe;
+#if defined(APP_FC)
+		/* the control interrupt checks the age of the packet itself */
+		fc_hw_cmd(&st.cmd, rx.armed, rx.have_packet ? rx.last_ms : 0);
+#endif
 		/* edges for the task: beeps and a log line */
 		if (rx.armed != was_armed || rx.failsafe != was_failsafe) {
 			was_armed = rx.armed;
@@ -172,6 +182,10 @@ void task_rc(ak_msg_t* msg) {
 		if (st.radio_ok) {
 			tele_preload();
 		}
+#if defined(APP_FC)
+		xprintf("fc: %d Hz control interrupt, IMU %s, motor limit %u permille; keep the board still for the gyro\n",
+				FC_LOOP_HZ, fc_hw_start(FC_LIMIT_BENCH) ? "MPU-6050 ok" : "NOT FOUND (I2C1, J7)", FC_LIMIT_BENCH);
+#endif
 		win_ms = hal_millis();
 		rc_ui_kick();
 		timer_set(TASK_RC_ID, RC_SIG_TICK, 1000, TIMER_ONE_SHOT);
@@ -251,6 +265,22 @@ void rc_ui_draw(const rc_status_t* s) {
 	if (s->cmd.flags & RC_F_BEEP) {
 		gfx_text(36, 10, "BEEP", 1);
 	}
+#if defined(APP_FC)
+	{
+		/* the bench view: what each motor gets, so that tilting the board by
+		 * hand shows the correction going the right way */
+		static const char* const names[4] = { "RR", "FR", "RL", "FL" };
+		fc_hw_status_t f;
+
+		fc_hw_status(&f);
+		gfx_text(66, 10, f.state == FC_RUN ? "FC RUN" : f.state == FC_CALIBRATING ? "FC CAL" :
+				 f.state == FC_OFF ? "FC OFF" : "FC STOP", 1);
+		for (int k = 0; k < 4; k++) {
+			bar(22 + 10 * k, names[k], f.motor[k], 0, f.limit ? f.limit : 1);
+		}
+		return;
+	}
+#endif
 	bar(22, "R", s->cmd.roll, -RC_STICK_MAX, RC_STICK_MAX);
 	bar(32, "P", s->cmd.pitch, -RC_STICK_MAX, RC_STICK_MAX);
 	bar(42, "Y", s->cmd.yaw, -RC_STICK_MAX, RC_STICK_MAX);
