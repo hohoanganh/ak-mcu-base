@@ -683,6 +683,27 @@ static void test_gfx_flush_only_changes(void) {
 	CHECK_EQ(lit_pixels(), 4);
 	gfx_flush(1);							/* force: every page, whole */
 	CHECK_EQ(gfx_flush_bytes(), KIT_LCD_PAGES * KIT_LCD_W);
+
+	/* in steps of at most 16 bytes: same picture in the end, never more per call */
+	{
+		int steps = 0;
+
+		gfx_fill(0, 0, 100, 16, 1);			/* pages 0, 1: 100 columns each */
+		gfx_pixel(127, 63, 0);
+		gfx_pixel(126, 63, 1);
+		pages_written = 0;
+		bytes_written = 0;
+		while (gfx_flush_step(16)) {
+			CHECK(bytes_written <= (steps + 1) * 16);
+			steps++;
+			CHECK(steps < 100);
+		}
+		CHECK_EQ(steps, 7 + 7 + 1);			/* 100 = 6 x 16 + 4, per page; one for page 7 */
+		CHECK_EQ(bytes_written, 100 + 100 + 1);
+		CHECK_EQ(gfx_flush(0), 0);			/* nothing left for the full flush */
+		CHECK_EQ(gfx_get(99, 15), 1);
+		CHECK_EQ(panel[1][99] != 0, 1);
+	}
 	/* outside the screen: ignored, no memory touched */
 	gfx_pixel(-1, 0, 1); gfx_pixel(128, 0, 1); gfx_pixel(0, 64, 1); gfx_fill(120, 60, 20, 20, 1);
 	CHECK_EQ(gfx_get(127, 63), 1);

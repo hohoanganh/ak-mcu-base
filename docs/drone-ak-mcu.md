@@ -174,6 +174,58 @@ Cách thử: nạp bản `kit_tools` (OTA: `ak_fw.py --port COMx flash .../app.i
 để console cũng bận. Ngắt TIM6 không post message, chỉ ghi biến đếm riêng. RAM của `kit_tools` còn 3.616 B cho
 heap + stack (ngân sách CI 3.072 B).
 
+### 6.2 P1: tay điều khiển và bên thu (25/10/2026), chưa chạy trên kit
+
+Hai bản build mới, cùng phần cứng (AK Base Kit 3.0 + mô-đun nRF24L01+ cắm J6):
+
+| Bản | Build | Làm gì |
+|---|---|---|
+| `rc_tx` | `pio run -e rc_tx` / `make stm32-rc-tx` | Tay điều khiển: cần gạt (ADS1115 trên J7, hoặc lệnh `link stick` từ máy tính), 250 gói/s, nhảy 8 kênh, đọc telemetry trong ACK, arm/disarm, bind, hiệu chỉnh, OLED |
+| `rc_rx` | `pio run -e rc_rx` / `make stm32-rc-rx` | Bên thu, nửa radio của FC sau này: bám nhảy kênh, ACK kèm telemetry, arm và failsafe; chưa điều khiển động cơ, OLED và `link` hiện cái động cơ sẽ nhận |
+
+**Mã:**
+- `src/rc/rc_link.c`: phần không phụ thuộc chip, gồm định dạng gói (có CRC16), địa chỉ và bảng nhảy kênh suy từ ID, cách
+  bên thu bám kênh, arm và failsafe, hiệu chỉnh cần gạt, bản ghi EEPROM `[224, 256)`.
+- `tests/test_rc.c` (13.433 kiểm tra) mô phỏng hai đầu nhảy kênh:
+
+| Điều kiện mô phỏng | Gói tới | Khoảng mất dài nhất |
+|---|---|---|
+| Không mất gói | 100 % | — |
+| Mất 5 % mỗi chiều | 90,5 % | 76 ms |
+| Mất 20 % / 10 % | 68 % | 148 ms |
+| Tay điều khiển gửi trễ 0–3 ms, mất 5 % | 90,6 % | 115 ms |
+| Tay điều khiển gửi trễ 0–6 ms, mất 5 % | 85,8 % | 184 ms |
+| Sau khi mất sóng hẳn | bắt lại kênh trong ≤ 68 ms | |
+
+  Mọi trường hợp đều dưới ngưỡng failsafe 200 ms.
+- `src/rc/rc_tx.c`, `rc_rx.c`, `rc_common.c`: các task. `port/stm32l151/nrf24.c`: driver Enhanced ShockBurst (tự ACK, 2 lần
+  gửi lại, payload động, payload trong ACK), không chờ sóng.
+- `gfx_flush_step()` mới: đẩy OLED từng 24 byte để task radio không bị chặn quá ~1,3 ms.
+
+**Đấu nối:** mô-đun nRF24L01+ cắm thẳng J6 (CE PA8, CSN PA4); nên hàn thêm tụ 10 µF ở chân nguồn mô-đun. Cần gạt: mô-đun
+ADS1115 vào J7 (3V3, GND, SDA PB7, SCL PB6, ADDR nối GND → 0x48); A0 roll, A1 pitch, A2 yaw, A3 ga; hai đầu mỗi chiết áp
+nối 3V3 và GND.
+
+**Thử:**
+1. Nạp `rc_rx` vào kit B, `rc_tx` vào kit A (OTA: `ak_fw.py --port COMx flash .../app.img`).
+2. Kit B chưa ghép thì tự vào chế độ bind. Trên kit A giữ B1 2 s (hoặc `link bind`): cả hai bíp, kit A hiện `LINK 100%`,
+   kit B hiện `RX 250/s`.
+3. Không có joystick: `python tools/rc_pc_sticks.py --port COMx --arm` trên kit A, quét cần gạt chậm; thanh R/P/Y/T trên
+   OLED kit B chạy theo.
+4. Có joystick: `link cal` (cần gạt ở giữa, ga thấp nhất), trong 10 s gạt mọi cần ra hết các phía.
+5. Arm: ga thấp nhất, giữ B3 1 s → kit B `ARMED`. Tắt kit A → trong 200 ms kit B `FAILSAFE`, bíp trầm. Bật lại kit A với
+   công tắc arm vẫn bật: kit B vẫn `SAFE` cho tới khi arm lại.
+6. Ghi `link` của cả hai sau 1 phút: tỉ lệ ACK, gói/s. Qua P1 khi 250 gói/s và mất < 1 % trong nhà.
+
+**Phím của tay điều khiển:**
+- B1 bấm: angle ↔ acro.
+- B1 giữ 2 s: bind.
+- B2: bật/tắt còi tìm drone.
+- B3 bấm: disarm.
+- B3 giữ 1 s: arm.
+
+**Phím của bên thu:** B3 giữ 1 s: bind.
+
 ## 7. Nguồn
 
 - Silverware cho H8 mini bo xanh — STM32F030, XN297L, `LOOPTIME 1000`, PWM 16 kHz, giao thức Bayang:

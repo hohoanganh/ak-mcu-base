@@ -28,6 +28,10 @@ enum {
 #if defined(APP_REMOTE)
 	TASK_REMOTE_ID,			/* remote/: bench remote for a toy drone */
 #endif
+#if defined(APP_RC_TX) || defined(APP_RC_RX)
+	TASK_RC_ID,				/* rc/: radio link of the remote / receiver */
+	TASK_RC_UI_ID,			/* rc/: its display */
+#endif
 
 	/* EOT task ID */
 	AK_TASK_EOT_ID,
@@ -41,6 +45,9 @@ enum {
 #endif
 #if defined(APP_REMOTE)
 	TASK_POLL_REMOTE_ID,
+#endif
+#if defined(APP_RC_TX) || defined(APP_RC_RX)
+	TASK_POLL_RC_ID,
 #endif
 
 	/* EOT polling task ID */

@@ -14,6 +14,13 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
   `fcb` trong bản `kit_tools` (`port/stm32l151/fc_bench.c`): chu kỳ CPU của một bước, đọc IMU trên I2C1, độ đều của ngắt
   TIM6 1 kHz khi demo đang chạy. `kit_i2c_write()` mới trong `kit.c`; vector TIM6 trong `startup.c`. Bản `kit_tools`
   +6,7 KB flash, RAM còn 3.616 B cho heap + stack. **Chưa chạy trên kit.**
+- **Tay điều khiển và bên thu (P1).** Bản `rc_tx` và `rc_rx` (`pio run -e rc_tx|rc_rx`, `make stm32-rc-tx|rc-rx`, CMake
+  `AK_APP=rc_tx|rc_rx`), kit 3.0 + nRF24L01+ ở J6. `src/rc/rc_link.c`: gói có CRC16, nhảy 8 kênh theo ID, bên thu bám theo
+  chỉ số kênh trong gói, arm/failsafe 200 ms, hiệu chỉnh cần gạt, bản ghi EEPROM `[224,256)`; `tests/test_rc.c` mô phỏng
+  hai đầu qua mất gói, mất sóng, gửi trễ (chi tiết trong `docs/drone-ak-mcu.md` 6.2). `port/stm32l151/nrf24.c`: Enhanced
+  ShockBurst với telemetry trong ACK. Cần gạt từ ADS1115 trên J7 hoặc lệnh `link stick` (`tools/rc_pc_sticks.py`).
+  `gfx_flush_step()` đẩy OLED từng mẩu nhỏ; `kit_i2c_write_n()`. **Chưa chạy trên kit; bản PlatformIO chưa build được
+  trong môi trường này (CMake build sạch).**
 
 ## ak-mcu-base v1.3.10 — 16/10/2026
 

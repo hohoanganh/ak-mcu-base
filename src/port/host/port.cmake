@@ -63,6 +63,13 @@ target_link_options(test_fc PRIVATE -fsanitize=address,undefined)
 target_link_libraries(test_fc PRIVATE m)
 add_test(NAME fc COMMAND test_fc)
 
+# --- radio link of the remote (src/rc): packets, hopping, arming, sticks ---
+add_executable(test_rc ${ROOT}/tests/test_rc.c ${RC_SRC} ${SRC}/common/crc.c)
+target_include_directories(test_rc PRIVATE ${ROOT}/tests ${SRC}/rc ${SRC}/common)
+target_compile_options(test_rc PRIVATE ${HOST_WARN} -fsanitize=address,undefined -g)
+target_link_options(test_rc PRIVATE -fsanitize=address,undefined)
+add_test(NAME rc COMMAND test_rc)
+
 # --- Modbus services (vendor library built without our warning set) ---
 add_library(nanomodbus_host STATIC ${ROOT}/third_party/nanomodbus/nanomodbus.c)
 target_include_directories(nanomodbus_host PUBLIC ${ROOT}/third_party/nanomodbus)

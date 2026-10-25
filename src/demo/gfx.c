@@ -312,6 +312,40 @@ uint8_t gfx_flush(uint8_t force) {
 	return written;
 }
 
+/* At most max_bytes of display data per call, for a task that must not hold
+ * the CPU for a whole page (the remote sends a radio packet every 4 ms). The
+ * first changed span is sent from its start; the rest of it, and the other
+ * pages, wait for the next calls. */
+uint8_t gfx_flush_step(uint8_t max_bytes) {
+	for (uint8_t p = 0; p < KIT_LCD_PAGES; p++) {
+		const uint8_t* a = fb[p];
+		uint8_t* b = shown[p];
+		uint8_t x0 = 0;
+		uint8_t x1 = GFX_W - 1;
+		uint8_t n;
+
+		while (x0 < GFX_W && a[x0] == b[x0]) {
+			x0++;
+		}
+		if (x0 == GFX_W) {
+			continue;
+		}
+		while (a[x1] == b[x1]) {
+			x1--;
+		}
+		n = (uint8_t)(x1 - x0 + 1);
+		if (n > max_bytes) {
+			n = max_bytes;
+		}
+		if (kit_lcd_write(p, x0, a + x0, n)) {
+			memcpy(b + x0, a + x0, n);
+			return 1;
+		}
+		return 0;						/* display not answering: try again later */
+	}
+	return 0;
+}
+
 const uint8_t* gfx_page(uint8_t page) {
 	return fb[page % KIT_LCD_PAGES];
 }

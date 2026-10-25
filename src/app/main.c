@@ -25,6 +25,9 @@
 #if defined(APP_REMOTE)
 #include "remote.h"
 #endif
+#if defined(APP_RC_TX) || defined(APP_RC_RX)
+#include "rc_app.h"
+#endif
 
 static fw_version_t running_version = { APP_VER_MAJOR, APP_VER_MINOR, APP_VER_PATCH, 0, APP_VER_BUILD };
 
@@ -78,6 +81,9 @@ void app_init(void) {
 #endif
 #if defined(APP_REMOTE)
 	task_post_pure_msg(TASK_REMOTE_ID, REMOTE_SIG_INIT);
+#endif
+#if defined(APP_RC_TX) || defined(APP_RC_RX)
+	task_post_pure_msg(TASK_RC_ID, RC_SIG_INIT);
 #endif
 }
 

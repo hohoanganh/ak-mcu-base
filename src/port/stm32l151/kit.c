@@ -363,12 +363,18 @@ uint8_t kit_i2c_read(uint8_t addr, uint8_t reg, uint8_t* buf, uint8_t len) {
 }
 
 uint8_t kit_i2c_write(uint8_t addr, uint8_t reg, uint8_t val) {
+	return kit_i2c_write_n(addr, reg, &val, 1);
+}
+
+uint8_t kit_i2c_write_n(uint8_t addr, uint8_t reg, const uint8_t* data, uint8_t len) {
 	uint8_t ok;
 
 	i2c_start(&bus_rtc);
 	ok = i2c_tx(&bus_rtc, (uint8_t)(addr << 1));
 	ok &= i2c_tx(&bus_rtc, reg);
-	ok &= i2c_tx(&bus_rtc, val);
+	while (len--) {
+		ok &= i2c_tx(&bus_rtc, *data++);
+	}
 	i2c_stop(&bus_rtc);
 	return ok;
 }

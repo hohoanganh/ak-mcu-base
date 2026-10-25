@@ -6,6 +6,9 @@
 #if defined(APP_REMOTE)
 #include "remote.h"
 #endif
+#if defined(APP_RC_TX) || defined(APP_RC_RX)
+#include "rc_app.h"
+#endif
 
 task_t app_task_table[] = {
 	/*************************************************************************/
@@ -28,6 +31,12 @@ task_t app_task_table[] = {
 	/* above the console: a packet every 8 ms must not wait for a shell command */
 	{TASK_REMOTE_ID,		TASK_PRI_LEVEL_5,		task_remote		},
 #endif
+#if defined(APP_RC_TX) || defined(APP_RC_RX)
+	/* the radio above everything but the system task: a packet every 4 ms */
+	{TASK_RC_ID,			TASK_PRI_LEVEL_5,		task_rc			},
+	/* the display below it, pushed out in short pieces */
+	{TASK_RC_UI_ID,			TASK_PRI_LEVEL_2,		task_rc_ui		},
+#endif
 
 	/*************************************************************************/
 	/* END OF TABLE */
@@ -47,6 +56,9 @@ task_polling_t app_task_polling_table[] = {
 #endif
 #if defined(APP_REMOTE)
 	{TASK_POLL_REMOTE_ID,	AK_ENABLE,		task_poll_remote	},
+#endif
+#if defined(APP_RC_TX) || defined(APP_RC_RX)
+	{TASK_POLL_RC_ID,		AK_ENABLE,		task_poll_rc		},
 #endif
 	{AK_TASK_POLLING_EOT_ID,AK_DISABLE,		(pf_task_polling)0	},
 };

@@ -65,6 +65,9 @@ extern char* gfx_utoa(char* buf, uint32_t v, uint8_t min_digits);
 extern uint8_t gfx_flush(uint8_t force);
 /* Display data bytes the last gfx_flush() sent (8 * 128 = everything). */
 extern uint16_t gfx_flush_bytes(void);
+/* Send at most max_bytes of what changed; returns 1 if it sent something
+ * (call again until 0). For tasks that must keep each handler short. */
+extern uint8_t gfx_flush_step(uint8_t max_bytes);
 /* Pages the last gfx_flush() found changed: bit n = page n. */
 extern uint8_t gfx_changed(void);
 

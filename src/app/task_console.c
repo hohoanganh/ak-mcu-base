@@ -240,6 +240,9 @@ static void cmd_loader(const char* args) {
 	task_post_pure_msg(TASK_FW_ID, FW_SIG_LOADER);
 }
 
+#if defined(APP_RC_TX) || defined(APP_RC_RX)
+extern void cmd_link(const char* args);	/* rc/rc_tx.c, rc/rc_rx.c */
+#endif
 #if defined(APP_FC_BENCH)
 extern void cmd_fcb(const char* args);		/* port/stm32l151/fc_bench.c */
 #endif
@@ -278,6 +281,11 @@ static const shell_cmd_t shell_cmds[] = {
 #endif
 #if defined(APP_FC_BENCH)
 	{ "fcb",	"flight control bench: fcb | fcb imu | fcb jit <s> [load]",	cmd_fcb	},
+#endif
+#if defined(APP_RC_TX)
+	{ "link",	"remote: link | bind | cal | arm | disarm | angle | acro | stick r p y t | stick off",	cmd_link	},
+#elif defined(APP_RC_RX)
+	{ "link",	"receiver: link | link bind",	cmd_link	},
 #endif
 #if defined(APP_REMOTE)
 	{ "rc",		"remote: rc | rc 1|2|3|h | rc go <n> | rc on|off | rc p <hex> | rc wd <ms>",	cmd_rc	},
