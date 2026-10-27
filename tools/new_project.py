@@ -30,7 +30,7 @@ BASE = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 REPO = BASE
 
 # not part of a product project: build output, the old base, repository plumbing
-SKIP_DIRS = {"build", ".pio", "__pycache__", "legacy", ".git", ".github", ".vscode", ".superpowers", ".cache"}
+SKIP_DIRS = {"build", ".pio", ".gradle", "__pycache__", "legacy", ".git", ".github", ".vscode", ".superpowers", ".cache"}
 # below docs/: the web site and its pictures stay behind, the Markdown comes along
 SKIP_DOCS = {"play", "superpowers"}
 SKIP_FILES = {"ak_sim_flash.bin", ".mcp.json", "README.en.md"}

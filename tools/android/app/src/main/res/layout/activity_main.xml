@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	android:id="@+id/root"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:orientation="vertical"
+	android:padding="8dp">
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:gravity="center_vertical"
+		android:orientation="horizontal">
+
+		<TextView
+			android:id="@+id/status"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_weight="1"
+			android:text="@string/not_connected"
+			android:textStyle="bold" />
+
+		<EditText
+			android:id="@+id/baud"
+			android:layout_width="96dp"
+			android:layout_height="wrap_content"
+			android:hint="@string/baud"
+			android:importantForAutofill="no"
+			android:inputType="number"
+			android:text="115200" />
+
+		<Button
+			android:id="@+id/connect"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:text="@string/connect" />
+	</LinearLayout>
+
+	<HorizontalScrollView
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content">
+
+		<LinearLayout
+			android:id="@+id/actions"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:orientation="horizontal">
+
+			<Button
+				android:id="@+id/info"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:text="@string/info" />
+
+			<Button
+				android:id="@+id/flash"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:text="@string/flash" />
+
+			<Button
+				android:id="@+id/confirm"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:text="@string/confirm" />
+
+			<Button
+				android:id="@+id/rollback"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:text="@string/rollback" />
+
+			<Button
+				android:id="@+id/loader"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:text="@string/loader" />
+
+			<Button
+				android:id="@+id/run"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:text="@string/run" />
+
+			<Button
+				android:id="@+id/reset"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:text="@string/reset" />
+		</LinearLayout>
+	</HorizontalScrollView>
+
+	<ProgressBar
+		android:id="@+id/progress"
+		style="@android:style/Widget.Material.ProgressBar.Horizontal"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:visibility="gone" />
+
+	<ScrollView
+		android:id="@+id/logScroll"
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1"
+		android:background="#111111">
+
+		<TextView
+			android:id="@+id/log"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:padding="4dp"
+			android:fontFamily="monospace"
+			android:textColor="#D0D0D0"
+			android:textIsSelectable="true"
+			android:textSize="12sp" />
+	</ScrollView>
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:orientation="horizontal">
+
+		<EditText
+			android:id="@+id/cmd"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_weight="1"
+			android:fontFamily="monospace"
+			android:hint="@string/cmd_hint"
+			android:imeOptions="actionSend"
+			android:importantForAutofill="no"
+			android:inputType="text" />
+
+		<Button
+			android:id="@+id/send"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:text="@string/send" />
+
+		<Button
+			android:id="@+id/clear"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:text="@string/clear" />
+	</LinearLayout>
+</LinearLayout>

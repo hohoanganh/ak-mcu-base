@@ -24,6 +24,26 @@ jobs:
       - name: Unit tests + simulator OTA
         run: ctest --test-dir build/host --output-on-failure -LE fast_only
 
+  # tools/android: the Kotlin fw_proto client flashes ak_sim, then the APK is built
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo sysctl -w vm.mmap_rnd_bits=28
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: ak_sim
+        run: cmake -S . -B build/host && cmake --build build/host -j --target ak_sim
+      - name: fw_proto tests (ak_sim) + APK
+        working-directory: tools/android
+        run: AK_SIM=$GITHUB_WORKSPACE/build/host/ak_sim ./gradlew --no-daemon :proto:test :app:assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ak-flash-apk
+          path: tools/android/app/build/outputs/apk/debug/*.apk
+
   # the firmware as WebAssembly (docs/play): only checks that it still builds;
   # the published copy in docs/play is built locally and committed
   web-build:
