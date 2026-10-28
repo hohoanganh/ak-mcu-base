@@ -100,7 +100,7 @@ pio run -e demo -t upload      # 2. demo trên AK Base Kit (hoặc -e app: app m
 pio device monitor             # console UART1, 115200: gõ help
 ```
 
-Từ lần sau cập nhật qua cổng console, không cần ST-Link: `python tools/ak_fw.py --port COMx flash .pio/build/demo/app.img`.
+Từ lần sau cập nhật qua cổng console, không cần ST-Link: `python tools/ak_fw.py --port COMx flash .pio/build/demo/app.img`. Từ điện thoại Android: app trong [`tools/android/`](tools/android/README.md).
 
 Chạy test và bộ giả lập trên máy tính (Linux / WSL): `make test`, `make sim`.
 Dự án mới: `python tools/new_project.py <thư-mục> --board <tên-board>` xuất một dự án độc lập, không dính repo này.
@@ -134,7 +134,7 @@ ak-mcu-base/
 │   ├── demo/       demo trên AK Base Kit (OLED, 3 nút, còi)
 │   └── port/       stm32l151 (chip) · host (máy tính, ak_sim) · web (WebAssembly)
 ├── tests/          unit test và test đầu-cuối trên ak_sim
-├── tools/          ak_fw.py, ak_mb.py, mkimage.py, new_project.py, tool cho demo và sơ đồ
+├── tools/          ak_fw.py, ak_mb.py, mkimage.py, new_project.py, app Android (android/), tool cho demo và sơ đồ
 ├── third_party/    nanoMODBUS · SPL + CMSIS của STM32L1 mà bản build dùng
 ├── docs/           tài liệu và trang web (GitHub Pages)
 ├── legacy/         base cũ (v1.3.0), chỉ còn bảo trì

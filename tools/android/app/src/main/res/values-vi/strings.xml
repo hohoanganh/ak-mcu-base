@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="not_connected">Chưa kết nối</string>
+	<string name="connect">Kết nối</string>
+	<string name="disconnect">Ngắt</string>
+	<string name="info">Thông tin</string>
+	<string name="flash">Nạp .img</string>
+	<string name="confirm">Xác nhận</string>
+	<string name="rollback">Quay lui</string>
+	<string name="loader">Bootloader</string>
+	<string name="run">Chạy app</string>
+	<string name="reset">Reset</string>
+	<string name="cmd_hint">lệnh console (help, fw, crash…)</string>
+	<string name="send">Gửi</string>
+	<string name="clear">Xoá</string>
+	<string name="no_device">Không thấy bộ chuyển USB-UART</string>
+	<string name="no_permission">Không được cấp quyền USB</string>
+	<string name="flash_title">Nạp ảnh này?</string>
+	<string name="flash_message">%1$s\n%2$d byte\n\nBoard cài ảnh rồi chạy thử; cần xác nhận (nút Xác nhận, hoặc tự động sau 30 s).</string>
+	<string name="rollback_message">Quay về ảnh trước lần cập nhật gần nhất?</string>
+	<string name="baud">Baud</string>
+	<string name="ok">OK</string>
+	<string name="cancel">Huỷ</string>
+</resources>

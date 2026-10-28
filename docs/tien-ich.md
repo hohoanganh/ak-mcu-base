@@ -11,6 +11,7 @@ Các tiện ích dưới đây nằm sẵn trong base, đã kiểm trên AK Base
 | [Build PlatformIO](#5-build) | Build và nạp như các dự án khác | `pio run` |
 | Modbus RTU / RS485 | Slave, master, OTA qua RS485 | [modbus.md](modbus.md) |
 | Demo trên kit | Đồng hồ số, Snake, Flappy trên OLED | [demo-kit.md](demo-kit.md) |
+| [App Android](../tools/android/README.md) | Nạp `.img` và dùng console từ điện thoại qua USB OTG | `tools/android/` |
 | [CI](#6-ci-trên-github) | Tự chạy test và build mỗi lần push | `.github/workflows/ak-mcu-base.yml` |
 
 ---
@@ -134,3 +135,5 @@ ST-Link bằng `-t upload` cũng ra ảnh hợp lệ.
 - **host-tests:** build bằng gcc của máy, chạy unit test kernel, bootloader, crash log và OTA đầu-cuối trên giả lập.
 - **stm32-build:** build boot + app ở cả hai kiểu staging bằng `arm-none-eabi-gcc`, kiểm bootloader không vượt
   10.240 B (phân vùng 12.288 B, chừa 2K cho bản sửa sau này), đính kèm `boot.bin`, `app.img`, `.elf`.
+- **android:** client `fw_proto` viết bằng Kotlin (`tools/android/proto`) nạp, cập nhật, xác nhận, quay lui trên
+  `ak_sim`, rồi build APK của app Android, đính kèm `ak-flash-apk`.

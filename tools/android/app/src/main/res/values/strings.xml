@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="app_name" translatable="false">AK Flash</string>
+	<string name="not_connected">Not connected</string>
+	<string name="baud">Baud</string>
+	<string name="connect">Connect</string>
+	<string name="disconnect">Disconnect</string>
+	<string name="info">Info</string>
+	<string name="flash">Flash .img</string>
+	<string name="confirm">Confirm</string>
+	<string name="rollback">Rollback</string>
+	<string name="loader">Loader</string>
+	<string name="run">Run app</string>
+	<string name="reset">Reset</string>
+	<string name="cmd_hint">console command (help, fw, crash…)</string>
+	<string name="send">Send</string>
+	<string name="clear">Clear</string>
+	<string name="no_device">No USB serial adapter found</string>
+	<string name="no_permission">USB permission denied</string>
+	<string name="connected" translatable="false">%1$s @ %2$d</string>
+	<string name="flash_title">Flash this image?</string>
+	<string name="flash_message">%1$s\n%2$d bytes\n\nThe board installs it and runs it on trial; it must be confirmed (Confirm, or automatically after 30 s).</string>
+	<string name="rollback_message">Put back the image before the last update?</string>
+	<string name="ok">OK</string>
+	<string name="cancel">Cancel</string>
+</resources>

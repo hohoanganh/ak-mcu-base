@@ -9,6 +9,12 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 
 ## Chưa phát hành
 
+- **App Android nạp firmware qua USB OTG (`tools/android/`).** Cắm bộ USB-UART (CH340, CP210x, FTDI, PL2303, cổng COM
+  ảo của ST-LINK/V2-1) vào điện thoại: xem thông tin board, nạp `.img`, xác nhận, quay lui, vào bootloader, reset, và gõ
+  lệnh console. Giao thức `fw_proto` chuyển từ `tools/ak_fw.py` sang Kotlin thuần (`proto/`), có các ca của
+  `tests/test_ak_fw.py` và một test nạp đầu-cuối trên `ak_sim`; job CI `android` chạy test đó và build APK. **Phần giao
+  thức đã qua test trên `ak_sim`; app chưa build trong môi trường này (không tải được Android SDK), chưa chạy trên
+  điện thoại và kit.**
 - **Đo khả năng làm bộ điều khiển bay (P0 của `docs/drone-ak-mcu.md`).** Lõi điều khiển `src/fc/fc_ctrl.c` (lọc gyro,
   Mahony, PID góc và tốc độ góc, trộn QUADX; bản float và Q16, không libm), test `tests/test_fc.c` (9 ca). Lệnh shell
   `fcb` trong bản `kit_tools` (`port/stm32l151/fc_bench.c`): chu kỳ CPU của một bước, đọc IMU trên I2C1, độ đều của ngắt
