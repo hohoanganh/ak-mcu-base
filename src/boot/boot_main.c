@@ -7,6 +7,12 @@
  *     INSTALL  : copy APP -> BACKUP, STAGING -> APP, update boot_ctrl, loop
  *     ROLLBACK : copy BACKUP -> APP (the image before the last install), loop
  *     LOADER   : receive an image on the console via fw_proto (tools/ak_fw.py)
+ *
+ *   BOOT_AUX_LOADER=1 (opt-in, the board must link hal_rs485): after every
+ *   reset, listen on the second link for BOOT_AUX_WINDOW_MS first; a LOADER
+ *   frame there keeps the bootloader in loader mode ON THAT LINK. Lets a host
+ *   wired to that link (e.g. a gateway on USART2) reflash a broken app
+ *   without the console or the ROM bootloader.
  ******************************************************************************
 **/
 
@@ -22,8 +28,34 @@
 
 #ifndef BOOT_VER_MAJOR
 #define BOOT_VER_MAJOR		1
-#define BOOT_VER_MINOR		3
+#define BOOT_VER_MINOR		4
 #define BOOT_VER_PATCH		0
+#endif
+
+/* Loader on the second link (see the header). Off by default: the base and
+ * every board without a host on hal_rs485 build exactly as before.
+ * Window: why 300 ms - long enough for a host that pulses NRST and then sends
+ * LOADER every ~30 ms, short enough not to matter at power-on. Any frame other
+ * than LOADER (INFO polls of an OTA waiting for the install) is answered and
+ * ignored; ASCII traffic on the link is ignored.
+ * Idle: in loader mode on that link, no frame for BOOT_AUX_IDLE_MS -> leave
+ * the loader (run the app if it is valid), so a host that died half-way does
+ * not leave the board parked. */
+#ifndef BOOT_AUX_LOADER
+#define BOOT_AUX_LOADER		0
+#endif
+#ifndef BOOT_AUX_WINDOW_MS
+#define BOOT_AUX_WINDOW_MS	(300)
+#endif
+#ifndef BOOT_AUX_IDLE_MS
+#define BOOT_AUX_IDLE_MS	(60000)
+#endif
+#ifndef BOOT_AUX_BAUD
+#define BOOT_AUX_BAUD		(115200)
+#endif
+
+#if BOOT_AUX_LOADER
+#include "hal_rs485.h"
 #endif
 
 /* 0 (default): run CRC-checked images only. 1: also run an APP without
@@ -58,6 +90,64 @@ static const fw_proto_cfg_t proto_cfg = {
 	0,						/* no application commands in the bootloader */
 };
 
+/* Where the loader talks: the console, or (BOOT_AUX_LOADER) the second link. */
+typedef struct {
+	const char* name;
+	int (*getc)(void);
+	void (*flush)(void);
+	const fw_proto_cfg_t* cfg;
+	uint32_t idle_ms;		/* 0: wait forever */
+} loader_io_t;
+
+static const loader_io_t console_io = { "console", hal_console_getc, hal_console_flush, &proto_cfg, 0 };
+
+#if BOOT_AUX_LOADER
+static void aux_tx(const uint8_t* data, uint32_t len) {
+	hal_rs485_write(data, len);		/* returns once the last stop bit is out */
+}
+
+static void aux_flush(void) {
+}
+
+static const fw_proto_cfg_t aux_cfg = {
+	FW_ROLE_BOOT,
+	&boot_version,
+	aux_tx,
+	0,
+};
+
+static const loader_io_t aux_io = { "aux link", hal_rs485_getc, aux_flush, &aux_cfg, BOOT_AUX_IDLE_MS };
+
+/* 1 if a LOADER frame arrived on the second link within the window. */
+static uint8_t aux_window(void) {
+	uint32_t t0;
+	int c;
+
+	hal_rs485_init(BOOT_AUX_BAUD);
+	fw_proto_init(&aux_cfg);
+	t0 = hal_millis();
+	while (hal_millis() - t0 < BOOT_AUX_WINDOW_MS) {
+		uint8_t got = 0;
+
+		/* byte by byte: stop right after the LOADER frame, the bytes behind it
+		 * (the upload that follows) are for the loader, and a later frame must
+		 * not overwrite the pending action. Other actions are dropped. */
+		while ((c = hal_rs485_getc()) >= 0) {
+			fw_proto_feed((uint8_t)c, hal_millis());
+			got = 1;
+			if (fw_proto_take_action() == FW_PROTO_ACT_LOADER) {
+				return 1;
+			}
+		}
+		hal_wdt_kick();
+		if (!got) {
+			hal_delay_ms(1);	/* RX is interrupt-buffered; also lets virtual time run on the host */
+		}
+	}
+	return 0;
+}
+#endif
+
 /* Marker for "not verified" (STAGING is skipped when the app is fine). */
 #define FW_NOT_CHECKED		((fw_err_t)0xFF)
 
@@ -76,41 +166,56 @@ static void print_ver(const char* name, const fw_image_hdr_t* hdr, fw_err_t err)
 }
 
 /* Returns FW_PROTO_ACT_INSTALL (new image received + verified), FW_PROTO_ACT_RUN
- * or FW_PROTO_ACT_ROLLBACK. */
-static fw_proto_action_t loader_loop(void) {
+ * (also: io->idle_ms without a frame) or FW_PROTO_ACT_ROLLBACK. */
+static fw_proto_action_t loader_loop(const loader_io_t* io) {
 	uint32_t last_blink = 0;
+	uint32_t last_rx = hal_millis();
 	int c;
 
-	LOG_I(TAG, "loader mode - send firmware with tools/ak_fw.py\n");
+	LOG_I(TAG, "loader mode on %s - send firmware with tools/ak_fw.py\n", io->name);
 
 	fw_update_abort();
-	fw_proto_init(&proto_cfg);
+	fw_proto_init(io->cfg);
 
 	for (;;) {
-		while ((c = hal_console_getc()) >= 0) {
-			fw_proto_feed((uint8_t)c, hal_millis());
+		uint8_t got = 0;
+
+		while ((c = io->getc()) >= 0) {
+			if (fw_proto_feed((uint8_t)c, hal_millis())) {
+				last_rx = hal_millis();
+			}
+			got = 1;
+		}
+		if (io->idle_ms && !got) {
+			hal_delay_ms(1);	/* idle timer: lets virtual time run on the host */
 		}
 
 		switch (fw_proto_take_action()) {
 		case FW_PROTO_ACT_INSTALL:
-			hal_console_flush();
+			io->flush();
 			return FW_PROTO_ACT_INSTALL;
 
 		case FW_PROTO_ACT_RUN:
-			hal_console_flush();
+			io->flush();
 			return FW_PROTO_ACT_RUN;
 
 		case FW_PROTO_ACT_ROLLBACK:
-			hal_console_flush();
+			io->flush();
 			return FW_PROTO_ACT_ROLLBACK;
 
 		case FW_PROTO_ACT_RESET:
-			hal_console_flush();
+			io->flush();
 			hal_reset();
 			break;
 
 		default:
 			break;
+		}
+
+		if (io->idle_ms && hal_millis() - last_rx >= io->idle_ms) {
+			LOG_W(TAG, "loader on %s idle %u ms - leaving\n", io->name, (unsigned)io->idle_ms);
+			fw_update_abort();
+			return FW_PROTO_ACT_RUN;
 		}
 
 		if (hal_millis() - last_blink >= 100) {
@@ -128,12 +233,20 @@ void boot_main(void) {
 	fw_image_hdr_t app_hdr, stg_hdr, bak_hdr;
 	fw_err_t app_err, stg_err, bak_err;
 	boot_act_t act;
+	uint8_t aux_req = 0;		/* LOADER arrived on the second link */
 
 	xprintf("\n");
 	LOG_I(TAG, "ak-mcu-base bootloader v%d.%d.%d, board %s, reset reason %d\n",
 		  BOOT_VER_MAJOR, BOOT_VER_MINOR, BOOT_VER_PATCH, hal_board_name(), hal_reset_reason());
 
 	hal_wdt_start(BOOT_WDT_TIMEOUT_MS);
+
+#if BOOT_AUX_LOADER
+	aux_req = aux_window();
+	if (aux_req) {
+		LOG_I(TAG, "LOADER on aux link\n");
+	}
+#endif
 
 	boot_ctrl_load(&ctrl);
 
@@ -197,6 +310,13 @@ void boot_main(void) {
 			ctrl.trial = 0;
 			ctrl.trial_boots = 0;
 			boot_ctrl_save(&ctrl);
+		}
+
+		/* host asked for the loader on the second link: after the bookkeeping
+		 * above (based on the real decision), so a pending install or rollback
+		 * is kept and done on the next pass once the loader returns */
+		if (aux_req) {
+			act = BOOT_ACT_LOADER;
 		}
 
 		switch (act) {
@@ -304,7 +424,13 @@ void boot_main(void) {
 
 		case BOOT_ACT_LOADER:
 		default: {
-			fw_proto_action_t r = loader_loop();
+#if BOOT_AUX_LOADER
+			fw_proto_action_t r = loader_loop(aux_req ? &aux_io : &console_io);
+#else
+			fw_proto_action_t r = loader_loop(&console_io);
+#endif
+
+			aux_req = 0;
 
 			if (r == FW_PROTO_ACT_INSTALL) {
 				ctrl.cmd = BOOT_CMD_UPDATE;

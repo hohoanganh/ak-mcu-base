@@ -91,6 +91,9 @@ extern uint8_t host_cur_sig(void);
 /* Emulated RS485 port (hal_rs485.h): inject = bytes arriving from the bus,
  * take_tx = bytes the firmware sent. */
 extern void host_rs485_inject(const uint8_t* data, uint32_t len);
+/* 1: hal_rs485_init() keeps bytes injected before it (a test can queue the
+ * frames a host sends while the board boots). */
+extern void host_rs485_keep_rx_on_init(uint8_t on);
 extern uint32_t host_rs485_take_tx(uint8_t* out, uint32_t max);
 extern uint32_t host_rs485_baud(void);
 

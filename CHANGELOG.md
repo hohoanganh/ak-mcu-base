@@ -37,6 +37,18 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 
 App **1.3.10**, bootloader **1.3.0** (không đổi). Nâng cấp từ v1.3.9 qua OTA (UART hoặc RS485) được, không cần ST-Link.
 
+- **Bootloader 1.4.0: loader trên đường thứ hai (`BOOT_AUX_LOADER`, mặc định TẮT)** — 15/10/2026.
+  - **Cách chạy:** bật cờ thì sau mỗi lần reset bootloader nghe `hal_rs485` trong `BOOT_AUX_WINDOW_MS` (300 ms). Một khung `LOADER` (06)
+    tới trong cửa sổ thì bootloader ở lại chế độ nạp **trên chính đường đó**.
+  - **Để làm gì:** máy chủ nối ở đường đó (ví dụ gateway trên USART2) nạp lại được app hỏng, không cần console hay bootloader
+    ROM. Trên STM32L151xB-A vỏ 48 chân, bootloader ROM chỉ nghe USART1: USART2 của nó nằm ở PD5/PD6, chân vỏ này không có.
+  - **Khung khác trong cửa sổ** (`INFO` của OTA đang chờ cài): được trả lời, không đổi gì.
+  - **Rảnh `BOOT_AUX_IDLE_MS`** (60 s) không có khung thì rời chế độ nạp.
+  - **Board bật cờ** phải link `hal_rs485`. Tắt cờ thì build y như cũ.
+  - **Đổi chung cho mọi board:** `loader_loop()` nhận đường giao tiếp qua `loader_io_t`. Số version bootloader lên 1.4.0.
+  - **Bài thử:** `tests/test_boot_aux.c` (target `test_boot_aux`, ctest `boot_aux`, 25 phép kiểm). Port host thêm
+    `host_rs485_keep_rx_on_init()`. `make test` 13/13 (sau khi gộp với main ngày 28/10).
+  - **Chưa thử trên chip** ở repo base.
 - **Trang "Bên trong firmware"** (`docs/play/inside.html`): cho người không lập trình xem mã nguồn chạy thế nào, trên chính
   firmware chạy trong trang. (1) Bốn việc của vòng lặp chính, kèm đoạn mã thật của `kernel/src/task.c`. (2) **Mọi message
   kernel giao cho task**, đọc thật từ firmware: ai gửi, ai nhận, tín hiệu gì, lời giải thích và file xử lý; dừng firmware

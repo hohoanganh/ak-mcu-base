@@ -81,6 +81,22 @@ target_compile_options(test_rc PRIVATE ${HOST_WARN} -fsanitize=address,undefined
 target_link_options(test_rc PRIVATE -fsanitize=address,undefined)
 add_test(NAME rc COMMAND test_rc)
 
+# --- bootloader with the loader on the second link (BOOT_AUX_LOADER=1) ---
+# Same sources as test_fw, built once more with the option on and a short idle time.
+add_executable(test_boot_aux
+	${ROOT}/tests/test_boot_aux.c
+	${ROOT}/tests/test_pubkey.c
+	${COMMON_SRC} ${TEST_FW_SRC} ${SYS_SRC} ${BOOT_SRC}
+	${HOST_DIR}/port_host.c
+)
+target_include_directories(test_boot_aux PRIVATE ${ROOT}/tests ${BASE_INC} ${HOST_DIR})
+target_compile_definitions(test_boot_aux PRIVATE AK_SIM ${VERSION_DEFS} FW_IMAGE_SIGN=1
+	BOOT_AUX_LOADER=1 BOOT_AUX_WINDOW_MS=300 BOOT_AUX_IDLE_MS=2000 BOOT_AUX_BAUD=115200)
+target_link_libraries(test_boot_aux PRIVATE p256m_host)
+target_compile_options(test_boot_aux PRIVATE ${HOST_WARN} -fsanitize=address,undefined -g)
+target_link_options(test_boot_aux PRIVATE -fsanitize=address,undefined)
+add_test(NAME boot_aux COMMAND test_boot_aux)
+
 # --- Modbus services (vendor library built without our warning set) ---
 add_library(nanomodbus_host STATIC ${ROOT}/third_party/nanomodbus/nanomodbus.c)
 target_include_directories(nanomodbus_host PUBLIC ${ROOT}/third_party/nanomodbus)

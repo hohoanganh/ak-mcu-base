@@ -253,12 +253,15 @@ static uint32_t rs_baud;
 static uint32_t rs_rx_bytes;
 static uint32_t rs_rx_last_ms;
 static uint32_t rs_tx_end_ms;		/* a hal_rs485_send() is on the wire until then */
+static uint8_t rs_keep_rx;
 
 void hal_rs485_init(uint32_t baudrate) {
 	rs_baud = baudrate;
-	rs_rx_head = rs_rx_tail = 0;
+	if (!rs_keep_rx) {
+		rs_rx_head = rs_rx_tail = 0;
+		rs_rx_bytes = 0;
+	}
 	rs_tx_len = 0;
-	rs_rx_bytes = 0;
 	rs_rx_last_ms = rs_tx_end_ms = hal_millis();
 }
 
@@ -268,6 +271,10 @@ uint8_t hal_rs485_tx_busy(void) {
 
 uint32_t hal_rs485_rx_idle_ms(void) {
 	return hal_millis() - rs_rx_last_ms;
+}
+
+void host_rs485_keep_rx_on_init(uint8_t on) {
+	rs_keep_rx = on;
 }
 
 uint32_t hal_rs485_rx_bytes(void) {

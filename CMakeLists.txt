@@ -24,7 +24,7 @@ set(CMAKE_C_EXTENSIONS ON)
 # App version: edit here or pass -DAPP_VERSION=1.2.3
 set(APP_VERSION "1.3.10" CACHE STRING "App version major.minor.patch")
 set(APP_BUILD "0" CACHE STRING "Build number (incremented by CI)")
-set(BOOT_VERSION "1.3.0" CACHE STRING "Bootloader version")
+set(BOOT_VERSION "1.4.0" CACHE STRING "Bootloader version")
 
 string(REPLACE "." ";" _av ${APP_VERSION})
 list(GET _av 0 APP_VER_MAJOR)

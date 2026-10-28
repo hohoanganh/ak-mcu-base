@@ -147,6 +147,13 @@ Thử trước trên máy tính: `python3 tools/ak_fw.py --sim build/host/ak_sim
 | APP hỏng, STAGING không dùng được, BACKUP còn ảnh | **cứu**: cài lại từ BACKUP |
 | còn lại | loader |
 
+**Loader trên đường thứ hai (bootloader ≥ 1.4.0, build với `BOOT_AUX_LOADER=1`, mặc định tắt):**
+- **Cửa sổ:** trước mọi việc trên, bootloader nghe `hal_rs485` trong 300 ms. Khung `LOADER` (06) tới trong lúc đó thì bootloader ở
+  lại chế độ nạp **trên đường đó** (không phải console). Khung khác chỉ được trả lời.
+- **Tự thoát:** rảnh 60 s không có khung nào thì rời chế độ nạp.
+- **Dùng khi** máy chủ chỉ nối vào đường thứ hai mà bootloader ROM của chip không nghe đường đó (ví dụ: gateway trên USART2
+  PA2/PA3).
+
 - **Xác nhận và quay lui (bootloader 1.3.0):** trước khi cài, bootloader chép ảnh đang chạy sang
   BACKUP (có kiểm CRC). Ảnh mới chạy ở trạng thái **thử** (`boot_ctrl.trial`); mỗi lần bootloader
   khởi động nó là một lượt (`trial_boots`), ghi vào EEPROM **trước** khi nhảy nên khởi động mà treo
