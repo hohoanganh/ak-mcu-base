@@ -53,6 +53,27 @@ if image_sign:
     env.BuildSources(os.path.join("$BUILD_DIR", "p256m"), os.path.join(proj, "third_party", "p256-m"),
                      src_filter=["+<p256-m.c>"])
 
+# rust_proto = 1: the app splits fw_proto frames with the Rust code of ak-mcu-rust
+# (crate ak-ffi -> libak_ffi.a). Needs a checkout of ak-mcu-rust at rust_dir and cargo
+# with the thumbv7m-none-eabi target. The bootloader stays C (see fw_proto.c).
+rust_proto = cfg.get("common", "rust_proto", "0").strip() == "1"
+if rust_proto and env.subst("$PIOENV") != "boot":
+    import shutil
+    import subprocess
+    rust_dir = os.path.normpath(os.path.join(proj, cfg.get("common", "rust_dir", "../ak-mcu-rust").strip()))
+    if not os.path.isfile(os.path.join(rust_dir, "ak-ffi", "Cargo.toml")):
+        raise SystemExit("rust_proto = 1 but no ak-mcu-rust at %s (set [common] rust_dir)" % rust_dir)
+    cargo = shutil.which("cargo") or os.path.join(os.environ.get("CARGO_HOME", os.path.expanduser("~/.cargo")), "bin", "cargo")
+    print("rust_proto: cargo build -p ak-ffi (%s)" % rust_dir)
+    if subprocess.call([cargo, "build", "--release", "-p", "ak-ffi", "--target", "thumbv7m-none-eabi"], cwd=rust_dir):
+        raise SystemExit("cargo build of ak-ffi failed")
+    env.Append(
+        CPPDEFINES=[("AK_RUST_PROTO", 1)],
+        CPPPATH=[os.path.join(rust_dir, "ak-ffi", "include")],
+        LIBPATH=[os.path.join(rust_dir, "target", "thumbv7m-none-eabi", "release")],
+        LIBS=["c", "ak_ffi"],  # libc first: memcpy/memmove from newlib, not the bigger Rust copies
+    )
+
 if env.subst("$PIOENV") != "boot":
     def patch_image(source, target, env):
         elf = target[0].get_abspath()

@@ -6,6 +6,41 @@
 #include "crc.h"
 #include "hal.h"
 
+/* AK_RUST_PROTO=1: the frame splitter is the Rust one of ak-mcu-rust (crate ak-ffi,
+ * libak_ffi.a), the app only - the bootloader keeps the C state machine (size budget,
+ * and it cannot be updated over the air). Everything after a whole frame is C. */
+#if !defined(AK_RUST_PROTO) || defined(AK_BOOTLOADER)
+#undef AK_RUST_PROTO
+#define AK_RUST_PROTO	(0)
+#endif
+
+#if AK_RUST_PROTO
+#include "ak_rs.h"
+#include "ak_port.h"
+
+void ak_rust_panic(void) {
+	FATAL("RS", 0x01);
+	for (;;) {
+	}
+}
+
+#if defined(__ARM_EABI__)
+/* Rust calls the ARM EABI copy helpers; newlib-nano has none, so compiler_builtins
+ * would bring its own 680 B memcpy. Theirs are weak: route them to newlib's. */
+void __aeabi_memcpy(void* d, const void* s, unsigned int n) {
+	memcpy(d, s, n);
+}
+
+void __aeabi_memcpy4(void* d, const void* s, unsigned int n) {
+	memcpy(d, s, n);
+}
+
+void __aeabi_memcpy8(void* d, const void* s, unsigned int n) {
+	memcpy(d, s, n);
+}
+#endif
+#endif
+
 typedef enum {
 	ST_SOF = 0,
 	ST_CMD,
@@ -22,9 +57,11 @@ static rx_state_t rx_state = ST_SOF;
 static uint8_t  rx_cmd;
 static uint8_t  rx_seq;
 static uint16_t rx_len;
+#if !AK_RUST_PROTO
 static uint16_t rx_idx;
 static uint16_t rx_crc;
 static uint32_t rx_last_ms;
+#endif
 static uint8_t  rx_buf[FW_PROTO_MAX_PAYLOAD];
 static fw_proto_action_t pending_action = FW_PROTO_ACT_NONE;
 
@@ -180,10 +217,17 @@ void fw_proto_init(const fw_proto_cfg_t* c) {
 	cfg = c;
 	rx_state = ST_SOF;
 	pending_action = FW_PROTO_ACT_NONE;
+#if AK_RUST_PROTO
+	ak_rs_proto_reset();
+#endif
 }
 
 uint8_t fw_proto_busy(void) {
+#if AK_RUST_PROTO
+	return ak_rs_proto_busy();
+#else
 	return rx_state != ST_SOF;
+#endif
 }
 
 fw_proto_action_t fw_proto_take_action(void) {
@@ -192,6 +236,21 @@ fw_proto_action_t fw_proto_take_action(void) {
 	return a;
 }
 
+#if AK_RUST_PROTO
+uint8_t fw_proto_feed(uint8_t b, uint32_t now_ms) {
+	static ak_rs_khung_t k;
+	uint8_t r = ak_rs_proto_feed(b, now_ms, &k);
+
+	if (r == 2 && cfg) {
+		rx_cmd = k.cmd;
+		rx_seq = k.seq;
+		rx_len = k.len;
+		memcpy(rx_buf, k.du_lieu, k.len);
+		handle_frame();
+	}
+	return r != 0;
+}
+#else
 uint8_t fw_proto_feed(uint8_t b, uint32_t now_ms) {
 	if (rx_state != ST_SOF && (now_ms - rx_last_ms) > FW_PROTO_BYTE_TIMEOUT) {
 		rx_state = ST_SOF;	/* frame interrupted */
@@ -260,3 +319,4 @@ uint8_t fw_proto_feed(uint8_t b, uint32_t now_ms) {
 
 	return 1;
 }
+#endif

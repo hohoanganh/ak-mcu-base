@@ -180,6 +180,7 @@ ak_firmware(app app.ld
 	DEFS ${VARIANT_DEFS} ${APP_KERNEL_DEFS}
 )
 target_link_libraries(app PRIVATE nanomodbus)
+ak_use_rust_proto(app thumbv7m-none-eabi)
 # Fill header CRC/size into app.bin -> app.img, and patch .fw_header in app.elf
 # so that flashing the .elf over SWD also yields a valid image.
 add_custom_command(TARGET app POST_BUILD

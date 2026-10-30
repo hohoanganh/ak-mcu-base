@@ -24,6 +24,35 @@ jobs:
       - name: Unit tests + simulator OTA
         run: ctest --test-dir build/host --output-on-failure -LE fast_only
 
+  # AK_RUST_PROTO=ON: the app splits fw_proto frames with the Rust code of
+  # github.com/hohoanganh/ak-mcu-rust (crate ak-ffi). Same host tests, then the demo image.
+  rust-proto:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: hohoanganh/ak-mcu-rust
+          path: ak-mcu-rust
+      - run: sudo sysctl -w vm.mmap_rnd_bits=28
+      - name: Rust targets
+        run: rustup target add thumbv7m-none-eabi x86_64-unknown-linux-gnu
+      - name: ak-boot unit tests (Rust)
+        working-directory: ak-mcu-rust
+        run: cargo test -p ak-boot --target x86_64-unknown-linux-gnu
+      - name: Host tests with the Rust frame splitter
+        run: |
+          cmake -S . -B build/host-rust -DAK_RUST_PROTO=ON -DAK_RUST_DIR=$PWD/ak-mcu-rust
+          cmake --build build/host-rust -j
+          ctest --test-dir build/host-rust --output-on-failure -LE fast_only
+      - name: ARM toolchain
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi
+      - name: STM32 demo with the Rust frame splitter
+        run: |
+          cmake -S . -B build/stm32-rust -DAK_PORT=stm32l151 -DAK_APP=demo             -DCMAKE_TOOLCHAIN_FILE=src/port/stm32l151/arm-none-eabi.cmake             -DAK_RUST_PROTO=ON -DAK_RUST_DIR=$PWD/ak-mcu-rust
+          cmake --build build/stm32-rust -j
+          arm-none-eabi-size build/stm32-rust/app.elf
+
   # tools/android: the Kotlin fw_proto client flashes ak_sim, then the APK is built
   android:
     runs-on: ubuntu-24.04
