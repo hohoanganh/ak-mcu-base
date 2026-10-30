@@ -19,7 +19,8 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
   13/13. **Trên kit (30/10/2026):** ghi/đọc qua SWD `0x20003FF0` và `0x20007FF0` giữ hai giá trị khác nhau (32K thật,
   không lặp địa chỉ); bản demo 32K: stack chưa dùng 24 408 B (16K: 8 024 B), chạy khối 3D + mê cung + tự chơi 60 s
   không sự cố; `info` in `chip id 0x429`. Bootloader 16K + app 32K: `app: bad vector table` → tự quay về bản BACKUP,
-  không treo. Chưa kiểm `chip id` sau khi rút nguồn (khối debug của chip có thể còn bật sau phiên SWD).
+  không treo. Gỡ dây CLK/DIO rồi tắt bật nguồn: `reset reason 1`, `chip id 0x429` — firmware tự đọc được mã chip khi
+  không có debugger, nên chốt chặn "chip Cat.1 thì từ chối app 32K" dùng được.
 
 - **App Android nạp firmware qua USB OTG (`tools/android/`).** Cắm bộ USB-UART (CH340, CP210x, FTDI, PL2303, cổng COM
   ảo của ST-LINK/V2-1) vào điện thoại: xem thông tin board, nạp `.img`, xác nhận, quay lui, vào bootloader, reset, và gõ

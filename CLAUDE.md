@@ -101,7 +101,10 @@ Thêm lệnh shell: một dòng trong `shell_cmds[]` của `src/app/task_console
 - **RAM: chip trên kit báo DEV_ID `0x429` = STM32L151CB-A, 32K** (BOM ghi CBT6, loại 16K). Mặc định build 16K (chạy trên
   cả hai); `ram_size_kb = 32` / `-DAK_RAM_SIZE=32K` cho chip CB-A, bootloader và app cùng giá trị. Bootloader luôn link
   16K. Đã kiểm trên kit 30/10/2026: 32K thật (không lặp địa chỉ), bản demo 32K chạy, stack chưa dùng 24 KB.
-  Chưa kiểm: `chip id` còn đọc được sau khi rút nguồn (không phiên SWD) không.
+  Không nối SWD, bật nguồn: `chip id 0x429` vẫn đọc được (DBGMCU đọc được từ phần mềm trên L151).
+- **Dây SWD còn cắm thì mỗi lần bật nguồn kit báo `reset reason 3` (reset mềm), không phải 1.** ST-Link khởi động lại
+  cùng kit và reset chip qua SWD (không có NRST → SYSRESETREQ). Muốn thử đường bật nguồn thật (lý do reset, mã chip
+  khi không có debugger) thì gỡ CLK/DIO trước (30/10/2026).
 - **Nạp đè bootloader luôn kèm `-rst`.** Ghi bootloader bằng `STM32_Programmer_CLI -d boot.bin 0x08000000` mà không
   reset thì lõi chạy tiếp mã cũ trên flash vừa bị ghi đè → hardfault rác (`pc 0x20000000`) vào nhật ký sự cố, và
   bootloader có thể bắt đầu cài lại BACKUP ngay lần chạy dở đó (30/10/2026).
