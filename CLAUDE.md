@@ -100,6 +100,9 @@ Thêm lệnh shell: một dòng trong `shell_cmds[]` của `src/app/task_console
   sector cuối trừ một, chương trình khối ở sector cuối.
 - Ảnh mới cài xong chạy **thử** (`boot_ctrl.trial`): app tự xác nhận sau `APP_FW_CONFIRM_MS` (30 s) hoặc `fw confirm`;
   không xác nhận sau 3 lần khởi động thì bootloader cài lại ảnh cũ từ BACKUP. `fw rollback` quay lui chủ động.
+- **Vector của app chỉ căn 256 B** (`0x08003100`, bản ký `0x08004100`): bảng vector của app phải ≤ 256 B (16 + 45 ngắt
+  của L151 = 244 B, vừa). App viết bằng ngôn ngữ khác (Rust: `cortex-m-rt` mặc định 240 ngắt, bảng 1 KB) không link được
+  ở địa chỉ này — xem repo `hohoanganh/ak-mcu-rust`. Đổi chip có nhiều ngắt hơn thì phải dời vector hoặc nới header.
 - Biến thể ký số (`AK_IMAGE_SIGN=ON` / `image_sign = 1`): bootloader 16K, APP từ `0x08004000`; ảnh phải ký bằng
   `mkimage.py --sign-key`; khoá công khai ở `src/services/fw/fw_pubkey.c`. **Khoá riêng không bao giờ vào repo** (`tools/keys/` bị git bỏ qua): chạy `python tools/ak_sign.py devkey` một lần mỗi clone trước khi build bản ký; lệnh ghi lại `fw_pubkey.c`, đừng commit thay đổi đó trừ khi cặp khoá là của sản phẩm.
 - Bootloader chỉ chạy ảnh có CRC đúng: nạp `app.img`, không nạp `.bin` trần. **App và bootloader lấy cùng một bản
