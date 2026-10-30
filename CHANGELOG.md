@@ -7,6 +7,14 @@ console lúc khởi động).
 Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 [docs/tinh-nang-moi-v1.2-v1.3.md](legacy/docs/tinh-nang-moi-v1.2-v1.3.md).
 
+## Chưa phát hành
+
+- **Tách khung `fw_proto` bằng Rust (`AK_RUST_PROTO` / PlatformIO `rust_proto`, mặc định tắt).** App gọi
+  `ak_rs_proto_feed()` của `libak_ffi.a` (repo `hohoanganh/ak-mcu-rust`, crate `ak-ffi`) thay máy trạng thái C; phần sau
+  khung vẫn là C, bootloader giữ bản C. Rust panic → `FATAL("RS", 1)`. Demo +312 B flash, +272 B RAM (`libc` link trước
+  `libak_ffi`, `__aeabi_memcpy*` trỏ về newlib — không thì +2,9 KB vì Rust mang `memcpy` riêng). Trên kit: nạp qua COM,
+  shell vẫn nhận lệnh, OTA 58 KB qua bộ tách khung Rust. CI job `rust-proto`: `make test` 13/13 và demo STM32 với Rust.
+
 ## ak-mcu-base v1.3.11 — 30/10/2026
 
 App **1.3.11**, bootloader **1.4.0**. App mặc định dùng RAM 32K nên **phải nạp bootloader 1.4.0 bằng ST-Link trước**:
