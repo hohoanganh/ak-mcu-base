@@ -60,4 +60,4 @@ Bootloader Refuses A Missing App And Enters The Loader
     Start Emulation
     Wait For Line On Uart       app${SPACE * 4}: no image
     Wait For Line On Uart       -> loader
-    Wait For Line On Uart       loader mode - send firmware with tools/ak_fw.py
+    Wait For Line On Uart       loader mode on console - send firmware with tools/ak_fw.py
