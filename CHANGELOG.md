@@ -7,7 +7,10 @@ console lúc khởi động).
 Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 [docs/tinh-nang-moi-v1.2-v1.3.md](legacy/docs/tinh-nang-moi-v1.2-v1.3.md).
 
-## Chưa phát hành
+## ak-mcu-base v1.3.11 — 30/10/2026
+
+App **1.3.11**, bootloader **1.4.0**. App mặc định dùng RAM 32K nên **phải nạp bootloader 1.4.0 bằng ST-Link trước**:
+bootloader 1.3.0 thấy stack của app ở `0x20008000` là vector hỏng, cài lại bản BACKUP (đã thử trên kit: không treo).
 
 - **RAM 32K (`ram_size_kb` / `AK_RAM_SIZE`, mặc định 32).** Chip STM32L151CB của kit là loại Cat.2 (DEV_ID `0x429`),
   có 32K RAM; base trước đây khai 16K, con số sót lại từ kit 2.1 (L151C8T6) khi nâng cấp chip. Chip Cat.1 (`0x416`,
