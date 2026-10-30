@@ -16,7 +16,10 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
   để app treo cứng ngay lần push đầu tiên). Lệnh `info` in `chip id`: số `0x000` nghĩa là không đọc được mã chip khi
   không có debugger (errata của nhiều dòng STM32) — khi đó bootloader tin giá trị lúc build. Bootloader và app phải
   build cùng giá trị. Đã build 10 bản PlatformIO (16K) và boot + demo ở 32K (`_estack` `0x20008000`), `make test`
-  13/13; **chưa chạy trên kit**.
+  13/13. **Trên kit (30/10/2026):** ghi/đọc qua SWD `0x20003FF0` và `0x20007FF0` giữ hai giá trị khác nhau (32K thật,
+  không lặp địa chỉ); bản demo 32K: stack chưa dùng 24 408 B (16K: 8 024 B), chạy khối 3D + mê cung + tự chơi 60 s
+  không sự cố; `info` in `chip id 0x429`. Bootloader 16K + app 32K: `app: bad vector table` → tự quay về bản BACKUP,
+  không treo. Chưa kiểm `chip id` sau khi rút nguồn (khối debug của chip có thể còn bật sau phiên SWD).
 
 - **App Android nạp firmware qua USB OTG (`tools/android/`).** Cắm bộ USB-UART (CH340, CP210x, FTDI, PL2303, cổng COM
   ảo của ST-LINK/V2-1) vào điện thoại: xem thông tin board, nạp `.img`, xác nhận, quay lui, vào bootloader, reset, và gõ

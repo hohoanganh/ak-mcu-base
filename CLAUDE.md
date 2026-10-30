@@ -100,7 +100,11 @@ Thêm lệnh shell: một dòng trong `shell_cmds[]` của `src/app/task_console
   sector cuối trừ một, chương trình khối ở sector cuối.
 - **RAM: chip trên kit báo DEV_ID `0x429` = STM32L151CB-A, 32K** (BOM ghi CBT6, loại 16K). Mặc định build 16K (chạy trên
   cả hai); `ram_size_kb = 32` / `-DAK_RAM_SIZE=32K` cho chip CB-A, bootloader và app cùng giá trị. Bootloader luôn link
-  16K. Chưa kiểm trên kit: `info` có in `chip id` đọc được khi không có debugger không, và bản 32K có chạy không.
+  16K. Đã kiểm trên kit 30/10/2026: 32K thật (không lặp địa chỉ), bản demo 32K chạy, stack chưa dùng 24 KB.
+  Chưa kiểm: `chip id` còn đọc được sau khi rút nguồn (không phiên SWD) không.
+- **Nạp đè bootloader luôn kèm `-rst`.** Ghi bootloader bằng `STM32_Programmer_CLI -d boot.bin 0x08000000` mà không
+  reset thì lõi chạy tiếp mã cũ trên flash vừa bị ghi đè → hardfault rác (`pc 0x20000000`) vào nhật ký sự cố, và
+  bootloader có thể bắt đầu cài lại BACKUP ngay lần chạy dở đó (30/10/2026).
 - Ảnh mới cài xong chạy **thử** (`boot_ctrl.trial`): app tự xác nhận sau `APP_FW_CONFIRM_MS` (30 s) hoặc `fw confirm`;
   không xác nhận sau 3 lần khởi động thì bootloader cài lại ảnh cũ từ BACKUP. `fw rollback` quay lui chủ động.
 - **Vector của app chỉ căn 256 B** (`0x08003100`, bản ký `0x08004100`): bảng vector của app phải ≤ 256 B (16 + 45 ngắt
