@@ -1,7 +1,7 @@
 # ak-mcu-base so với base cũ (`legacy/sources/`): hơn gì, bằng gì, còn thiếu gì
 
 Cập nhật: 06/10/2026 · `ak-mcu-base` v1.3.0 (bootloader 1.2.0) · so với `ak-base-kit-pio` v1.3.0 (bootloader 0.0.3)
-· Board: AK Base Kit, STM32L151CBT6 (128K flash, 16K RAM)
+· Board: AK Base Kit, STM32L151CBT6 (128K flash, 32K RAM)
 
 Bản HTML (có bản đồ flash vẽ đúng tỉ lệ, in được): <https://hohoanganh.github.io/ak-mcu-base/ak-mcu-base-so-voi-base-cu.html> · nguồn: `docs/ak-mcu-base-so-voi-base-cu.html`.
 

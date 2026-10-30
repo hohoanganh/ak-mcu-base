@@ -11,7 +11,7 @@ Cỡ việc: S = vài giờ, M = một hai ngày, L = nhiều ngày.
 | Câu hỏi | Trả lời ngắn |
 |---|---|
 | Kit làm tay điều khiển được không? | **Được, và đã có một nửa**: bản `remote` (kit 2.1) đã phát gói điều khiển cho một drone đồ chơi 2,4 GHz qua nRF24L01+. Thiếu cần gạt analog, giao thức hai chiều và failsafe. |
-| STM32L151 (Cortex-M3 32 MHz, không FPU, 16 KB RAM) làm FC được không? | **Được cho drone chổi than (brushed) cỡ 65–100 mm, 1S**, vòng điều khiển 1 kHz. Tiền lệ: firmware Silverware bay H8 mini bằng STM32F030 (Cortex-M0 48 MHz, không FPU) ở vòng 1 ms. Không hợp cho drone không chổi than (brushless) cần vòng 4–8 kHz và DShot. |
+| STM32L151 (Cortex-M3 32 MHz, không FPU, 32 KB RAM) làm FC được không? | **Được cho drone chổi than (brushed) cỡ 65–100 mm, 1S**, vòng điều khiển 1 kHz. Tiền lệ: firmware Silverware bay H8 mini bằng STM32F030 (Cortex-M0 48 MHz, không FPU) ở vòng 1 ms. Không hợp cho drone không chổi than (brushless) cần vòng 4–8 kHz và DShot. |
 | Kernel AK có hợp với FC không? | **Không trực tiếp.** AK không chen ngang (non-preemptive): một handler 15 ms của task khác làm vòng điều khiển trễ 15 ms. Cần một tầng thời gian thực cứng chạy trong ngắt timer, đứng ngoài kernel; AK lo phần còn lại (radio, arm, pin, log, cấu hình, OTA). |
 | Nên bắt đầu từ đâu? | Đo trước trên kit (mục 6, P0): thời gian tính một vòng điều khiển và thời gian đọc IMU. Nếu một vòng ≤ 40 % của 1 ms thì làm tiếp; nếu không, chuyển sang chip mạnh hơn (mục 5.4). |
 
@@ -77,7 +77,7 @@ góc) rồi **angle** (tự cân bằng). Không GPS, không bay ngoài trời t
 | Silverware trên H8 mini (bo xanh) | STM32F030, Cortex-M0 48 MHz, không FPU, radio XN297L | 1 ms (`LOOPTIME 1000`), động cơ PWM 16 kHz |
 | Naze32 với Baseflight/Cleanflight/Betaflight ≤ 3.2 | STM32F103, Cortex-M3 72 MHz, không FPU | Betaflight bỏ F1 từ bản 3.3 vì thiếu flash và sức tính |
 | Crazyflie 2.1 | STM32F405, Cortex-M4F 168 MHz + nRF51822 lo radio | PID xếp tầng (vị trí → vận tốc → góc → tốc độ góc) |
-| **AK Base Kit** | **STM32L151, Cortex-M3 32 MHz, không FPU, 128 KB flash, 16 KB RAM** | **cần đo** |
+| **AK Base Kit** | **STM32L151, Cortex-M3 32 MHz, không FPU, 128 KB flash, 32 KB RAM** | **cần đo** |
 
 Cortex-M3 có nhân 1 chu kỳ và chia phần cứng, M0 thì không; L151 ở 32 MHz chạy flash với 1 chu kỳ chờ. Ước lượng thô:
 sức tính L151 32 MHz ngang cỡ F030 48 MHz mà Silverware dùng — **chưa kiểm chứng**, phải đo (mục 6, P0). Bộ nhớ thì

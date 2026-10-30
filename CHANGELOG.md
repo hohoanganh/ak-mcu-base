@@ -9,9 +9,9 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 
 ## Chưa phát hành
 
-- **RAM 16K hoặc 32K (`ram_size_kb` / `AK_RAM_SIZE`, mặc định 16).** AK MCU KIT đọc qua SWD (29/10/2026) báo DEV_ID
-  `0x429` — dòng Cat.2, tức STM32L151CB-**A** có 32K RAM — dù BOM ghi CBT6 (CB thường: Cat.1, `0x416`, 16K). Mặc định
-  vẫn link 16K vì chạy được trên cả hai loại chip; 32K là tùy chọn cho chip CB-A. Bootloader luôn link 16K nên khởi
+- **RAM 32K (`ram_size_kb` / `AK_RAM_SIZE`, mặc định 32).** Chip STM32L151CB của kit là loại Cat.2 (DEV_ID `0x429`),
+  có 32K RAM; base trước đây khai 16K, con số sót lại từ kit 2.1 (L151C8T6) khi nâng cấp chip. Chip Cat.1 (`0x416`,
+  16K) thì build `ram_size_kb = 16`. Bootloader luôn link 16K nên khởi
   động trên mọi chip; build 32K thì nó nhận app có stack tới `0x20008000`, nhưng từ chối nếu chip báo Cat.1 (thay vì
   để app treo cứng ngay lần push đầu tiên). Lệnh `info` in `chip id`: số `0x000` nghĩa là không đọc được mã chip khi
   không có debugger (errata của nhiều dòng STM32) — khi đó bootloader tin giá trị lúc build. Bootloader và app phải

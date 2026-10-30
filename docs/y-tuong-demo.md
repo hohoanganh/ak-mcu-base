@@ -6,7 +6,7 @@ Arduboy, TinyJoypad, các demo SSD1306/u8g2). Xếp theo "độ ấn tượng tr
 Lưu ý về nguồn: danh sách dựa trên tóm tắt kết quả tìm kiếm, **chưa mở và chưa build thử** các repo được dẫn.
 Chỗ nào ghi "chưa kiểm chứng" là không có nguồn đứng sau.
 
-Ràng buộc của kit: STM32L151CB (Cortex-M3 32 MHz, không FPU, 16K RAM), 3 nút, còi thụ động, RTC, cảm biến SHT45,
+Ràng buộc của kit: STM32L151CB (Cortex-M3 32 MHz, không FPU, 32K RAM), 3 nút, còi thụ động, RTC, cảm biến SHT45,
 flash SPI, RS485. Gửi trọn một khung ra OLED mất khoảng 40 ms, nên hiệu ứng nào đổi cả màn hình sẽ chạy 12–20 khung/giây;
 hiệu ứng chỉ đổi một vùng thì rẻ hơn nhiều vì base chỉ gửi những trang đã thay đổi.
 

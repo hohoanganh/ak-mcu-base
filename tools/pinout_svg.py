@@ -122,7 +122,7 @@ def main():
       % (CX, CY + 8, MUTED, SANS))
     a('<text x="%d" y="%d" text-anchor="middle" fill="%s" font-family="%s" font-size="17">Cortex-M3 · 32 MHz</text>'
       % (CX, CY + 36, MUTED, SANS))
-    a('<text x="%d" y="%d" text-anchor="middle" fill="%s" font-family="%s" font-size="17">flash 128K · RAM 16K · EEPROM 4K</text>'
+    a('<text x="%d" y="%d" text-anchor="middle" fill="%s" font-family="%s" font-size="17">flash 128K · RAM 32K · EEPROM 4K</text>'
       % (CX, CY + 62, MUTED, SANS))
 
     for n in range(1, 49):

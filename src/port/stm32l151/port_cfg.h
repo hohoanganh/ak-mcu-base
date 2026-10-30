@@ -3,10 +3,9 @@
  * @brief:  STM32L151CB port configuration (AK Embedded Base Kit).
  *
  *  Flash 128K @ 0x08000000, 256 B pages, erased value 0x00.
- *  RAM @ 0x20000000: STM32L151CB (Cat.1, DEV_ID 0x416) has 16K, STM32L151CB-A
- *  (Cat.2, DEV_ID 0x429) has 32K. The AK MCU KIT read over SWD on 29/10/2026
- *  reports 0x429 although the BOM says CBT6. The build links PORT_RAM_SIZE
- *  (default 16K: runs on both); 32K is opt-in (ram_size / AK_RAM_SIZE).
+ *  RAM 32K @ 0x20000000: the kit's STM32L151CB is the Cat.2 die (DEV_ID 0x429,
+ *  checked 30/10/2026). The 16K of older notes came from the kit 2.1 chip. A
+ *  Cat.1 L151CB (DEV_ID 0x416) has 16K: build with ram_size_kb = 16 / AK_RAM_SIZE=16K.
  *  Data EEPROM 4K @ 0x08080000.
  *  External W25Qxx SPI NOR on SPI1 (default STAGING location).
  *
@@ -81,11 +80,11 @@
  * The bootloader always links 16K, so it starts on any L151CB; with 32K it
  * accepts an app whose stack reaches 32K, unless the chip says it is Cat.1. */
 #ifndef PORT_RAM_SIZE
-#define PORT_RAM_SIZE			(0x4000UL)
+#define PORT_RAM_SIZE			(0x8000UL)
 #endif
 #define PORT_RAM_START			(0x20000000UL)
 #define PORT_RAM_END			(PORT_RAM_START + PORT_RAM_SIZE)
-#define PORT_DEV_ID_CAT1		(0x416U)		/* STM32L1 Cat.1: L151CB, 16K RAM */
+#define PORT_DEV_ID_CAT1		(0x416U)		/* STM32L1 Cat.1: 16K RAM (the kit is Cat.2, 0x429) */
 
 #define PORT_EEPROM_ADDR		(0x08080000UL)	/* boot_ctrl at EEPROM start */
 

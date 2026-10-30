@@ -8,7 +8,7 @@ OTA) · [docs/demo-kit.md](docs/demo-kit.md) · [docs/tien-ich.md](docs/tien-ich
 
 ## 1. Repo này là gì
 
-**ak-mcu-base**: nền firmware bare-metal cho STM32L151CBT6 (128K flash, 16K RAM, 32 MHz), gồm kernel AK (Active
+**ak-mcu-base**: nền firmware bare-metal cho STM32L151CBT6 (128K flash, 32K RAM, 32 MHz), gồm kernel AK (Active
 Object, không RTOS, không preemptive), bootloader, cập nhật firmware an toàn khi mất điện, Modbus RTU và bộ demo cho
 AK Base Kit. Mã phía trên HAL không include header của chip; cùng mã đó chạy trên chip, trên máy tính (unit test,
 bộ giả lập `ak_sim`) và trong trình duyệt (WebAssembly).
@@ -98,9 +98,9 @@ Thêm lệnh shell: một dòng trong `shell_cmds[]` của `src/app/task_console
   ở flash SPI ngoài `0x80000`, bản sao app cũ (quay lui) ở `0xA0000` · EEPROM: `[0,64)` boot_ctrl, `[64,224)` nhật ký
   sự cố, `[224,256)` dành cho dự án. Kho media của demo là flash SPI `[0,0x80000)`: clip từ 0, log thời tiết ở 16
   sector cuối trừ một, chương trình khối ở sector cuối.
-- **RAM: chip trên kit báo DEV_ID `0x429` = STM32L151CB-A, 32K** (BOM ghi CBT6, loại 16K). Mặc định build 16K (chạy trên
-  cả hai); `ram_size_kb = 32` / `-DAK_RAM_SIZE=32K` cho chip CB-A, bootloader và app cùng giá trị. Bootloader luôn link
-  16K. Đã kiểm trên kit 30/10/2026: 32K thật (không lặp địa chỉ), bản demo 32K chạy, stack chưa dùng 24 KB.
+- **RAM 32K** (chip STM32L151CB của kit là loại Cat.2, DEV_ID `0x429`; con số 16K cũ sót lại từ kit 2.1). Mặc định build
+  32K; chip Cat.1 (DEV_ID `0x416`, 16K) thì `ram_size_kb = 16` / `-DAK_RAM_SIZE=16K`. Bootloader và app cùng giá trị;
+  bootloader luôn link 16K, bản 32K từ chối app nếu chip báo Cat.1. Đã kiểm trên kit 30/10/2026: 32K thật (không lặp địa chỉ), bản demo 32K chạy, stack chưa dùng 24 KB.
   Không nối SWD, bật nguồn: `chip id 0x429` vẫn đọc được (DBGMCU đọc được từ phần mềm trên L151).
 - **Dây SWD còn cắm thì mỗi lần bật nguồn kit báo `reset reason 3` (reset mềm), không phải 1.** ST-Link khởi động lại
   cùng kit và reset chip qua SWD (không có NRST → SYSRESETREQ). Muốn thử đường bật nguồn thật (lý do reset, mã chip

@@ -71,7 +71,7 @@ extern void kit_i2c_watch(uint32_t n, uint32_t* scl_high, uint32_t* sda_high, ui
 						  uint32_t* sda_edges);
 
 /* Only with -DAPP_KIT_SPI_SNIFF (env:kit_tools): the capture buffers take 5.6 KB
- * of the 16 KB of RAM.
+ * of the 32 KB of RAM.
  * SPI sniffer on the J6 pins: SPI1 becomes a receive-only slave (NSS PA4,
  * SCK PA5, MOSI PA7), every byte on the bus lands in a RAM buffer, a falling
  * edge of NSS starts a new frame. The flash is off the bus while it runs;

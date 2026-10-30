@@ -13,8 +13,8 @@ cfg = env.GetProjectConfig()
 staging_external = cfg.get("common", "staging_external", "1").strip() == "1"
 image_sign = cfg.get("common", "image_sign", "0").strip() == "1"
 sign_key = cfg.get("common", "sign_key", "tools/keys/dev_priv.pem").strip()
-# APP RAM (port_cfg.h): 16K runs on L151CB and CB-A, 32K only on CB-A
-ram_size = {"16": "0x4000", "32": "0x8000"}.get(cfg.get("common", "ram_size_kb", "16").strip())
+# APP RAM (port_cfg.h): 32K on the kit (Cat.2 die), 16K on a Cat.1 chip
+ram_size = {"16": "0x4000", "32": "0x8000"}.get(cfg.get("common", "ram_size_kb", "32").strip())
 if ram_size is None:
     raise SystemExit("[common] ram_size_kb must be 16 or 32")
 # signed images: 16K bootloader, APP 4K smaller (port_cfg.h)

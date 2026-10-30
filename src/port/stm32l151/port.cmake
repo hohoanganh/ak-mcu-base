@@ -41,8 +41,8 @@ else()
 	set(SIGN_DEFS "")
 	set(SIGN_ARGS "")
 endif()
-# RAM linked by the APP: 16K runs on L151CB and CB-A, 32K only on CB-A (port_cfg.h).
-set(AK_RAM_SIZE "16K" CACHE STRING "APP RAM: 16K | 32K (STM32L151CB-A only)")
+# RAM linked by the APP: 32K on the kit (Cat.2 die), 16K on a Cat.1 chip (port_cfg.h).
+set(AK_RAM_SIZE "32K" CACHE STRING "APP RAM: 32K (kit, DEV_ID 0x429) | 16K (Cat.1, DEV_ID 0x416)")
 if(AK_RAM_SIZE STREQUAL "16K")
 	set(RAM_SIZE 0x4000)
 elseif(AK_RAM_SIZE STREQUAL "32K")

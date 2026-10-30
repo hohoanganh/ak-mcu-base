@@ -17,9 +17,9 @@
     "svd_path": "STM32L15xC.svd"
   },
   "frameworks": ["spl", "cmsis"],
-  "name": "Generic STM32L151CB bare-metal (16k RAM, 128k Flash) - AK Base Kit",
+  "name": "Generic STM32L151CB bare-metal (32k RAM, 128k Flash) - AK Base Kit",
   "upload": {
-    "maximum_ram_size": 16384,
+    "maximum_ram_size": 32768,
     "maximum_size": 131072,
     "protocol": "stlink",
     "protocols": ["stlink", "jlink", "cmsis-dap", "blackmagic"]

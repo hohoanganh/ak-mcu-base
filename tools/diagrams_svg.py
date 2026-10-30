@@ -97,7 +97,7 @@ def block_diagram():
     g.add('<rect x="%d" y="%d" width="%d" height="%d" rx="12" fill="%s" stroke="%s" stroke-width="2"/>' % (mx, my, mw, mh, "#16202b", ACCENT))
     g.text(mx + mw / 2, my + mh / 2 - 26, "STM32L151CBT6", 24, TEXT, "middle", 700, mono=True)
     g.text(mx + mw / 2, my + mh / 2 + 2, "Cortex-M3 · 32 MHz", 16, MUTED, "middle")
-    g.text(mx + mw / 2, my + mh / 2 + 26, "flash 128K · RAM 16K", 16, MUTED, "middle")
+    g.text(mx + mw / 2, my + mh / 2 + 26, "flash 128K · RAM 32K", 16, MUTED, "middle")
     g.text(mx + mw / 2, my + mh / 2 + 50, "EEPROM 4K", 16, MUTED, "middle")
 
     # left: how the board talks to a PC

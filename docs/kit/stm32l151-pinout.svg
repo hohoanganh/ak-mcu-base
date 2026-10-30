@@ -9,7 +9,7 @@
 <text x="640" y="578" text-anchor="middle" fill="#e6edf3" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="27" font-weight="700">STM32L151CBT6</text>
 <text x="640" y="608" text-anchor="middle" fill="#8d9bab" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="17">LQFP-48 · nhìn từ trên</text>
 <text x="640" y="636" text-anchor="middle" fill="#8d9bab" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="17">Cortex-M3 · 32 MHz</text>
-<text x="640" y="662" text-anchor="middle" fill="#8d9bab" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="17">flash 128K · RAM 16K · EEPROM 4K</text>
+<text x="640" y="662" text-anchor="middle" fill="#8d9bab" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="17">flash 128K · RAM 32K · EEPROM 4K</text>
 <rect x="422" y="440.0" width="22" height="12" rx="2" fill="#7c8a9a"/>
 <text x="452" y="447.0" fill="#8d9bab" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="11" dominant-baseline="middle">1</text>
 <text x="412" y="447.0" text-anchor="end" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="16" dominant-baseline="middle"><tspan fill="#e6edf3" font-weight="700">VLCD</tspan><tspan fill="#7c8a9a" dx="10">nguồn</tspan></text>

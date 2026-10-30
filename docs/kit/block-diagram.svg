@@ -7,7 +7,7 @@
 <rect x="500" y="250" width="280" height="330" rx="12" fill="#16202b" stroke="#a8ff3e" stroke-width="2"/>
 <text x="640.0" y="389.0" fill="#e6edf3" font-family="ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace" font-size="24" font-weight="700" text-anchor="middle">STM32L151CBT6</text>
 <text x="640.0" y="417.0" fill="#8d9bab" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="400" text-anchor="middle">Cortex-M3 · 32 MHz</text>
-<text x="640.0" y="441.0" fill="#8d9bab" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="400" text-anchor="middle">flash 128K · RAM 16K</text>
+<text x="640.0" y="441.0" fill="#8d9bab" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="400" text-anchor="middle">flash 128K · RAM 32K</text>
 <text x="640.0" y="465.0" fill="#8d9bab" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="400" text-anchor="middle">EEPROM 4K</text>
 <rect x="60" y="251" width="260" height="68" rx="8" fill="#111821" stroke="#7c8a9a" stroke-width="1.5"/>
 <rect x="60" y="251" width="6" height="68" rx="3" fill="#7c8a9a"/>

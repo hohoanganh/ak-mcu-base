@@ -343,7 +343,7 @@ uint32_t hal_chip_id(void) {
 
 uint8_t hal_vector_ok(uint32_t initial_sp, uint32_t reset_handler) {
 	uint32_t ram_end = PORT_RAM_END;
-	/* a 32K build on a 16K chip: refuse the app instead of a lockup at its first push */
+	/* a 32K build on a Cat.1 (16K) chip: refuse the app instead of a lockup at its first push */
 	if (PORT_RAM_SIZE > 0x4000UL && hal_chip_id() == PORT_DEV_ID_CAT1) {
 		ram_end = PORT_RAM_START + 0x4000UL;
 	}
