@@ -104,6 +104,7 @@ static void cmd_info(const char* args) {
 			ctrl.install_attempts, fw_err_str((fw_err_t)ctrl.last_result), ctrl.install_count,
 			ctrl.trial ? ", on trial" : "", ctrl.rolled_back ? ", rolled back" : "");
 	xprintf("reset reason %d, uptime %u ms\n", hal_reset_reason(), hal_millis());
+	xprintf("chip id 0x%03X\n", (unsigned)hal_chip_id());
 }
 
 static void cmd_verify(const char* args) {

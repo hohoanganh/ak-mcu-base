@@ -445,6 +445,10 @@ const char* hal_board_name(void) {
 	return HOST_BOARD_NAME;
 }
 
+uint32_t hal_chip_id(void) {
+	return 0;	/* no chip */
+}
+
 void hal_jump_to_app(uint32_t vector_addr) {
 	if (host_jump_handler) {
 		host_jump_handler(vector_addr);

@@ -9,6 +9,15 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 
 ## Chưa phát hành
 
+- **RAM 16K hoặc 32K (`ram_size_kb` / `AK_RAM_SIZE`, mặc định 16).** AK MCU KIT đọc qua SWD (29/10/2026) báo DEV_ID
+  `0x429` — dòng Cat.2, tức STM32L151CB-**A** có 32K RAM — dù BOM ghi CBT6 (CB thường: Cat.1, `0x416`, 16K). Mặc định
+  vẫn link 16K vì chạy được trên cả hai loại chip; 32K là tùy chọn cho chip CB-A. Bootloader luôn link 16K nên khởi
+  động trên mọi chip; build 32K thì nó nhận app có stack tới `0x20008000`, nhưng từ chối nếu chip báo Cat.1 (thay vì
+  để app treo cứng ngay lần push đầu tiên). Lệnh `info` in `chip id`: số `0x000` nghĩa là không đọc được mã chip khi
+  không có debugger (errata của nhiều dòng STM32) — khi đó bootloader tin giá trị lúc build. Bootloader và app phải
+  build cùng giá trị. Đã build 10 bản PlatformIO (16K) và boot + demo ở 32K (`_estack` `0x20008000`), `make test`
+  13/13; **chưa chạy trên kit**.
+
 - **App Android nạp firmware qua USB OTG (`tools/android/`).** Cắm bộ USB-UART (CH340, CP210x, FTDI, PL2303, cổng COM
   ảo của ST-LINK/V2-1) vào điện thoại: xem thông tin board, nạp `.img`, xác nhận, quay lui, vào bootloader, reset, và gõ
   lệnh console. Giao thức `fw_proto` chuyển từ `tools/ak_fw.py` sang Kotlin thuần (`proto/`), có các ca của

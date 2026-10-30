@@ -10,7 +10,7 @@ ENTRY(reset_handler)
 
 MEMORY {
 	FLASH (rx)	: ORIGIN = 0x08000000 + __boot_size, LENGTH = 128K - __boot_size
-	RAM (rwx)	: ORIGIN = 0x20000000, LENGTH = 16K
+	RAM (rwx)	: ORIGIN = 0x20000000, LENGTH = __ram_size	/* 16K, or 32K on L151CB-A (port_cfg.h) */
 }
 
 _estack = ORIGIN(RAM) + LENGTH(RAM);

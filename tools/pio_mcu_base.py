@@ -13,6 +13,10 @@ cfg = env.GetProjectConfig()
 staging_external = cfg.get("common", "staging_external", "1").strip() == "1"
 image_sign = cfg.get("common", "image_sign", "0").strip() == "1"
 sign_key = cfg.get("common", "sign_key", "tools/keys/dev_priv.pem").strip()
+# APP RAM (port_cfg.h): 16K runs on L151CB and CB-A, 32K only on CB-A
+ram_size = {"16": "0x4000", "32": "0x8000"}.get(cfg.get("common", "ram_size_kb", "16").strip())
+if ram_size is None:
+    raise SystemExit("[common] ram_size_kb must be 16 or 32")
 # signed images: 16K bootloader, APP 4K smaller (port_cfg.h)
 if image_sign and not os.path.exists(os.path.join(proj, sign_key)):
     raise SystemExit("No signing key at %s. Make a development pair first: python tools/ak_sign.py devkey" % sign_key)
@@ -26,6 +30,7 @@ env.Append(LINKFLAGS=[
     "-mcpu=cortex-m3", "-mthumb", "-mfloat-abi=soft", "-Os", "-flto",
     "-Wl,--defsym=__app_part_size=" + app_part_size,
     "-Wl,--defsym=__boot_size=" + boot_size,
+    "-Wl,--defsym=__ram_size=" + ram_size,
     "-nostartfiles", "--specs=nano.specs",
     "-Wl,--gc-sections", "-Wl,--print-memory-usage",
     "-L" + os.path.join(proj, "src", "port", "stm32l151"),

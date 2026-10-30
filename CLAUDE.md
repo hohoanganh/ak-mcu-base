@@ -98,6 +98,9 @@ Thêm lệnh shell: một dòng trong `shell_cmds[]` của `src/app/task_console
   ở flash SPI ngoài `0x80000`, bản sao app cũ (quay lui) ở `0xA0000` · EEPROM: `[0,64)` boot_ctrl, `[64,224)` nhật ký
   sự cố, `[224,256)` dành cho dự án. Kho media của demo là flash SPI `[0,0x80000)`: clip từ 0, log thời tiết ở 16
   sector cuối trừ một, chương trình khối ở sector cuối.
+- **RAM: chip trên kit báo DEV_ID `0x429` = STM32L151CB-A, 32K** (BOM ghi CBT6, loại 16K). Mặc định build 16K (chạy trên
+  cả hai); `ram_size_kb = 32` / `-DAK_RAM_SIZE=32K` cho chip CB-A, bootloader và app cùng giá trị. Bootloader luôn link
+  16K. Chưa kiểm trên kit: `info` có in `chip id` đọc được khi không có debugger không, và bản 32K có chạy không.
 - Ảnh mới cài xong chạy **thử** (`boot_ctrl.trial`): app tự xác nhận sau `APP_FW_CONFIRM_MS` (30 s) hoặc `fw confirm`;
   không xác nhận sau 3 lần khởi động thì bootloader cài lại ảnh cũ từ BACKUP. `fw rollback` quay lui chủ động.
 - **Vector của app chỉ căn 256 B** (`0x08003100`, bản ký `0x08004100`): bảng vector của app phải ≤ 256 B (16 + 45 ngắt

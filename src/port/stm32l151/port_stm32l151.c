@@ -335,8 +335,19 @@ void hal_jump_to_app(uint32_t vector_addr) {
 	hal_reset();
 }
 
+/* DBGMCU_IDCODE.DEV_ID. Some STM32 read 0 here without a debugger attached
+ * (errata of several families): 0 means "unknown", never "small chip". */
+uint32_t hal_chip_id(void) {
+	return DBGMCU->IDCODE & 0xFFFU;
+}
+
 uint8_t hal_vector_ok(uint32_t initial_sp, uint32_t reset_handler) {
-	return initial_sp > PORT_RAM_START && initial_sp <= PORT_RAM_END && (initial_sp & 3U) == 0 &&
+	uint32_t ram_end = PORT_RAM_END;
+	/* a 32K build on a 16K chip: refuse the app instead of a lockup at its first push */
+	if (PORT_RAM_SIZE > 0x4000UL && hal_chip_id() == PORT_DEV_ID_CAT1) {
+		ram_end = PORT_RAM_START + 0x4000UL;
+	}
+	return initial_sp > PORT_RAM_START && initial_sp <= ram_end && (initial_sp & 3U) == 0 &&
 		   (reset_handler & 1U) &&
 		   reset_handler > PORT_APP_ADDR + 256U && reset_handler < PORT_APP_ADDR + PORT_APP_SIZE;
 }

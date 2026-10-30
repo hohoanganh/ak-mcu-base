@@ -41,6 +41,16 @@ else()
 	set(SIGN_DEFS "")
 	set(SIGN_ARGS "")
 endif()
+# RAM linked by the APP: 16K runs on L151CB and CB-A, 32K only on CB-A (port_cfg.h).
+set(AK_RAM_SIZE "16K" CACHE STRING "APP RAM: 16K | 32K (STM32L151CB-A only)")
+if(AK_RAM_SIZE STREQUAL "16K")
+	set(RAM_SIZE 0x4000)
+elseif(AK_RAM_SIZE STREQUAL "32K")
+	set(RAM_SIZE 0x8000)
+else()
+	message(FATAL_ERROR "Unknown AK_RAM_SIZE: ${AK_RAM_SIZE}")
+endif()
+message(STATUS "STM32L151 RAM: ${AK_RAM_SIZE}")
 message(STATUS "STM32L151 staging: ${AK_STAGING}, signed images: ${AK_IMAGE_SIGN} (BOOT ${BOOT_SIZE}, APP partition ${APP_PART_SIZE})")
 
 # the Ethernet chip driver only goes into the gateway build
@@ -139,11 +149,11 @@ function(ak_firmware name ldscript)
 	add_executable(${name} ${FW_SOURCES})
 	set_target_properties(${name} PROPERTIES SUFFIX ".elf")
 	target_include_directories(${name} PRIVATE ${FW_INCS} ${BASE_INC} ${PORT_INC})
-	target_compile_definitions(${name} PRIVATE ${MCU_DEFS} ${VERSION_DEFS} ${STAGING_DEFS} ${SIGN_DEFS} ${BOARD_DEFS} ${FW_DEFS})
+	target_compile_definitions(${name} PRIVATE ${MCU_DEFS} ${VERSION_DEFS} ${STAGING_DEFS} ${SIGN_DEFS} ${BOARD_DEFS} PORT_RAM_SIZE=${RAM_SIZE}UL ${FW_DEFS})
 	target_compile_options(${name} PRIVATE ${MCU_FLAGS} -Os -g -ffunction-sections -fdata-sections ${MCU_WARN} -Werror)
 	target_link_options(${name} PRIVATE ${MCU_FLAGS}
 		-T${PORT_DIR}/${ldscript} -L${PORT_DIR} -Wl,--defsym=__app_part_size=${APP_PART_SIZE}
-		-Wl,--defsym=__boot_size=${BOOT_SIZE}
+		-Wl,--defsym=__boot_size=${BOOT_SIZE} -Wl,--defsym=__ram_size=${RAM_SIZE}
 		-nostartfiles --specs=nano.specs
 		-Wl,--gc-sections -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/${name}.map -Wl,--print-memory-usage)
 	target_link_libraries(${name} PRIVATE spl ${SIGN_LIBS} c gcc)

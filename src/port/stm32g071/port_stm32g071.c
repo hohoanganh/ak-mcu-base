@@ -326,6 +326,10 @@ const char* hal_board_name(void) {
 	return PORT_BOARD_NAME;
 }
 
+uint32_t hal_chip_id(void) {
+	return 0;	/* not read on this port */
+}
+
 void hal_jump_to_app(uint32_t vector_addr) {
 	port_noinit.jump_addr = vector_addr;
 	port_noinit.jump_magic = PORT_JUMP_MAGIC;

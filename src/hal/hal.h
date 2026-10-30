@@ -43,6 +43,9 @@ extern void hal_reset(void) __attribute__((noreturn));
  * Prevents installing an image built for another board. */
 extern const char* hal_board_name(void);
 
+/* Chip identity (STM32: DBGMCU DEV_ID), 0 when unknown or not readable. */
+extern uint32_t hal_chip_id(void);
+
 /* Bootloader only: start the application whose vector table is at vector_addr. */
 extern void hal_jump_to_app(uint32_t vector_addr) __attribute__((noreturn));
 
