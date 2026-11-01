@@ -9,6 +9,13 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 
 ## Chưa phát hành
 
+- **Tách yêu cầu Modbus bằng Rust (`AK_RUST_MODBUS` / PlatformIO `rust_modbus`, mặc định tắt).** Slave gọi
+  `ak_rs_mb_tach()` của `libak_ffi.a` (crate `ak-modbus` của `hohoanganh/ak-mcu-rust`) thay `nmbs_server_poll()`;
+  callback thanh ghi, OTA vẫn là C. App slave STM32 −3 452 B flash (server của nanoMODBUS không còn được link),
+  +148 B RAM; demo −3 200 B. `test_modbus` thêm `test_slave_bad_requests` và `test_slave_random_requests` (20 000 yêu cầu
+  ngẫu nhiên, câu trả lời phải giống nanoMODBUS từng byte), chạy cho cả hai bản. Bốn chỗ cố ý khác (theo đặc tả):
+  `docs/modbus.md`. CMake: `ak_use_rust_proto()` đổi tên `ak_use_rust()`; CI job `rust-proto` đổi tên `rust`, bật cả hai
+  tuỳ chọn, build thêm app slave. **Chưa chạy trên kit**; PlatformIO chưa build thử (máy không có `pio`).
 - **Tách khung `fw_proto` bằng Rust (`AK_RUST_PROTO` / PlatformIO `rust_proto`, mặc định tắt).** App gọi
   `ak_rs_proto_feed()` của `libak_ffi.a` (repo `hohoanganh/ak-mcu-rust`, crate `ak-ffi`) thay máy trạng thái C; phần sau
   khung vẫn là C, bootloader giữ bản C. Rust panic → `FATAL("RS", 1)`. Demo +312 B flash, +272 B RAM (`libc` link trước

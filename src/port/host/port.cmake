@@ -45,7 +45,7 @@ add_executable(test_fw
 target_include_directories(test_fw PRIVATE ${ROOT}/tests ${BASE_INC} ${HOST_DIR})
 target_compile_definitions(test_fw PRIVATE AK_SIM ${VERSION_DEFS} FW_IMAGE_SIGN=1)
 target_link_libraries(test_fw PRIVATE p256m_host)
-ak_use_rust_proto(test_fw x86_64-unknown-linux-gnu)
+ak_use_rust(test_fw x86_64-unknown-linux-gnu)
 target_compile_options(test_fw PRIVATE ${HOST_WARN} -fsanitize=address,undefined -g)
 target_link_options(test_fw PRIVATE -fsanitize=address,undefined)
 add_test(NAME fw COMMAND test_fw)
@@ -113,6 +113,7 @@ target_compile_definitions(test_modbus PRIVATE AK_SIM ${VERSION_DEFS})
 target_compile_options(test_modbus PRIVATE ${HOST_WARN} -fsanitize=address,undefined -g)
 target_link_options(test_modbus PRIVATE -fsanitize=address,undefined)
 target_link_libraries(test_modbus PRIVATE nanomodbus_host)
+ak_use_rust(test_modbus x86_64-unknown-linux-gnu)
 add_test(NAME modbus COMMAND test_modbus)
 
 # --- kit demo: screens and game logic, with the kit emulated in the test ---
@@ -140,7 +141,7 @@ add_executable(ak_sim
 target_include_directories(ak_sim PRIVATE ${SRC}/app ${BASE_INC} ${MB_INC} ${HOST_DIR})
 target_compile_definitions(ak_sim PRIVATE AK_SIM ${VERSION_DEFS} APP_MODBUS_SLAVE)
 target_link_libraries(ak_sim PRIVATE nanomodbus_host)
-ak_use_rust_proto(ak_sim x86_64-unknown-linux-gnu)
+ak_use_rust(ak_sim x86_64-unknown-linux-gnu)
 target_compile_options(ak_sim PRIVATE ${HOST_WARN} -g)
 
 # --- end-to-end: tools/ak_fw.py flashes ak_sim over pipes ---

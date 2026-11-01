@@ -14,7 +14,9 @@
 #define AK_RUST_PROTO	(0)
 #endif
 
-#if AK_RUST_PROTO
+/* libak_ffi.a is linked (AK_RUST_PROTO or AK_RUST_MODBUS, app side only): the C half
+ * that every Rust module needs lives here */
+#if (AK_RUST_PROTO || defined(AK_RUST_MODBUS)) && !defined(AK_BOOTLOADER)
 #include "ak_rs.h"
 #include "ak_port.h"
 

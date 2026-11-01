@@ -116,6 +116,10 @@ Thêm lệnh shell: một dòng trong `shell_cmds[]` của `src/app/task_console
 - **`AK_RUST_PROTO` (mặc định tắt):** app tách khung `fw_proto` bằng Rust (`../ak-mcu-rust`, crate `ak-ffi`, cần `cargo`).
   Giữ `libc` đứng trước `libak_ffi` khi link và các hàm `__aeabi_memcpy*` trong `fw_proto.c`, không thì Rust kéo `memcpy`
   riêng vào (+2,9 KB). Đổi định dạng khung thì sửa cả `ak-boot/src/khung.rs` và `ak-ffi/include/ak_rs.h` bên đó.
+- **`AK_RUST_MODBUS` (mặc định tắt, PlatformIO `rust_modbus`):** slave Modbus tách yêu cầu bằng Rust (crate `ak-modbus`)
+  thay `nmbs_server_poll()`; callback thanh ghi và OTA vẫn ở `mb_slave.c`. `test_modbus` có
+  `test_slave_random_requests`: digest câu trả lời phải bằng của nanoMODBUS. Đổi bộ sinh khung thì tính lại digest
+  bằng bản **không** bật Rust, rồi kiểm bản Rust ra cùng số. Bốn chỗ cố ý khác nanoMODBUS: `docs/modbus.md`.
 - Biến thể ký số (`AK_IMAGE_SIGN=ON` / `image_sign = 1`): bootloader 16K, APP từ `0x08004000`; ảnh phải ký bằng
   `mkimage.py --sign-key`; khoá công khai ở `src/services/fw/fw_pubkey.c`. **Khoá riêng không bao giờ vào repo** (`tools/keys/` bị git bỏ qua): chạy `python tools/ak_sign.py devkey` một lần mỗi clone trước khi build bản ký; lệnh ghi lại `fw_pubkey.c`, đừng commit thay đổi đó trừ khi cặp khoá là của sản phẩm.
 - Bootloader chỉ chạy ảnh có CRC đúng: nạp `app.img`, không nạp `.bin` trần. **App và bootloader lấy cùng một bản
