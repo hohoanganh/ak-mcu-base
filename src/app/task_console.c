@@ -219,6 +219,13 @@ static void cmd_crash(const char* args) {
 			memcpy(tag, &r.info, 4);
 			tag[4] = 0;
 			xprintf("  %s 0x%02X", tag, r.code);
+			/* a panic of an ak-mcu-rust program: pc = line, lr = first 4 chars of the file */
+			if (memcmp(tag, "RUST", 4) == 0 && r.pc != 0) {
+				char file[5];
+				memcpy(file, &r.lr, 4);
+				file[4] = 0;
+				xprintf(" (panic %s.. line %u)", file, (unsigned)r.pc);
+			}
 		}
 			break;
 		case CRASH_KIND_TASK_STALLED:

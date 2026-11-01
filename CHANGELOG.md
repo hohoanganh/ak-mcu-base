@@ -9,6 +9,9 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 
 ## Chưa phát hành
 
+- **Lệnh `crash` đọc được panic của bài Rust (ak-mcu-rust).** `ak-kit` ghi panic, HardFault, watchdog vào cùng nhật ký sự
+  cố (`crash_log.c`, cùng định dạng, kiểm từng byte bằng ảnh mẫu do chính `crash_log.c` sinh). Bản ghi thẻ `RUST` in thêm
+  tệp và dòng: `fatal  RUST 0x01 (panic main.. line 34)`. +76 B flash. Đã thử trong `ak_sim`; chưa thử trên kit.
 - **Tách yêu cầu Modbus bằng Rust (`AK_RUST_MODBUS` / PlatformIO `rust_modbus`, mặc định tắt).** Slave gọi
   `ak_rs_mb_tach()` của `libak_ffi.a` (crate `ak-modbus` của `hohoanganh/ak-mcu-rust`) thay `nmbs_server_poll()`;
   callback thanh ghi, OTA vẫn là C. App slave STM32 −3 452 B flash (server của nanoMODBUS không còn được link),
