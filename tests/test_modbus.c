@@ -257,6 +257,189 @@ static void test_slave_other_unit(void) {
 	CHECK_EQ(mb_slave_request_count(), 0);
 }
 
+/* one raw request on the bus, t3.5 of silence, then the answer (0 = none) */
+static uint32_t raw_request(const uint8_t* head, uint32_t n, uint8_t bad_crc, uint8_t* rsp) {
+	uint8_t f[32];
+	uint16_t crc;
+
+	memcpy(f, head, n);
+	crc = rtu_crc(f, n);
+	f[n] = (uint8_t)crc ^ (bad_crc ? 0x01 : 0x00);
+	f[n + 1] = (uint8_t)(crc >> 8);
+	host_rs485_inject(f, n + 2);
+	host_advance_ms(5);
+	mb_slave_poll();
+	while (hal_rs485_tx_busy()) {
+		host_advance_ms(1);
+	}
+	return host_rs485_take_tx(rsp, 32);
+}
+
+/* edge cases both frame splitters (nanoMODBUS, and Rust with AK_RUST_MODBUS) must
+ * answer the same way */
+static void test_slave_bad_requests(void) {
+	static const uint8_t qty0[] = { 1, 3, 0, 0, 0, 0 };				/* quantity 0 */
+	static const uint8_t qty126[] = { 1, 4, 0, 0, 0, 126 };			/* quantity > 125 */
+	static const uint8_t wrap[] = { 1, 3, 0xFF, 0xFF, 0, 2 };		/* past 0xFFFF */
+	static const uint8_t fc5[] = { 1, 5, 0, 0, 0xFF, 0 };			/* not supported */
+	static const uint8_t bytes[] = { 1, 16, 0, 100, 0, 2, 2, 0, 1 };	/* 2 bytes for 2 registers */
+	static const uint8_t bcast[] = { 0, 6, 0, 101, 0, 77 };			/* broadcast write */
+	uint8_t rsp[32];
+
+	setup_slave(0);
+	CHECK_EQ(raw_request(qty0, sizeof(qty0), 0, rsp), 5);
+	CHECK_EQ(rsp[1], 0x83);
+	CHECK_EQ(rsp[2], NMBS_EXCEPTION_ILLEGAL_DATA_VALUE);
+	CHECK_EQ(raw_request(qty126, sizeof(qty126), 0, rsp), 5);
+	CHECK_EQ(rsp[1], 0x84);
+	CHECK_EQ(rsp[2], NMBS_EXCEPTION_ILLEGAL_DATA_VALUE);
+	CHECK_EQ(raw_request(wrap, sizeof(wrap), 0, rsp), 5);
+	CHECK_EQ(rsp[2], NMBS_EXCEPTION_ILLEGAL_DATA_ADDRESS);
+	CHECK_EQ(raw_request(fc5, sizeof(fc5), 0, rsp), 5);
+	CHECK_EQ(rsp[1], 0x85);
+	CHECK_EQ(rsp[2], NMBS_EXCEPTION_ILLEGAL_FUNCTION);
+	CHECK_EQ(raw_request(bytes, sizeof(bytes), 0, rsp), 5);
+	CHECK_EQ(rsp[1], 0x90);
+	CHECK_EQ(rsp[2], NMBS_EXCEPTION_ILLEGAL_DATA_VALUE);
+	CHECK_EQ(rtu_crc(rsp, 5), 0);
+	/* function 16 with an odd byte count: the spec says exception 03. nanoMODBUS reads
+	 * the frame one byte short, finds a bad CRC and stays silent */
+	{
+		static const uint8_t odd[] = { 1, 16, 0, 100, 0, 1, 3, 0, 1, 2 };
+#if defined(AK_RUST_MODBUS)
+		CHECK_EQ(raw_request(odd, sizeof(odd), 0, rsp), 5);
+		CHECK_EQ(rsp[2], NMBS_EXCEPTION_ILLEGAL_DATA_VALUE);
+#else
+		CHECK_EQ(raw_request(odd, sizeof(odd), 0, rsp), 0);
+#endif
+		CHECK_EQ(setpoint_regs[0], 10);
+	}
+	/* bad CRC: silence, nothing written */
+	CHECK_EQ(raw_request(qty0, sizeof(qty0), 1, rsp), 0);
+	CHECK_EQ(raw_request(bcast, sizeof(bcast), 1, rsp), 0);
+	CHECK_EQ(setpoint_regs[1], 20);
+	/* broadcast: done, not answered */
+	CHECK_EQ(raw_request(bcast, sizeof(bcast), 0, rsp), 0);
+	CHECK_EQ(setpoint_regs[1], 77);
+	CHECK_EQ(write_calls, 1);
+}
+
+/* Random requests, every byte of every answer folded into a CRC-32. The constant is
+ * what nanoMODBUS answers; a build with AK_RUST_MODBUS must give the same, frame for
+ * frame. Left out on purpose (the Rust splitter follows the Modbus spec there, see
+ * docs/modbus.md): bytes after the end of a frame, an unknown function code with a
+ * bad CRC, function 01/02 with a bad quantity, function 16 with an odd byte count
+ * (test_slave_bad_requests); and other units (tested above). */
+#define RANDOM_REQUESTS			(20000)
+#define RANDOM_REQUESTS_DIGEST	(0x75694FC2UL)
+
+static uint32_t rnd_state;
+
+static uint32_t rnd(void) {
+	rnd_state = rnd_state * 1103515245UL + 12345UL;
+	return rnd_state >> 8;
+}
+
+static uint16_t rnd_address(void) {
+	switch (rnd() % 4) {
+	case 0:  return (uint16_t)(rnd() % 8);
+	case 1:  return (uint16_t)(95 + rnd() % 10);
+	case 2:  return (uint16_t)(0xFFFF - rnd() % 130);		/* runs past 0xFFFF */
+	default: return (uint16_t)(rnd() % 300);
+	}
+}
+
+static uint16_t rnd_quantity(uint16_t max) {
+	switch (rnd() % 4) {
+	case 0:  return 0;
+	case 1:  return (uint16_t)(1 + rnd() % 3);
+	case 2:  return (uint16_t)(max - 1 + rnd() % 3);		/* max - 1 .. max + 1 */
+	default: return (uint16_t)(rnd() % (max + 5U));
+	}
+}
+
+static void put16(uint8_t* p, uint16_t v) {
+	p[0] = (uint8_t)(v >> 8);
+	p[1] = (uint8_t)v;
+}
+
+static void test_slave_random_requests(void) {
+	static const uint8_t fcs[] = { 3, 4, 6, 16, 16, 1, 2, 5 };
+	uint8_t f[300], rsp[300];
+	uint32_t digest = CRC32_INIT;
+	uint32_t n, answered = 0;
+	uint16_t crc, q, nb;
+
+	setup_slave(0);
+	rnd_state = 1;
+	for (uint32_t i = 0; i < RANDOM_REQUESTS; i++) {
+		f[0] = (rnd() % 8 == 0) ? 0 : 1;			/* broadcast or us */
+		f[1] = fcs[rnd() % sizeof(fcs)];
+		put16(f + 2, rnd_address());
+		switch (f[1]) {
+		case 3:
+		case 4:
+			put16(f + 4, rnd_quantity(125));
+			n = 6;
+			break;
+		case 1:
+		case 2:		/* unsupported, valid quantity: exception 01 */
+			put16(f + 2, (uint16_t)(rnd() % 1000));
+			put16(f + 4, (uint16_t)(1 + rnd() % 100));
+			n = 6;
+			break;
+		case 16:
+			q = rnd_quantity(123);
+			switch (rnd() % 5) {
+			case 0:  nb = (uint16_t)(2U * q + 2U); break;
+			case 1:  nb = 0; break;
+			case 2:  nb = (uint16_t)(rnd() % 256); break;		/* up to 255 (> 246) */
+			default: nb = (uint16_t)(2U * q); break;
+			}
+			nb &= ~1U;		/* odd: the two splitters differ, see above */
+			if (nb > 254) {
+				nb = 254;
+			}
+			put16(f + 4, q);
+			f[6] = (uint8_t)nb;
+			for (uint32_t k = 0; k < nb; k++) {
+				f[7 + k] = (uint8_t)rnd();
+			}
+			n = 7U + nb;
+			break;
+		default:	/* 5 and 6: address + value */
+			put16(f + 4, (uint16_t)rnd());
+			n = 6;
+			break;
+		}
+		crc = rtu_crc(f, n);
+		f[n] = (uint8_t)crc;
+		f[n + 1] = (uint8_t)(crc >> 8);
+		if (rnd() % 10 == 0) {
+			f[n + (rnd() % 2)] ^= (uint8_t)(1U << (rnd() % 8));	/* bad CRC */
+		}
+		host_rs485_inject(f, n + 2);
+		host_advance_ms(5);
+		mb_slave_poll();
+		while (hal_rs485_tx_busy()) {
+			host_advance_ms(1);
+		}
+		n = host_rs485_take_tx(rsp, sizeof(rsp));
+		answered += (n != 0);
+		digest = crc32_update(digest, &n, sizeof(n));
+		digest = crc32_update(digest, rsp, n);
+		host_advance_ms(25);		/* nothing left half-read */
+		mb_slave_poll();
+		CHECK_EQ(host_rs485_take_tx(rsp, sizeof(rsp)), 0);
+	}
+	digest = crc32_update(digest, setpoint_regs, sizeof(setpoint_regs));
+	digest = crc32_update(digest, &write_calls, sizeof(write_calls));
+	printf("    %u requests, %u answered, digest 0x%08lX\n", RANDOM_REQUESTS, (unsigned)answered,
+		   (unsigned long)digest);
+	CHECK(answered > RANDOM_REQUESTS / 2);
+	CHECK_EQ(digest, RANDOM_REQUESTS_DIGEST);
+}
+
 /*----------------------------------------------------------------------------
  * firmware update over the 0xF000 block
  *--------------------------------------------------------------------------*/
@@ -740,6 +923,8 @@ TT_MAIN_BEGIN("test_modbus")
 	RUN_TEST(test_slave_waits_for_frame_end);
 	RUN_TEST(test_slave_answer_does_not_block);
 	RUN_TEST(test_slave_other_unit);
+	RUN_TEST(test_slave_bad_requests);
+	RUN_TEST(test_slave_random_requests);
 	RUN_TEST(test_ota_full_flow);
 	RUN_TEST(test_ota_rejects);
 	RUN_TEST(test_ota_bad_image);

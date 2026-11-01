@@ -60,6 +60,34 @@ Bảng thanh ghi của app mẫu:
 Lệnh shell `mb` in số byte đã nhận và số request đã trả lời. Có byte mà không có request nào được trả lời thì sai
 baud hoặc đảo A/B; không có byte nào thì không có tín hiệu tới bộ thu.
 
+### Tách yêu cầu bằng Rust (`AK_RUST_MODBUS`, mặc định tắt)
+
+CMake `-DAK_RUST_MODBUS=ON`, PlatformIO `rust_modbus = 1`; cần repo
+[ak-mcu-rust](https://github.com/hohoanganh/ak-mcu-rust) ở `../ak-mcu-rust` và `cargo`. Khi đó `mb_slave_poll()` không
+gọi `nmbs_server_poll()` nữa. Khung yêu cầu được tách bằng crate `ak-modbus`, gồm địa chỉ, độ dài, CRC, mã hàm và giới
+hạn số thanh ghi. Phần còn lại vẫn là C: khối thanh ghi, `on_write`, OTA, chặn OTA bằng quảng bá. Master và gateway vẫn
+dùng nanoMODBUS.
+
+| App STM32 (slave) | C (nanoMODBUS) | Rust |
+|---|---|---|
+| Flash | 22 044 B | 18 592 B (**−3 452 B**: phần server của nanoMODBUS không còn được link) |
+| RAM tĩnh | 2 808 B | 2 956 B (+148 B) |
+| Demo, flash | 59 596 B | 56 396 B (−3 200 B) |
+
+`test_modbus` chạy được cho cả hai bản. `test_slave_random_requests` gửi 20 000 yêu cầu ngẫu nhiên (đủ loại số lượng,
+địa chỉ vượt `0xFFFF`, số byte không khớp, quảng bá, CRC sai). CRC-32 của mọi câu trả lời phải bằng đúng giá trị của
+nanoMODBUS, tức là hai bản trả lời giống nhau từng byte. Có bốn chỗ bản Rust cố ý khác, đều theo đặc tả Modbus:
+
+| Khung | nanoMODBUS | Rust |
+|---|---|---|
+| Mã hàm 16, số byte lẻ (CRC đúng) | im lặng (đọc thiếu một byte rồi thấy sai CRC) | ngoại lệ 03 |
+| Mã hàm không hỗ trợ, CRC sai | mã lạ: vẫn trả ngoại lệ 01 | im lặng |
+| Mã hàm 01/02, số lượng sai | ngoại lệ 03 | ngoại lệ 01 (mã hàm được kiểm trước) |
+| Thừa byte sau khung | trả lời phần đầu, phần thừa thành khung sau | bỏ cả khung |
+
+Khung đứt giữa chừng: nanoMODBUS đứng chờ trong `mb_slave_poll()` tới 20 ms cho byte còn thiếu. Bản Rust giữ khung và
+trả về ngay, lần gọi sau ghép tiếp; im quá 20 ms thì bỏ.
+
 ## Cập nhật firmware qua RS485
 
 ![Năm bước của một lần cập nhật firmware](diagram-ota.svg)

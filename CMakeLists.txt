@@ -64,22 +64,24 @@ set(FW_SRC
 	${SRC}/services/fw/fw_pubkey.c
 )
 
-# AK_RUST_PROTO: the app splits fw_proto frames with the Rust code of ak-mcu-rust
-# (crate ak-ffi -> libak_ffi.a), checked out at AK_RUST_DIR; needs cargo. The port calls
-# ak_use_rust_proto(<target> <rust target triple>) on the app-side targets; the
-# bootloader keeps the C state machine (fw_proto.c).
+# Rust modules of ak-mcu-rust (crate ak-ffi -> libak_ffi.a), checked out at AK_RUST_DIR;
+# need cargo. The bootloader keeps C.
+#   AK_RUST_PROTO : the app splits fw_proto frames with Rust (fw_proto.c keeps the C one)
+#   AK_RUST_MODBUS: the Modbus slave splits requests with Rust instead of nmbs_server_poll()
+# The port calls ak_use_rust(<target> <rust target triple>) on the app-side targets.
 option(AK_RUST_PROTO "App splits fw_proto frames with Rust (ak-mcu-rust, crate ak-ffi)" OFF)
+option(AK_RUST_MODBUS "Modbus slave splits requests with Rust (ak-mcu-rust, crate ak-ffi)" OFF)
 set(AK_RUST_DIR "${ROOT}/../ak-mcu-rust" CACHE PATH "Checkout of github.com/hohoanganh/ak-mcu-rust")
-function(ak_use_rust_proto tgt rust_target)
-	if(NOT AK_RUST_PROTO)
+function(ak_use_rust tgt rust_target)
+	if(NOT AK_RUST_PROTO AND NOT AK_RUST_MODBUS)
 		return()
 	endif()
 	if(NOT EXISTS ${AK_RUST_DIR}/ak-ffi/Cargo.toml)
-		message(FATAL_ERROR "AK_RUST_PROTO=ON but no ak-mcu-rust at ${AK_RUST_DIR} (-DAK_RUST_DIR=...)")
+		message(FATAL_ERROR "AK_RUST_PROTO/AK_RUST_MODBUS=ON but no ak-mcu-rust at ${AK_RUST_DIR} (-DAK_RUST_DIR=...)")
 	endif()
 	find_program(CARGO cargo HINTS $ENV{HOME}/.cargo/bin $ENV{CARGO_HOME}/bin)
 	if(NOT CARGO)
-		message(FATAL_ERROR "AK_RUST_PROTO=ON but cargo not found")
+		message(FATAL_ERROR "AK_RUST_PROTO/AK_RUST_MODBUS=ON but cargo not found")
 	endif()
 	set(lib ${AK_RUST_DIR}/target/${rust_target}/release/libak_ffi.a)
 	if(NOT TARGET ak_ffi_${rust_target})
@@ -90,7 +92,12 @@ function(ak_use_rust_proto tgt rust_target)
 			COMMENT "cargo build -p ak-ffi --target ${rust_target}")
 	endif()
 	add_dependencies(${tgt} ak_ffi_${rust_target})
-	target_compile_definitions(${tgt} PRIVATE AK_RUST_PROTO=1)
+	if(AK_RUST_PROTO)
+		target_compile_definitions(${tgt} PRIVATE AK_RUST_PROTO=1)
+	endif()
+	if(AK_RUST_MODBUS)
+		target_compile_definitions(${tgt} PRIVATE AK_RUST_MODBUS=1)
+	endif()
 	target_include_directories(${tgt} PRIVATE ${AK_RUST_DIR}/ak-ffi/include)
 	# libc first: memcpy/memmove from the C library, not the bigger Rust copies
 	target_link_libraries(${tgt} PRIVATE c ${lib})
