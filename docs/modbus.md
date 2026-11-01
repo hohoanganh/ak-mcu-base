@@ -70,7 +70,7 @@ dùng nanoMODBUS.
 
 | App STM32 (slave) | C (nanoMODBUS) | Rust |
 |---|---|---|
-| Flash | 22 044 B | 18 592 B (**−3 452 B**: phần server của nanoMODBUS không còn được link) |
+| Flash (`.text` + `.data`) | 22 292 B | 18 840 B (**−3 452 B**: phần server của nanoMODBUS không còn được link) |
 | RAM tĩnh | 2 808 B | 2 956 B (+148 B) |
 | Demo, flash | 59 596 B | 56 396 B (−3 200 B) |
 
