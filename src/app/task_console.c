@@ -373,6 +373,13 @@ void task_console(ak_msg_t* msg) {
 	}
 		break;
 
+#if defined(APP_MODBUS_MASTER) || defined(APP_MODBUS_GATEWAY)
+	case CONSOLE_SIG_MB_DONE:
+		cmd_mb_done();
+		xprintf("> ");
+		break;
+#endif
+
 	default:
 		break;
 	}

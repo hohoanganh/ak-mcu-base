@@ -9,6 +9,13 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 
 ## Chưa phát hành
 
+- **Modbus master và gateway không chặn.** `mb_master_send()` gửi rồi trả về, `mb_master_poll()` nhặt câu trả lời (đủ
+  khung khi đường dây im 3,5 ký tự, hết giờ tính từ lúc yêu cầu ra hết), kết quả báo bằng callback → message
+  (`CONSOLE_SIG_MB_DONE` cho lệnh `mb read`/`mb write`). Gateway bóc MBAP và chuyển tiếp PDU thô: mọi mã hàm đi qua,
+  slave im lặng trả `0x0B` (trước là `0x04`), socket vẫn được đọc trong lúc chờ slave. Cả hai bỏ nanoMODBUS (chỉ slave
+  còn dùng): app master −512 B flash, gateway −4 564 B flash, −152 B RAM. API cũ `mb_master_read_holding()`… (chặn
+  tới 200 ms trong handler) bỏ. `test_modbus`: test master viết lại theo kiểu send/poll/done, thêm quảng bá, FC 16,
+  trả lời sai unit/mã hàm/CRC; test gateway kiểm mỗi `poll` không làm đồng hồ ảo nhích. **Chưa thử trên kit.**
 - **Lệnh `crash` đọc được panic của bài Rust (ak-mcu-rust).** `ak-kit` ghi panic, HardFault, watchdog vào cùng nhật ký sự
   cố (`crash_log.c`, cùng định dạng, kiểm từng byte bằng ảnh mẫu do chính `crash_log.c` sinh). Bản ghi thẻ `RUST` in thêm
   tệp và dòng: `fatal  RUST 0x01 (panic main.. line 34)`. +76 B flash. Đã thử trong `ak_sim`; chưa thử trên kit.

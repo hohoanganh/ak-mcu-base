@@ -44,8 +44,8 @@ mb_slave_enable_ota(on_ota_commit);  /* cho phép cập nhật firmware qua RS48
   (`hal_rs485_send()`), chân hướng nhả khi bit stop cuối ra khỏi dây. Trước bản này, trả lời 125 thanh ghi giữ CPU
   266 ms và nhận một khung OTA giữ khoảng 146 ms. Khung đứt giữa chừng vẫn chờ tối đa 20 ms cho byte còn thiếu.
 - Lệnh COMMIT của OTA: app chỉ cho `task_fw` cài và reset sau khi câu trả lời đã ra hết khỏi dây.
-- Master và gateway vẫn chờ câu trả lời trong handler (`APP_MB_RESPONSE_TIMEOUT_MS`); đổi sang máy trạng thái là
-  việc còn lại (`docs/huong-toi-uu-sau-v1.3.9.md` mục 2).
+- Master và gateway cũng không chặn (từ 2/11/2026): gửi yêu cầu rồi trả về, câu trả lời được nhặt trong vòng polling,
+  kết quả báo về task bằng callback → message. Xem hai mục dưới.
 
 Bảng thanh ghi của app mẫu:
 
@@ -65,8 +65,8 @@ baud hoặc đảo A/B; không có byte nào thì không có tín hiệu tới b
 CMake `-DAK_RUST_MODBUS=ON`, PlatformIO `rust_modbus = 1`; cần repo
 [ak-mcu-rust](https://github.com/hohoanganh/ak-mcu-rust) ở `../ak-mcu-rust` và `cargo`. Khi đó `mb_slave_poll()` không
 gọi `nmbs_server_poll()` nữa. Khung yêu cầu được tách bằng crate `ak-modbus`, gồm địa chỉ, độ dài, CRC, mã hàm và giới
-hạn số thanh ghi. Phần còn lại vẫn là C: khối thanh ghi, `on_write`, OTA, chặn OTA bằng quảng bá. Master và gateway vẫn
-dùng nanoMODBUS.
+hạn số thanh ghi. Phần còn lại vẫn là C: khối thanh ghi, `on_write`, OTA, chặn OTA bằng quảng bá. Master và gateway không
+dùng nanoMODBUS (xem dưới), nên bật tuỳ chọn này thì nanoMODBUS không còn trong ảnh nào.
 
 | App STM32 (slave) | C (nanoMODBUS) | Rust |
 |---|---|---|
@@ -123,14 +123,41 @@ python tools/ak_mb.py --port COM16 flash .pio/build/app/app.img
 
 ## Master
 
+`services/modbus/mb_master.c`, không dùng thư viện: dựng khung RTU (unit + PDU + CRC), gửi bằng ngắt, nhặt câu trả lời
+trong vòng polling. **Không có hàm nào chờ**: một yêu cầu đi qua ba bước, mỗi bước trả về ngay.
+
 ```c
-mb_master_init(9600, 200);                           /* chờ trả lời tối đa 200 ms */
-int err = mb_master_read_holding(5, 0, 4, regs);     /* thiết bị 5, thanh ghi 0..3 */
+/* khởi tạo: 9600 baud, chờ byte đầu của câu trả lời tối đa 200 ms sau khi yêu cầu ra hết */
+mb_master_init(9600, 200);
+
+/* gửi: thiết bị 5, đọc 4 thanh ghi giữ từ địa chỉ 0; xong thì gọi on_done() */
+uint8_t pdu[MB_PDU_MAX];
+uint8_t n = mb_pdu_read(pdu, 3, 0, 4);
+int err = mb_master_send(5, pdu, n, on_done);        /* MB_OK, MB_ERR_ARG, MB_ERR_BUSY */
+
+/* on_done() chạy từ mb_master_poll(): chỉ post message cho task của mình */
+static void on_done(void) { task_post_pure_msg(TASK_MY_ID, MY_SIG_MB_DONE); }
+
+/* trong handler của MY_SIG_MB_DONE: */
+const mb_result_t* r = mb_master_result();           /* r->err: 0, exception > 0, MB_ERR_* < 0 */
+uint16_t regs[4];
+int count = mb_result_regs(r, regs, 4);              /* số thanh ghi, hoặc MB_ERR_BAD_RESPONSE */
 ```
 
-Giá trị trả về: `0` thành công, số dương là mã exception của slave, số âm là lỗi đường truyền (`MB_ERR_TIMEOUT`…).
-Mỗi lần gọi chặn trong thời gian khung cộng thời gian chờ trả lời, nên gọi một request cho mỗi message và giữ
-timeout ngắn. Lệnh shell: `mb read <unit> <addr> [count]`, `mb write <unit> <addr> <value>`.
+- `mb_master_poll()` chạy trong vòng polling của kernel (`task_poll_modbus`). Khung trả lời được coi là đủ khi đường
+  dây im 3,5 ký tự (như slave); slave im lặng thì hết `response_timeout` là `MB_ERR_TIMEOUT`, tính từ lúc yêu cầu ra
+  hết khỏi dây. Trả lời sai unit, sai mã hàm, sai CRC: `MB_ERR_UNIT_ID`, `MB_ERR_BAD_RESPONSE`, `MB_ERR_CRC`.
+- Một yêu cầu một lúc (bus bán song công): `mb_master_send()` khi đang bận trả `MB_ERR_BUSY`; `mb_master_busy()`.
+- Unit 0 là quảng bá: không ai trả lời, `done()` gọi ngay khi khung ra hết.
+- Dựng PDU: `mb_pdu_read` (03/04), `mb_pdu_write_single` (06), `mb_pdu_write_multiple` (16). Mã hàm khác thì tự dựng
+  PDU (mã hàm + dữ liệu) và gửi như byte thô; `r->pdu` là câu trả lời nguyên vẹn.
+- Lệnh shell `mb read <unit> <addr> [count]`, `mb write <unit> <addr> <value>`: trả về ngay, kết quả in ra ở message
+  `CONSOLE_SIG_MB_DONE` (`cmd_mb_done()` trong `task_modbus.c` là ví dụ để chép cho task của dự án).
+- Câu trả lời đến muộn của một yêu cầu đã hết giờ: bị bỏ khi gửi yêu cầu kế tiếp. Nếu nó đến đúng lúc đang chờ yêu
+  cầu kế tiếp (cùng unit, cùng mã hàm) thì không phân biệt được, giống mọi master RTU.
+
+Bản trước (tới 1/11/2026) chặn trong handler tới `response_timeout` mỗi lần hỏi, vi phạm luật 2 của kernel. Bỏ phần
+client của nanoMODBUS: app master −512 B flash.
 
 ## Gateway Modbus TCP ↔ RTU (W5500)
 
@@ -141,17 +168,22 @@ RS485 bằng RTU rồi trả lời. W5500 chạy trọn TCP/IP trong chip, firmw
 - **Lớp HAL mới `hal/hal_tcp.h`:** một socket server, một client tại một thời điểm, đọc không chặn. Port STM32L151:
   `port/stm32l151/w5500.c` (khung SPI địa chỉ 16 bit + byte điều khiển, mọi vòng chờ chip đều có giới hạn).
   Port host: hàng đợi trong RAM (`host_tcp_*`) cho unit test.
-- **Dịch vụ `services/modbus/mb_gateway.c`:** server nanoMODBUS transport TCP; mỗi yêu cầu gọi `mb_master_*` trên
-  RS485. Unit identifier trong MBAP chọn slave RTU (0 = broadcast RTU, chỉ với lệnh ghi). Chuyển tiếp FC 03, 04, 06,
-  16; lệnh khác trả exception 1; slave không trả lời (hoặc trả lời sai) → exception 4; exception của slave đi qua
-  nguyên vẹn. Client rời đi giữa khung → đóng socket, nghe lại; khung bị cắt quá 50 ms giữa hai byte → bỏ.
+- **Dịch vụ `services/modbus/mb_gateway.c`:** không dùng thư viện. Bóc MBAP (transaction, protocol, length, unit) khỏi
+  khung TCP, đưa PDU cho `mb_master_send()`, câu trả lời về dưới cùng header. **Mọi mã hàm đi qua** (01, 02, 05, 15, 23…
+  tuỳ slave): gateway không xét PDU. Unit identifier trong MBAP chọn slave RTU (0 = broadcast RTU, không có trả lời).
+  Slave không trả lời → exception `0x0B` (gateway target device failed to respond, theo đặc tả); trả lời sai → `0x04`;
+  exception của slave đi qua nguyên vẹn. Client rời đi giữa khung → đóng socket, nghe lại; khung bị cắt quá 50 ms giữa
+  hai byte → bỏ; header không phải Modbus (protocol ≠ 0, length ngoài 2..254) → đóng socket vì luồng TCP không tự
+  đồng bộ lại được.
 - **Cấu hình trong `app/app.h`** (đổi bằng `-D`): `APP_NET_MAC` (locally administered `02:41:4B:00:00:01`),
   `APP_NET_IP` 192.168.1.80, `APP_NET_MASK`, `APP_NET_GW`, `APP_MB_TCP_PORT` 502. Chưa có DHCP.
-- `mb_gateway_poll()` chạy trong vòng polling của kernel; trong lúc chờ slave nó chặn tối đa
-  `APP_MB_RESPONSE_TIMEOUT_MS` (200 ms) như master. Shell: `mb` in trạng thái (chip, link, client, số yêu cầu, số
-  lỗi); `mb read` / `mb write` vẫn dùng được từ console.
+- `mb_gateway_poll()` và `mb_master_poll()` chạy trong vòng polling của kernel, **không chặn**: trong lúc chờ slave,
+  socket vẫn được đọc (byte của yêu cầu sau nằm chờ trong chip), các task khác chạy bình thường. Một yêu cầu TCP một
+  lúc. Shell: `mb` in trạng thái (chip, link, client, số yêu cầu, số lỗi = số exception đã trả về, kể cả của slave);
+  `mb read` / `mb write` vẫn dùng được từ console, khi đó lệnh TCP tới cùng lúc nhận `0x04` vì master đang bận.
 - Không có chip (VERSIONR không phải 0x04): log `no Ethernet chip: gateway off`, master RS485 vẫn chạy.
 
-Thử trên máy tính: `test_modbus` có một client Modbus TCP giả gửi FC 3/4/6/16, exception, lệnh không hỗ trợ, slave
-im lặng, unit khác, client rớt giữa khung, khung bị cắt (55 kiểm tra). **Chưa thử với mô-đun W5500 thật**: driver
-viết theo datasheet W5500, cần kiểm trên kit trước khi dùng.
+Thử trên máy tính: `test_modbus` có một client Modbus TCP giả gửi FC 3/4/6/16, exception, mã hàm slave không có, slave
+im lặng, unit khác, client rớt giữa khung, khung bị cắt; mỗi lần `poll` được kiểm là không làm đồng hồ ảo nhích. Bỏ
+nanoMODBUS: app gateway −4 564 B flash, −152 B RAM. **Chưa thử với mô-đun W5500 thật**: driver viết theo datasheet
+W5500, cần kiểm trên kit trước khi dùng.

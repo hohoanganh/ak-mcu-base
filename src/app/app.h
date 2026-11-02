@@ -79,6 +79,7 @@ enum {
 enum {
 	CONSOLE_SIG_INIT = AK_USER_DEFINE_SIG,
 	CONSOLE_SIG_LINE,		/* common msg: one command line */
+	CONSOLE_SIG_MB_DONE,	/* master / gateway: the answer to "mb read" / "mb write" is in */
 };
 
 /* TASK_FW_ID */
@@ -108,5 +109,7 @@ extern void app_modbus_init(void);
  * give the kernel an endless loop (port/web) and calls task_run_once() itself. */
 extern void app_init(void);
 extern void cmd_mb(const char* args);
+/* master / gateway: prints the answer to the last "mb read" / "mb write" */
+extern void cmd_mb_done(void);
 
 #endif /* __APP_H__ */

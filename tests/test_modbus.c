@@ -659,6 +659,8 @@ static nmbs_error far_write(uint16_t address, uint16_t value, uint8_t unit_id, v
 	return NMBS_ERROR_NONE;
 }
 
+static nmbs_error far_write_multi(uint16_t address, uint16_t quantity, const uint16_t* regs, uint8_t unit_id, void* arg);
+
 static void setup_master(void) {
 	nmbs_platform_conf conf;
 	nmbs_callbacks cb;
@@ -670,6 +672,7 @@ static void setup_master(void) {
 	nmbs_callbacks_create(&cb);
 	cb.read_holding_registers = far_read;
 	cb.write_single_register = far_write;
+	cb.write_multiple_registers = far_write_multi;
 	nmbs_server_create(&peer, 5, &conf, &cb);
 	nmbs_set_read_timeout(&peer, 0);
 	nmbs_set_byte_timeout(&peer, 0);
@@ -678,32 +681,160 @@ static void setup_master(void) {
 	CHECK_EQ(mb_master_init(19200, 50), MB_OK);
 }
 
+/* the bus, one virtual ms at a time, until the master has its result */
+static uint8_t master_done_flag;
+static uint32_t master_done_calls;
+
+static void master_done(void) {
+	master_done_flag = 1;
+	master_done_calls++;
+}
+
+static const mb_result_t* master_run(void) {
+	for (uint32_t i = 0; i < 1000 && !master_done_flag; i++) {
+		if (!peer_silent) {
+			nmbs_server_poll(&peer);
+		}
+		mb_master_poll();
+		host_advance_ms(1);
+	}
+	CHECK(master_done_flag);
+	master_done_flag = 0;
+	return mb_master_result();
+}
+
+/* one request through send() -> poll() -> done(): the whole round trip */
+static int master_read(uint8_t unit, uint16_t address, uint16_t quantity, uint16_t* out) {
+	uint8_t pdu[MB_PDU_MAX];
+	uint8_t n = mb_pdu_read(pdu, 3, address, quantity);
+	const mb_result_t* r;
+	int err;
+
+	if (n == 0) {
+		return MB_ERR_ARG;
+	}
+	err = mb_master_send(unit, pdu, n, master_done);
+	if (err != MB_OK) {
+		return err;
+	}
+	r = master_run();
+	if (r->err != MB_OK) {
+		return r->err;
+	}
+	return mb_result_regs(r, out, quantity) == (int)quantity ? MB_OK : MB_ERR_BAD_RESPONSE;
+}
+
+static int master_write(uint8_t unit, uint16_t address, uint16_t value) {
+	uint8_t pdu[MB_PDU_MAX];
+	uint8_t n = mb_pdu_write_single(pdu, address, value);
+	int err = mb_master_send(unit, pdu, n, master_done);
+
+	return err != MB_OK ? err : master_run()->err;
+}
+
 static void test_master(void) {
+	uint8_t pdu[MB_PDU_MAX];
 	uint16_t r[4];
-	uint32_t t0;
+	uint16_t w[2] = { 0x0102, 0x0304 };
+	uint32_t t0, t;
 
 	setup_master();
+	master_done_flag = 0;
+	master_done_calls = 0;
 	CHECK_EQ(host_rs485_baud(), 19200);
-	CHECK_EQ(mb_master_read_holding(5, 0, 4, r), MB_OK);
+	CHECK_EQ(master_read(5, 0, 4, r), MB_OK);
 	CHECK_EQ(r[0], 11);
 	CHECK_EQ(r[3], 44);
-	CHECK_EQ(mb_master_write_single(5, 2, 99), MB_OK);
+	CHECK_EQ(master_write(5, 2, 99), MB_OK);
 	CHECK_EQ(far_regs[2], 99);
 	/* the slave's exception code comes back as a positive value */
-	CHECK_EQ(mb_master_read_holding(5, 3, 2, r), 2);
+	CHECK_EQ(master_read(5, 3, 2, r), 2);
 	CHECK(strcmp(mb_err_str(2), "exception 2: illegal data address") == 0);
+	CHECK_EQ(master_done_calls, 3);
 
-	/* nobody answers: gives up after the response timeout, not later */
+	/* send() returns at once; the request is on the wire, the master busy */
+	t0 = hal_millis();
+	CHECK_EQ(mb_master_send(5, pdu, mb_pdu_read(pdu, 3, 0, 1), master_done), MB_OK);
+	CHECK_EQ(hal_millis(), t0);
+	CHECK(mb_master_busy());
+	CHECK(hal_rs485_tx_busy());
+	CHECK_EQ(mb_master_send(5, pdu, 5, master_done), MB_ERR_BUSY);	/* one at a time */
+	CHECK_EQ(mb_master_result()->err, MB_ERR_BUSY);
+	/* every poll returns at once too */
+	t = hal_millis();
+	mb_master_poll();
+	CHECK_EQ(hal_millis(), t);
+	CHECK_EQ(master_run()->err, MB_OK);
+	CHECK(!mb_master_busy());
+	CHECK_EQ(mb_result_regs(mb_master_result(), r, 4), 1);
+	CHECK_EQ(r[0], 11);
+
+	/* nobody answers: gives up after the response timeout (counted from the
+	 * end of the request), not later */
 	peer_silent = 1;
 	t0 = hal_millis();
-	CHECK_EQ(mb_master_read_holding(5, 0, 1, r), MB_ERR_TIMEOUT);
+	CHECK_EQ(master_read(5, 0, 1, r), MB_ERR_TIMEOUT);
 	CHECK(hal_millis() - t0 >= 50 && hal_millis() - t0 < 80);
 
 	/* a late answer to that request must not be taken for the next one */
 	peer_silent = 0;
 	nmbs_server_poll(&peer);
-	CHECK_EQ(mb_master_read_holding(5, 1, 1, r), MB_OK);
+	CHECK_EQ(master_read(5, 1, 1, r), MB_OK);
 	CHECK_EQ(r[0], 22);
+
+	/* FC 16 through the builder; broadcast: done right after the frame, no answer */
+	CHECK_EQ(mb_master_send(5, pdu, mb_pdu_write_multiple(pdu, 0, 2, w), master_done), MB_OK);
+	CHECK_EQ(master_run()->err, MB_OK);
+	CHECK_EQ(far_regs[0], 0x0102);
+	CHECK_EQ(far_regs[1], 0x0304);
+	peer_silent = 1;
+	t0 = hal_millis();
+	CHECK_EQ(mb_master_send(0, pdu, mb_pdu_write_single(pdu, 3, 7), master_done), MB_OK);
+	CHECK_EQ(master_run()->err, MB_OK);
+	CHECK_EQ(mb_master_result()->len, 0);
+	CHECK(hal_millis() - t0 < 20);
+	peer_silent = 0;
+	while (hal_rs485_tx_busy()) {
+		host_advance_ms(1);
+	}
+	host_rs485_take_tx(pdu, sizeof(pdu));	/* the slave never saw the broadcast */
+
+	/* an answer from another unit, a wrong function code, a bad CRC: errors, not data */
+	{
+		uint8_t bad[8];
+		uint16_t crc;
+
+		CHECK_EQ(mb_master_send(5, pdu, mb_pdu_read(pdu, 3, 0, 1), master_done), MB_OK);
+		host_rs485_take_tx(bad, sizeof(bad));		/* nobody sees the request */
+		bad[0] = 6; bad[1] = 3; bad[2] = 2; bad[3] = 0; bad[4] = 11;
+		crc = rtu_crc(bad, 5);
+		bad[5] = (uint8_t)crc;
+		bad[6] = (uint8_t)(crc >> 8);
+		host_rs485_inject(bad, 7);
+		CHECK_EQ(master_run()->err, MB_ERR_UNIT_ID);
+
+		CHECK_EQ(mb_master_send(5, pdu, mb_pdu_read(pdu, 3, 0, 1), master_done), MB_OK);
+		host_rs485_take_tx(bad, sizeof(bad));
+		bad[0] = 5; bad[1] = 4;
+		crc = rtu_crc(bad, 5);
+		bad[5] = (uint8_t)crc;
+		bad[6] = (uint8_t)(crc >> 8);
+		host_rs485_inject(bad, 7);
+		CHECK_EQ(master_run()->err, MB_ERR_BAD_RESPONSE);
+
+		CHECK_EQ(mb_master_send(5, pdu, mb_pdu_read(pdu, 3, 0, 1), master_done), MB_OK);
+		host_rs485_take_tx(bad, sizeof(bad));
+		bad[1] = 3;
+		bad[6] ^= 0x01;
+		host_rs485_inject(bad, 7);
+		CHECK_EQ(master_run()->err, MB_ERR_CRC);
+	}
+	/* bad arguments never reach the bus */
+	CHECK_EQ(mb_pdu_read(pdu, 3, 0, 126), 0);
+	CHECK_EQ(mb_pdu_read(pdu, 3, 0xFFFF, 2), 0);
+	CHECK_EQ(mb_pdu_write_multiple(pdu, 0, 124, w), 0);
+	CHECK_EQ(mb_master_send(248, pdu, 5, master_done), MB_ERR_ARG);
+	CHECK_EQ(mb_master_send(5, pdu, 0, master_done), MB_ERR_ARG);
 	peer_is_server = 0;
 }
 
@@ -771,8 +902,24 @@ static uint32_t tcp_request(uint16_t tid, uint8_t unit, const uint8_t* pdu, uint
 	frame[6] = unit;
 	memcpy(&frame[7], pdu, pdu_len);
 	host_tcp_inject(frame, 7U + pdu_len);
-	mb_gateway_poll();
-	return host_tcp_take_tx(resp, max);
+	/* the gateway and its master never wait: run the bus until the answer is out */
+	for (uint32_t i = 0; i < 1000; i++) {
+		uint32_t t = hal_millis();
+		uint32_t n;
+
+		mb_gateway_poll();
+		mb_master_poll();
+		CHECK_EQ(hal_millis(), t);
+		n = host_tcp_take_tx(resp, max);
+		if (n) {
+			return n;
+		}
+		if (!peer_silent) {
+			nmbs_server_poll(&peer);
+		}
+		host_advance_ms(1);
+	}
+	return 0;
 }
 
 static void test_gateway(void) {
@@ -836,7 +983,7 @@ static void test_gateway(void) {
 		CHECK_EQ(resp[7], 0x83);
 		CHECK_EQ(resp[8], 2);
 	}
-	/* a function the gateway does not forward: exception 1 */
+	/* any function code goes through; this slave has no coils: its exception 1 comes back */
 	{
 		const uint8_t pdu[] = { 0x01, 0x00, 0x00, 0x00, 0x08 };
 		n = tcp_request(6, 5, pdu, sizeof(pdu), resp, sizeof(resp));
@@ -844,7 +991,8 @@ static void test_gateway(void) {
 		CHECK_EQ(resp[7], 0x81);
 		CHECK_EQ(resp[8], 1);
 	}
-	/* nobody answers on RS485: exception 4, after the master's timeout */
+	/* nobody answers on RS485: exception 0x0B (gateway target failed to
+	 * respond), after the master's timeout */
 	{
 		const uint8_t pdu[] = { 0x03, 0x00, 0x00, 0x00, 0x01 };
 		uint32_t t0 = hal_millis();
@@ -853,7 +1001,7 @@ static void test_gateway(void) {
 		peer_silent = 0;
 		CHECK_EQ(n, 7 + 2);
 		CHECK_EQ(resp[7], 0x83);
-		CHECK_EQ(resp[8], 4);
+		CHECK_EQ(resp[8], 0x0B);
 		CHECK(hal_millis() - t0 >= 50 && hal_millis() - t0 < 100);
 		/* the slave wakes up and answers the stale request: the gateway's
 		 * master must not take that for the answer to its next one */
@@ -865,9 +1013,9 @@ static void test_gateway(void) {
 		n = tcp_request(8, 6, pdu, sizeof(pdu), resp, sizeof(resp));
 		CHECK_EQ(n, 7 + 2);
 		CHECK_EQ(resp[6], 6);
-		CHECK_EQ(resp[8], 4);
+		CHECK_EQ(resp[8], 0x0B);
 	}
-	CHECK_EQ(mb_gateway_error_count(), 3);
+	CHECK_EQ(mb_gateway_error_count(), 4);		/* every exception that went back, including the slave's */
 
 	/* the client goes away mid-frame: the gateway drops the socket and takes
 	 * the next client */
@@ -891,6 +1039,9 @@ static void test_gateway(void) {
 		host_tcp_inject(head, sizeof(head));
 		mb_gateway_poll();
 		CHECK_EQ(host_tcp_take_tx(resp, sizeof(resp)), 0);
+		host_advance_ms(MB_GW_BYTE_TIMEOUT_MS + 10);
+		mb_gateway_poll();							/* nothing more came: dropped */
+		CHECK_EQ(host_tcp_take_tx(resp, sizeof(resp)), 0);
 		n = tcp_request(11, 5, pdu, sizeof(pdu), resp, sizeof(resp));
 		CHECK_EQ(n, 7 + 2 + 2);
 		CHECK_EQ((resp[9] << 8) | resp[10], 0x1234);
@@ -911,7 +1062,7 @@ static void test_gateway_no_chip(void) {
 	mb_gateway_poll();
 	CHECK_EQ(host_tcp_port(), 0);
 	CHECK_EQ(host_tcp_connect(), -1);
-	CHECK_EQ(mb_master_read_holding(5, 1, 1, r), MB_OK);
+	CHECK_EQ(master_read(5, 1, 1, r), MB_OK);
 	CHECK_EQ(r[0], 22);
 	host_tcp_set_present(1);
 	peer_is_server = 0;

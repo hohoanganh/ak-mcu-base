@@ -26,7 +26,7 @@ src/            mã nguồn firmware
   kernel/       task, message, timer, fsm, tsm. Sửa ở đây phải có test trước
   hal/          giao diện phần cứng mà mọi port phải có (hal.h, hal_flash.h, hal_rs485.h, hal_tcp.h)
   common/       xprintf, CRC, log
-  services/     fw (ảnh, OTA, boot_ctrl) · sys (nhật ký sự cố, flog) · modbus (nanoMODBUS: slave, master, gateway TCP)
+  services/     fw (ảnh, OTA, boot_ctrl) · sys (nhật ký sự cố, flog) · modbus (slave: nanoMODBUS hoặc Rust; master, gateway TCP: mb_master.c, không chặn)
   boot/         bootloader, không phụ thuộc chip
   app/          app mẫu: task_system, task_console, task_fw, task_modbus  ← dự án viết task ở đây
   demo/         demo trên AK Base Kit: task_ui, scr_*.c, gfx, music, video
