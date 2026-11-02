@@ -68,6 +68,25 @@
 #define APP_FW_CONFIRM_MS		(30000)
 #endif
 
+/* Settings kept in NVM (services/sys/settings, app_cfg.c): what a product
+ * sets in the field. Add fields at the end and bump APP_CFG_VERSION: an old
+ * record is then ignored and the defaults above apply. */
+typedef struct {
+	uint8_t  mb_unit;		/* Modbus slave address 1..247 */
+	uint8_t  reserved[3];
+	uint32_t mb_baud;		/* RS485 baud rate */
+} app_cfg_t;
+
+#define APP_CFG_VERSION			(1)
+
+extern app_cfg_t app_cfg;
+extern void app_cfg_load(void);					/* NVM, or the defaults; at start, before the RS485 port */
+extern int app_cfg_save(void);					/* 0 = ok; the port picks it up at the next reset */
+extern void app_cfg_set(const app_cfg_t* c);	/* change in RAM (not saved) */
+extern uint8_t app_cfg_valid(const app_cfg_t* c);
+extern uint8_t app_cfg_baud_ok(uint32_t baud);
+extern void cmd_cfg(const char* args);
+
 /* TASK_SYSTEM_ID */
 enum {
 	SYSTEM_SIG_INIT = AK_USER_DEFINE_SIG,

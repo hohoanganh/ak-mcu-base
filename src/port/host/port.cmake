@@ -98,6 +98,18 @@ target_compile_options(test_boot_aux PRIVATE ${HOST_WARN} -fsanitize=address,und
 target_link_options(test_boot_aux PRIVATE -fsanitize=address,undefined)
 add_test(NAME boot_aux COMMAND test_boot_aux)
 
+# --- services/sys: the settings record in NVM ---
+add_executable(test_sys
+	${ROOT}/tests/test_sys.c
+	${COMMON_SRC} ${SYS_SRC} ${SRC}/services/fw/boot_ctrl.c
+	${HOST_DIR}/port_host.c
+)
+target_include_directories(test_sys PRIVATE ${ROOT}/tests ${BASE_INC} ${HOST_DIR})
+target_compile_definitions(test_sys PRIVATE AK_SIM ${VERSION_DEFS})
+target_compile_options(test_sys PRIVATE ${HOST_WARN} -fsanitize=address,undefined -g)
+target_link_options(test_sys PRIVATE -fsanitize=address,undefined)
+add_test(NAME sys COMMAND test_sys)
+
 # --- Modbus services (vendor library built without our warning set) ---
 add_library(nanomodbus_host STATIC ${ROOT}/third_party/nanomodbus/nanomodbus.c)
 target_include_directories(nanomodbus_host PUBLIC ${ROOT}/third_party/nanomodbus)

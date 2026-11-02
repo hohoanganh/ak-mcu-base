@@ -69,6 +69,26 @@ Kênh khác (Modbus, RF…) đọc nhật ký bằng `crash_log_count()` và `cr
 
 > Cần bootloader từ 1.2.0. Bootloader cũ hơn xoá mất thông tin HardFault trước khi app kịp đọc.
 
+## 2a. Cấu hình của sản phẩm (`services/sys/settings.c`)
+
+Một bản ghi 32 B ở cuối EEPROM (`[224,256)`): magic, version, len, tới 26 B dữ liệu của app, CRC-16. App mẫu giữ ở đó
+địa chỉ Modbus và baud RS485 (`app_cfg_t` trong `app.h`, `app_cfg.c`); dự án thêm trường vào cuối struct và tăng
+`APP_CFG_VERSION`, bản ghi cũ trong EEPROM khi đó bị bỏ qua (dùng mặc định), không phải chuyển đổi gì.
+
+```
+cfg                 modbus unit 1, baud 9600 (defaults)
+cfg unit 7          unit 7, baud 9600 (not saved yet: 'cfg save')
+cfg baud 19200
+cfg save            saved, takes effect after 'reboot'
+cfg reset           về mặc định (APP_MB_UNIT_ID, APP_MB_BAUD), rồi 'cfg save'
+```
+
+Cổng RS485 được dựng một lần lúc khởi động nên giá trị mới có hiệu lực sau `reboot`; `mb` in giá trị cổng **đang**
+chạy, `cfg` in giá trị đang giữ. Master cũng đặt được qua thanh ghi 32–33 ([modbus.md](modbus.md)). Mất điện giữa lúc
+ghi: bản ghi sai CRC, lần sau lên bằng mặc định (một ô, không có bản cũ để lùi: ghi hiếm và do người vận hành làm).
+Test: `tests/test_sys.c` (EEPROM trắng 0x00 và 0xFF, lưu rồi đọc, bản ghi khác layout, bản ghi bị cắt, không đè lên
+`boot_ctrl` và nhật ký sự cố).
+
 ## 2b. Log bản ghi trên flash (`services/sys/flog.c`)
 
 Vòng ghi bản ghi cố định trên flash xoá theo sector (flash SPI của kit, hoặc flash trong qua ba hàm

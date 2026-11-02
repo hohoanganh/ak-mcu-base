@@ -56,6 +56,15 @@ Bảng thanh ghi của app mẫu:
 | 2 | R | Uptime, giây |
 | 3 | R | Số bản ghi sự cố |
 | 16–19 | R/W | Thanh ghi thử, giữ tới khi reset |
+| 32 | R/W | Địa chỉ của chính slave này (1..247) |
+| 33 | R/W | Baud RS485 / 100 (96 = 9600, 192 = 19200, 1152 = 115200) |
+
+Thanh ghi 32–33 là **cấu hình tại hiện trường** (`app_cfg`, lưu trong EEPROM qua `services/sys/settings`): master ghi
+hai thanh ghi (FC 16, hoặc FC 06 từng cái) → slave kiểm (địa chỉ 1..247, baud trong danh sách 1200…115200), lưu, và
+**dùng từ lần reset sau** — câu trả lời vẫn đi ra ở địa chỉ và baud cũ. Giá trị sai bị bỏ, thanh ghi quay về giá trị
+đang lưu (nanoMODBUS không cho `on_write` trả exception). Cùng việc từ console: `cfg unit 7`, `cfg baud 19200`,
+`cfg save`, `reboot`. Một bus nhiều thiết bị cùng firmware thì đặt địa chỉ từng cái theo cách này, không phải build
+riêng mỗi địa chỉ.
 
 Lệnh shell `mb` in số byte đã nhận và số request đã trả lời. Có byte mà không có request nào được trả lời thì sai
 baud hoặc đảo A/B; không có byte nào thì không có tín hiệu tới bộ thu.

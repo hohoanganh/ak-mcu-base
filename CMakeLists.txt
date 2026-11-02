@@ -106,6 +106,7 @@ endfunction()
 set(SYS_SRC
 	${SRC}/services/sys/crash_log.c
 	${SRC}/services/sys/flog.c
+	${SRC}/services/sys/settings.c
 )
 
 # Signed images: bootloader and app refuse images not signed with the key in
@@ -197,6 +198,7 @@ set(APP_SRC
 	${SRC}/app/task_console.c
 	${SRC}/app/task_fw.c
 	${SRC}/app/task_modbus.c
+	${SRC}/app/app_cfg.c
 )
 
 set(BASE_INC

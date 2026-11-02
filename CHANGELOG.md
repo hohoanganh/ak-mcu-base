@@ -9,6 +9,11 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 
 ## Chưa phát hành
 
+- **Cấu hình của sản phẩm trong EEPROM (`services/sys/settings.c`, `app/app_cfg.c`).** Bản ghi 32 B ở `[224,256)`
+  (magic, version, len, data, CRC-16). App mẫu lưu địa chỉ Modbus và baud: shell `cfg` (`cfg unit 7`, `cfg baud
+  19200`, `cfg save`, `cfg reset`), slave có thanh ghi 32–33 để master đặt địa chỉ từ xa; có hiệu lực sau reset. Bản
+  ghi khác version/len hay bị cắt → mặc định. `test_sys` mới (55 kiểm tra), thử trên `ak_sim` qua ba lần khởi động.
+  App base +1 988 B flash (dịch vụ vài trăm byte, phần lớn là lệnh shell và chuỗi), +16 B RAM. **Chưa thử trên kit.**
 - **Modbus master và gateway không chặn.** `mb_master_send()` gửi rồi trả về, `mb_master_poll()` nhặt câu trả lời (đủ
   khung khi đường dây im 3,5 ký tự, hết giờ tính từ lúc yêu cầu ra hết), kết quả báo bằng callback → message
   (`CONSOLE_SIG_MB_DONE` cho lệnh `mb read`/`mb write`). Gateway bóc MBAP và chuyển tiếp PDU thô: mọi mã hàm đi qua,

@@ -69,6 +69,8 @@ void app_init(void) {
 		}
 	}
 
+	app_cfg_load();
+
 	task_init();
 	task_create(app_task_table);
 	task_polling_create(app_task_polling_table);
