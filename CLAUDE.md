@@ -26,7 +26,7 @@ src/            mã nguồn firmware
   kernel/       task, message, timer, fsm, tsm. Sửa ở đây phải có test trước
   hal/          giao diện phần cứng mà mọi port phải có (hal.h, hal_flash.h, hal_rs485.h, hal_tcp.h)
   common/       xprintf, CRC, log
-  services/     fw (ảnh, OTA, boot_ctrl) · sys (nhật ký sự cố, flog) · modbus (nanoMODBUS: slave, master, gateway TCP)
+  services/     fw (ảnh, OTA, boot_ctrl) · sys (nhật ký sự cố, flog) · modbus (slave: nanoMODBUS hoặc Rust; master, gateway TCP: mb_master.c, không chặn)
   boot/         bootloader, không phụ thuộc chip
   app/          app mẫu: task_system, task_console, task_fw, task_modbus  ← dự án viết task ở đây
   demo/         demo trên AK Base Kit: task_ui, scr_*.c, gfx, music, video
@@ -96,7 +96,8 @@ Thêm lệnh shell: một dòng trong `shell_cmds[]` của `src/app/task_console
   vào thanh ghi, đổi theo từng bản build, không báo lỗi.
 - Bản đồ bộ nhớ: BOOT 12K `0x08000000` · APP 116K `0x08003000` (header ảnh 256 B, vector ở `0x08003100`) · ảnh chờ cài
   ở flash SPI ngoài `0x80000`, bản sao app cũ (quay lui) ở `0xA0000` · EEPROM: `[0,64)` boot_ctrl, `[64,224)` nhật ký
-  sự cố, `[224,256)` dành cho dự án. Kho media của demo là flash SPI `[0,0x80000)`: clip từ 0, log thời tiết ở 16
+  sự cố, `[224,256)` cấu hình (`services/sys/settings.c`: một bản ghi magic/version/len/data[26]/crc16; app khai
+  `app_cfg_t` trong `app.h`, thêm trường thì tăng `APP_CFG_VERSION`; shell `cfg`, thanh ghi Modbus 32–33). Kho media của demo là flash SPI `[0,0x80000)`: clip từ 0, log thời tiết ở 16
   sector cuối trừ một, chương trình khối ở sector cuối.
 - **RAM 32K** (chip STM32L151CB của kit là loại Cat.2, DEV_ID `0x429`; con số 16K cũ sót lại từ kit 2.1). Mặc định build
   32K; chip Cat.1 (DEV_ID `0x416`, 16K) thì `ram_size_kb = 16` / `-DAK_RAM_SIZE=16K`. Bootloader và app cùng giá trị;

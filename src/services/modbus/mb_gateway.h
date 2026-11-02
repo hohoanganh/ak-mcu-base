@@ -28,6 +28,9 @@ extern "C"
 
 #include <stdint.h>
 
+/* a TCP frame is dropped when the gap between two bytes exceeds this */
+#define MB_GW_BYTE_TIMEOUT_MS	(50)
+
 /* Start the TCP server on tcp_port; hal_tcp_init() and mb_master_init() must
  * have succeeded before. 0 = ok. */
 extern int mb_gateway_init(uint16_t tcp_port);

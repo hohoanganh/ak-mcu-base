@@ -272,6 +272,7 @@ static const shell_cmd_t shell_cmds[] = {
 	{ "fw",		"trial state (fw confirm, fw rollback)",	cmd_fw	},
 	{ "stat",	"pools, stack, crash count",	cmd_stat	},
 	{ "crash",	"crash log (crash clear)",		cmd_crash	},
+	{ "cfg",	"settings: cfg | cfg unit N | cfg baud N | cfg save | cfg reset",	cmd_cfg	},
 #if defined(APP_MODBUS_SLAVE)
 	{ "mb",		"modbus slave status",			cmd_mb		},
 #elif defined(APP_MODBUS_MASTER) || defined(APP_MODBUS_GATEWAY)
@@ -372,6 +373,13 @@ void task_console(ak_msg_t* msg) {
 		xprintf("> ");
 	}
 		break;
+
+#if defined(APP_MODBUS_MASTER) || defined(APP_MODBUS_GATEWAY)
+	case CONSOLE_SIG_MB_DONE:
+		cmd_mb_done();
+		xprintf("> ");
+		break;
+#endif
 
 	default:
 		break;

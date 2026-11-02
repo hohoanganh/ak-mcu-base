@@ -46,9 +46,10 @@ CPU mà Modbus trả lại; số trên chỉ cho thấy tải Modbus không làm
 chưa thử trên kit.
 
 Chưa làm và vì sao: I2C OLED 400 kHz (cần máy phân tích logic và kit), gửi RS485 bằng DMA (đã dùng ngắt TXE thay
-vì DMA: ở 9600 baud chỉ khoảng 1.000 ngắt/giây, khỏi phải kiểm bảng kênh DMA trên kit), master/gateway thành máy
-trạng thái, vào bằng sự kiện → tickless → Stop, nén/delta OTA, gom ba danh sách file về một (CMake đã tự lấy cả thư
-mục `src/demo`, `src/remote`; `src/app` và `build.py` vẫn khai tay).
+vì DMA: ở 9600 baud chỉ khoảng 1.000 ngắt/giây, khỏi phải kiểm bảng kênh DMA trên kit), vào bằng sự kiện → tickless →
+Stop, nén/delta OTA, gom ba danh sách file về một (CMake đã tự lấy cả thư mục `src/demo`, `src/remote`; `src/app` và
+`build.py` vẫn khai tay). Master/gateway thành máy trạng thái (mục 2, bước 3): **đã làm 2/11/2026**, xem
+[modbus.md](modbus.md).
 
 Cách đo:
 

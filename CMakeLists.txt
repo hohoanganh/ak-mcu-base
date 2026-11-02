@@ -106,6 +106,7 @@ endfunction()
 set(SYS_SRC
 	${SRC}/services/sys/crash_log.c
 	${SRC}/services/sys/flog.c
+	${SRC}/services/sys/settings.c
 )
 
 # Signed images: bootloader and app refuse images not signed with the key in
@@ -116,7 +117,9 @@ set(P256M_SRC ${ROOT}/third_party/p256-m/p256-m.c)
 set(P256M_INC ${ROOT}/third_party/p256-m)
 
 # Modbus on RS485: slave | master | gateway | none (role of the sample app);
-# gateway = Modbus TCP server on the Ethernet chip (hal_tcp) forwarding to RS485
+# gateway = Modbus TCP server on the Ethernet chip (hal_tcp) forwarding to RS485.
+# nanoMODBUS serves the slave only (unless AK_RUST_MODBUS); master and gateway
+# are mb_master.c / mb_gateway.c, no library
 set(AK_MODBUS "slave" CACHE STRING "Modbus role of the app: slave | master | gateway | none")
 set(MB_SRC
 	${SRC}/services/modbus/mb_port.c
@@ -129,9 +132,9 @@ set(MB_INC ${SRC}/services/modbus ${ROOT}/third_party/nanomodbus)
 if(AK_MODBUS STREQUAL "slave")
 	set(MB_DEFS APP_MODBUS_SLAVE NMBS_CLIENT_DISABLED NMBS_STRERROR_DISABLED)
 elseif(AK_MODBUS STREQUAL "master")
-	set(MB_DEFS APP_MODBUS_MASTER NMBS_SERVER_DISABLED NMBS_STRERROR_DISABLED)
+	set(MB_DEFS APP_MODBUS_MASTER NMBS_SERVER_DISABLED NMBS_CLIENT_DISABLED NMBS_STRERROR_DISABLED)
 elseif(AK_MODBUS STREQUAL "gateway")
-	set(MB_DEFS APP_MODBUS_GATEWAY NMBS_STRERROR_DISABLED)
+	set(MB_DEFS APP_MODBUS_GATEWAY NMBS_SERVER_DISABLED NMBS_CLIENT_DISABLED NMBS_STRERROR_DISABLED)
 elseif(AK_MODBUS STREQUAL "none")
 	set(MB_DEFS "")
 else()
@@ -195,6 +198,7 @@ set(APP_SRC
 	${SRC}/app/task_console.c
 	${SRC}/app/task_fw.c
 	${SRC}/app/task_modbus.c
+	${SRC}/app/app_cfg.c
 )
 
 set(BASE_INC

@@ -74,6 +74,7 @@ nên APP dùng được toàn bộ phần flash trong còn lại.
 | BACKUP | SPI NOR `0xA0000` | 116K | bản sao của APP trước lần cài gần nhất: ảnh để **quay lui** |
 | boot_ctrl | `0x08080000` | 2 × 32 B | data EEPROM: lệnh boot ↔ app, trạng thái thử, hai bản ghi luân phiên |
 | crash log | `0x08080040` | 8 × 20 B | data EEPROM: tám sự cố gần nhất |
+| settings | `0x080800E0` | 32 B | data EEPROM: cấu hình của sản phẩm (`services/sys/settings`): địa chỉ Modbus, baud… đặt tại hiện trường |
 
 Board không gắn chip SPI thì build với `AK_STAGING=internal` (`make stm32-internal`): APP 58K tại
 `0x08003000`, STAGING 58K tại `0x08011800` trong flash trong; không có chỗ cho BACKUP nên không quay lui được.

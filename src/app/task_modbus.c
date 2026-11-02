@@ -5,6 +5,8 @@
  *   APP_MODBUS_SLAVE   the board answers a register map and takes firmware
  *                      updates over RS485 (block 0xF000, tools/ak_mb.py)
  *   APP_MODBUS_MASTER  the board asks other devices; shell: mb read / mb write
+ *                      (the answer is printed from a later message: the
+ *                      master never waits inside a handler)
  *   APP_MODBUS_GATEWAY Modbus TCP server (W5500 on J6, hal_tcp) forwarding to
  *                      the RS485 slaves as RTU master; shell as the master
  *
@@ -14,6 +16,8 @@
  *    2  R  uptime in seconds (wraps at 65535)
  *    3  R  crash log: number of records
  *    16..19  R/W  scratch registers, kept until reset
+ *    32  R/W  this unit's address (1..247)      } saved to NVM, in force at
+ *    33  R/W  RS485 baud rate / 100 (96 = 9600) } the next reset (app_cfg)
  ******************************************************************************
 **/
 
@@ -48,13 +52,47 @@
 
 static uint16_t info_regs[4];
 static uint16_t user_regs[4];
+static uint16_t cfg_regs[2];
+/* what the port runs with (app_cfg may already hold a newer, saved value) */
+static uint8_t run_unit;
+static uint32_t run_baud;
 
 static const mb_reg_block_t holding_blocks[] = {
 	{ 0,  4, info_regs, MB_REG_RO },
 	{ 16, 4, user_regs, MB_REG_RW },
+	{ 32, 2, cfg_regs,  MB_REG_RW },
 };
 
+static void cfg_regs_show(void) {
+	cfg_regs[0] = app_cfg.mb_unit;
+	cfg_regs[1] = (uint16_t)(app_cfg.mb_baud / 100U);
+}
+
+/* the master wrote the settings block: keep it if it makes sense */
+static void cfg_regs_written(void) {
+	app_cfg_t c = app_cfg;
+
+	c.mb_unit = (uint8_t)cfg_regs[0];
+	c.mb_baud = (uint32_t)cfg_regs[1] * 100U;
+	if (cfg_regs[0] > 247 || !app_cfg_valid(&c)) {
+		LOG_W(TAG, "settings written over Modbus rejected: unit %u, baud %u\n", cfg_regs[0], c.mb_baud);
+		cfg_regs_show();
+		return;
+	}
+	app_cfg_set(&c);
+	if (app_cfg_save() == 0) {
+		LOG_I(TAG, "settings saved over Modbus: unit %d, %u baud, in force after reset\n", c.mb_unit, c.mb_baud);
+	}
+	else {
+		LOG_E(TAG, "settings save failed\n");
+	}
+}
+
 static void on_write(uint16_t address, uint16_t quantity) {
+	if (address >= 32) {
+		cfg_regs_written();
+		return;
+	}
 #if defined(APP_KIT_DEMO)
 	/* register 16 feeds the scope screen; no log line, a master may write it many times a second */
 	if (address == 16) {
@@ -87,13 +125,16 @@ void app_modbus_init(void) {
 
 	info_regs[0] = (uint16_t)((v->major << 8) | v->minor);
 	info_regs[1] = v->patch;
+	cfg_regs_show();
+	run_unit = app_cfg.mb_unit;
+	run_baud = app_cfg.mb_baud;
 
-	if (mb_slave_init(APP_MB_UNIT_ID, APP_MB_BAUD, &reg_map) != 0) {
+	if (mb_slave_init(run_unit, run_baud, &reg_map) != 0) {
 		LOG_E(TAG, "slave init failed\n");
 		return;
 	}
 	mb_slave_enable_ota(on_ota_commit);
-	LOG_I(TAG, "slave unit %d, %d 8N1\n", APP_MB_UNIT_ID, APP_MB_BAUD);
+	LOG_I(TAG, "slave unit %d, %u 8N1\n", run_unit, run_baud);
 }
 
 void task_poll_modbus(void) {
@@ -114,8 +155,8 @@ void task_poll_modbus(void) {
 
 void cmd_mb(const char* args) {
 	(void)args;
-	xprintf("modbus slave unit %d, %d 8N1: %u byte(s) received, %u request(s) answered\n",
-			APP_MB_UNIT_ID, APP_MB_BAUD, hal_rs485_rx_bytes(), mb_slave_request_count());
+	xprintf("modbus slave unit %d, %u 8N1: %u byte(s) received, %u request(s) answered\n",
+			run_unit, run_baud, hal_rs485_rx_bytes(), mb_slave_request_count());
 }
 
 /*----------------------------------------------------------------------------
@@ -133,11 +174,11 @@ static uint8_t gateway_up;
 #endif
 
 void app_modbus_init(void) {
-	if (mb_master_init(APP_MB_BAUD, APP_MB_RESPONSE_TIMEOUT_MS) != MB_OK) {
+	if (mb_master_init(app_cfg.mb_baud, APP_MB_RESPONSE_TIMEOUT_MS) != MB_OK) {
 		LOG_E(TAG, "master init failed\n");
 		return;
 	}
-	LOG_I(TAG, "master, %d 8N1, response timeout %d ms\n", APP_MB_BAUD, APP_MB_RESPONSE_TIMEOUT_MS);
+	LOG_I(TAG, "master, %u 8N1, response timeout %d ms\n", app_cfg.mb_baud, APP_MB_RESPONSE_TIMEOUT_MS);
 #if defined(APP_MODBUS_GATEWAY)
 	if (hal_tcp_init(&net_cfg) != 0) {
 		LOG_E(TAG, "no Ethernet chip: gateway off, RS485 master still works\n");
@@ -154,11 +195,43 @@ void app_modbus_init(void) {
 }
 
 void task_poll_modbus(void) {
+	mb_master_poll();
 #if defined(APP_MODBUS_GATEWAY)
 	if (gateway_up) {
 		mb_gateway_poll();
 	}
 #endif
+}
+
+/* the shell command in flight: what to print when its answer is in */
+static uint32_t cmd_address, cmd_count;
+static uint8_t cmd_is_write;
+
+static void cmd_done(void) {
+	task_post_pure_msg(TASK_CONSOLE_ID, CONSOLE_SIG_MB_DONE);
+}
+
+void cmd_mb_done(void) {
+	const mb_result_t* r = mb_master_result();
+	uint16_t regs[16];
+	int n;
+
+	if (r->err != MB_OK) {
+		xprintf("%s unit %u reg %u: %s\n", cmd_is_write ? "write" : "read", r->unit, cmd_address, mb_err_str(r->err));
+		return;
+	}
+	if (cmd_is_write) {
+		xprintf("write unit %u reg %u: ok\n", r->unit, cmd_address);
+		return;
+	}
+	n = mb_result_regs(r, regs, 16);
+	if (n != (int)cmd_count) {
+		xprintf("read unit %u reg %u: %s\n", r->unit, cmd_address, mb_err_str(MB_ERR_BAD_RESPONSE));
+		return;
+	}
+	for (int i = 0; i < n; i++) {
+		xprintf("  %5u: %5u  0x%04X\n", cmd_address + (uint32_t)i, regs[i], regs[i]);
+	}
 }
 
 /* decimal or 0x hex; returns 0 if *p is not a number */
@@ -190,7 +263,8 @@ static uint8_t next_num(const char** p, uint32_t* out) {
 }
 
 void cmd_mb(const char* args) {
-	uint16_t regs[16];
+	uint8_t pdu[MB_PDU_MAX];
+	uint8_t n;
 	uint32_t unit, address, x = 1;
 	uint8_t is_write;
 	int err;
@@ -221,22 +295,22 @@ void cmd_mb(const char* args) {
 			xprintf("bad value\n");
 			return;
 		}
-		err = mb_master_write_single((uint8_t)unit, (uint16_t)address, (uint16_t)x);
-		xprintf("write unit %u reg %u = %u: %s\n", unit, address, x, mb_err_str(err));
-		return;
+		n = mb_pdu_write_single(pdu, (uint16_t)address, (uint16_t)x);
 	}
-
-	next_num(&args, &x);
-	if (x < 1 || x > 16) {
-		x = 1;
+	else {
+		next_num(&args, &x);
+		if (x < 1 || x > 16) {
+			x = 1;
+		}
+		n = mb_pdu_read(pdu, 3, (uint16_t)address, (uint16_t)x);
 	}
-	err = mb_master_read_holding((uint8_t)unit, (uint16_t)address, (uint16_t)x, regs);
+	cmd_address = address;
+	cmd_count = x;
+	cmd_is_write = is_write;
+	/* the answer arrives as CONSOLE_SIG_MB_DONE -> cmd_mb_done() */
+	err = mb_master_send((uint8_t)unit, pdu, n, cmd_done);
 	if (err != MB_OK) {
-		xprintf("read unit %u reg %u: %s\n", unit, address, mb_err_str(err));
-		return;
-	}
-	for (uint32_t i = 0; i < x; i++) {
-		xprintf("  %5u: %5u  0x%04X\n", address + i, regs[i], regs[i]);
+		xprintf("%s unit %u reg %u: %s\n", is_write ? "write" : "read", unit, address, mb_err_str(err));
 	}
 }
 
