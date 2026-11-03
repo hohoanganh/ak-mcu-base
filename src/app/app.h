@@ -68,12 +68,19 @@
 #define APP_FW_CONFIRM_MS		(30000)
 #endif
 
+#ifndef APP_MB_FORMAT
+#define APP_MB_FORMAT			(0)			/* HAL_RS485_8N1; 1 = 8E1 (the Modbus default), 2 = 8O1, 3 = 8N2 */
+#endif
+
 /* Settings kept in NVM (services/sys/settings, app_cfg.c): what a product
  * sets in the field. Add fields at the end and bump APP_CFG_VERSION: an old
- * record is then ignored and the defaults above apply. */
+ * record is then ignored and the defaults above apply. A field that takes
+ * over a byte that was always 0 keeps the version when 0 means "default",
+ * as mb_format and mb_timeout_ms did: records saved before still load. */
 typedef struct {
 	uint8_t  mb_unit;		/* Modbus slave address 1..247 */
-	uint8_t  reserved[3];
+	uint8_t  mb_format;		/* HAL_RS485_8N1 / 8E1 / 8O1 / 8N2 */
+	uint16_t mb_timeout_ms;	/* master / gateway: wait for an answer; 0 = APP_MB_RESPONSE_TIMEOUT_MS */
 	uint32_t mb_baud;		/* RS485 baud rate */
 } app_cfg_t;
 
@@ -85,6 +92,8 @@ extern int app_cfg_save(void);					/* 0 = ok; the port picks it up at the next r
 extern void app_cfg_set(const app_cfg_t* c);	/* change in RAM (not saved) */
 extern uint8_t app_cfg_valid(const app_cfg_t* c);
 extern uint8_t app_cfg_baud_ok(uint32_t baud);
+extern uint16_t app_cfg_timeout_ms(void);		/* mb_timeout_ms, or the default for 0 */
+extern const char* app_cfg_format_str(uint8_t format);
 extern void cmd_cfg(const char* args);
 
 /* TASK_SYSTEM_ID */

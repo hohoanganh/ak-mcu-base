@@ -9,6 +9,14 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 
 ## Chưa phát hành
 
+- **Định dạng khung RS485 và thời gian chờ của master trong cấu hình.** `hal_rs485_set_format()` (8N1, 8E1, 8O1, 8N2;
+  STM32: từ 9 bit khi có chẵn lẻ); `cfg format 8E1`, `cfg timeout 300`, thanh ghi slave 34. `app_cfg_t` giữ 8 byte và
+  version 1: bản ghi lưu bằng bản trước vẫn đọc được. App base +652 B flash. Test mới `tests/test_sim_cfg.py` (lệnh `cfg`
+  trên `ak_sim` qua ba lần khởi động, 21 kiểm tra), `test_modbus` kiểm định dạng tới port. **Chưa thử 8E1 trên kit.**
+- **`new_project.py --mb-unit/--mb-baud/--mb-format`:** mặc định Modbus của dự án ghi vào `app/app.h`, giá trị sai bị từ
+  chối. Test mới `tests/test_new_project.py`: tham số sai, nội dung bản xuất, rồi build `test_sys` trong chính bản xuất.
+- **CMake lấy nguồn theo thư mục** (`file(GLOB CONFIGURE_DEPENDS)`) như PlatformIO và bản web: thêm `.c` vào thư mục đã
+  có thì cả ba bản build tự nhận.
 - **Stack xấu nhất tính lúc build (`AK_STACK_REPORT`, mặc định bật).** Sau mỗi lần link bản STM32L151, GCC ghi đồ thị
   lời gọi của mã sau LTO kèm khung từng hàm (`-fcallgraph-info=su`); `tools/stack_report.py` tính đường gọi sâu nhất từ
   `reset_handler` (lời gọi qua con trỏ giải theo bảng `POINTER_TARGETS`) cộng mọi ngắt lồng nhau, so với RAM còn cho

@@ -173,4 +173,13 @@ if(Python3_FOUND)
 		COMMAND ${Python3_EXECUTABLE} ${ROOT}/tests/test_sim_ota.py
 			--sim $<TARGET_FILE:ak_sim> --tools ${ROOT}/tools
 			--workdir ${CMAKE_CURRENT_BINARY_DIR})
+	# tools/new_project.py: arguments, what the export holds, and that it builds alone
+	add_test(NAME new_project
+		COMMAND ${Python3_EXECUTABLE} ${ROOT}/tests/test_new_project.py --tools ${ROOT}/tools
+			--workdir ${CMAKE_CURRENT_BINARY_DIR} --cmake ${CMAKE_COMMAND})
+	# product settings: shell 'cfg', kept in the simulated EEPROM across restarts
+	add_test(NAME sim_cfg
+		COMMAND ${Python3_EXECUTABLE} ${ROOT}/tests/test_sim_cfg.py
+			--sim $<TARGET_FILE:ak_sim> --tools ${ROOT}/tools
+			--workdir ${CMAKE_CURRENT_BINARY_DIR})
 endif()

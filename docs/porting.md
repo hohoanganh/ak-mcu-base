@@ -28,7 +28,8 @@ ISR), `ak_port_millis`, `ak_port_fatal` (không trả về), `ak_port_idle`.
 
 **`hal_flash.h`** — `hal_flash_info/erase/write/read` theo partition BOOT / APP / STAGING.
 
-**`hal_rs485.h`** (chỉ khi có Modbus) — `hal_rs485_init/getc/write/rx_bytes`, và cho slave không chặn:
+**`hal_rs485.h`** (chỉ khi có Modbus) — `hal_rs485_init/getc/write/rx_bytes`, `hal_rs485_set_format` (8N1, 8E1,
+8O1, 8N2 cho lần `init` sau; port chỉ có 8N1 thì ghi nhận rồi bỏ qua), và cho slave không chặn:
 `hal_rs485_send` (bắt đầu gửi rồi trả về, nhả chân hướng sau bit stop cuối), `hal_rs485_tx_busy`,
 `hal_rs485_rx_idle_ms` (ms từ byte nhận cuối, ghi trong ngắt RX). Port không có ngắt TX thì `send` có thể gửi
 chờ như `write` và `tx_busy` luôn trả 0.

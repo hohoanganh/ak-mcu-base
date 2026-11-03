@@ -10,8 +10,12 @@ Một cổng RS485, một vai trò, chọn lúc build:
 | Gateway TCP ↔ RTU | `pio run -e app_gateway` | `-DAK_MODBUS=gateway` (`make stm32-gateway`) | `APP_MODBUS_GATEWAY` |
 | Không dùng | — | `-DAK_MODBUS=none` | — |
 
-Cổng: USART2, PA2 TX, PA3 RX, chân hướng PA1 (`port/stm32l151/port_cfg.h`), 8N1.
-Tốc độ và địa chỉ: `APP_MB_BAUD` (9600), `APP_MB_UNIT_ID` (1) trong `app/app.h`.
+Cổng: USART2, PA2 TX, PA3 RX, chân hướng PA1 (`port/stm32l151/port_cfg.h`).
+Mặc định lúc build: `APP_MB_BAUD` (9600), `APP_MB_UNIT_ID` (1), `APP_MB_FORMAT` (8N1) trong `app/app.h`; thiết bị đổi
+tại hiện trường bằng `cfg` hoặc thanh ghi 32–34 (xem dưới). Định dạng khung: 8N1, **8E1** (mặc định của đặc tả Modbus
+RTU, nhiều biến tần và đồng hồ điện xuất xưởng như vậy), 8O1, 8N2 (`hal_rs485_set_format()`; byte sai chẵn lẻ được
+giữ lại, khung hỏng CRC và bị bỏ). Master và gateway: thời gian chờ trả lời `cfg timeout <ms>` (20..5000, mặc định
+`APP_MB_RESPONSE_TIMEOUT_MS` 200).
 
 > **Đã kiểm trên AK Base Kit (06/10/2026)** qua bộ chuyển USB-RS485:
 > slave đọc/ghi thanh ghi và trả đúng exception; OTA qua RS485 (ảnh 20K mất 26 s, ảnh 27K mất 35 s ở 9600 baud);
@@ -58,12 +62,13 @@ Bảng thanh ghi của app mẫu:
 | 16–19 | R/W | Thanh ghi thử, giữ tới khi reset |
 | 32 | R/W | Địa chỉ của chính slave này (1..247) |
 | 33 | R/W | Baud RS485 / 100 (96 = 9600, 192 = 19200, 1152 = 115200) |
+| 34 | R/W | Định dạng khung: 0 = 8N1, 1 = 8E1, 2 = 8O1, 3 = 8N2 |
 
-Thanh ghi 32–33 là **cấu hình tại hiện trường** (`app_cfg`, lưu trong EEPROM qua `services/sys/settings`): master ghi
-hai thanh ghi (FC 16, hoặc FC 06 từng cái) → slave kiểm (địa chỉ 1..247, baud trong danh sách 1200…115200), lưu, và
+Thanh ghi 32–34 là **cấu hình tại hiện trường** (`app_cfg`, lưu trong EEPROM qua `services/sys/settings`): master ghi
+(FC 16, hoặc FC 06 từng cái) → slave kiểm (địa chỉ 1..247, baud trong danh sách 1200…115200, định dạng 0..3), lưu, và
 **dùng từ lần reset sau** — câu trả lời vẫn đi ra ở địa chỉ và baud cũ. Giá trị sai bị bỏ, thanh ghi quay về giá trị
 đang lưu (nanoMODBUS không cho `on_write` trả exception). Cùng việc từ console: `cfg unit 7`, `cfg baud 19200`,
-`cfg save`, `reboot`. Một bus nhiều thiết bị cùng firmware thì đặt địa chỉ từng cái theo cách này, không phải build
+`cfg format 8E1`, `cfg save`, `reboot`. Một bus nhiều thiết bị cùng firmware thì đặt địa chỉ từng cái theo cách này, không phải build
 riêng mỗi địa chỉ.
 
 Lệnh shell `mb` in số byte đã nhận và số request đã trả lời. Có byte mà không có request nào được trả lời thì sai

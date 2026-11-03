@@ -38,6 +38,7 @@ static uint8_t layout_external = 1;
 static uint8_t flash_mem[HOST_FLASH_SIZE];
 static uint8_t ext_mem[HOST_EXT_MEM_SIZE];
 static uint8_t nvm_mem[HAL_NVM_SIZE];
+static uint8_t rs_format;		/* hal_rs485_set_format() */
 
 static uint32_t flash_ops;
 static uint32_t power_cut_at;
@@ -84,6 +85,7 @@ void host_reset_state(uint8_t erased_val) {
 	memset(flash_mem, erased_val, sizeof(flash_mem));
 	memset(ext_mem, 0xFF, sizeof(ext_mem));
 	memset(nvm_mem, 0, sizeof(nvm_mem));
+	rs_format = 0;
 	flash_ops = 0;
 	power_cut_at = 0;
 	power_cut_jmp = 0;
@@ -254,6 +256,14 @@ static uint32_t rs_rx_bytes;
 static uint32_t rs_rx_last_ms;
 static uint32_t rs_tx_end_ms;		/* a hal_rs485_send() is on the wire until then */
 static uint8_t rs_keep_rx;
+
+void hal_rs485_set_format(uint8_t format) {
+	rs_format = format <= HAL_RS485_8N2 ? format : HAL_RS485_8N1;
+}
+
+uint8_t host_rs485_format(void) {
+	return rs_format;
+}
 
 void hal_rs485_init(uint32_t baudrate) {
 	rs_baud = baudrate;
