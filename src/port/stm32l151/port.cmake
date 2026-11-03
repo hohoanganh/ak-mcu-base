@@ -110,6 +110,17 @@ if(AK_LTO)
 	list(APPEND MCU_FLAGS -flto)
 endif()
 
+# Worst-case stack at build time (tools/stack_report.py): GCC writes the call
+# graph of the final LTO code with every frame size, the script walks it and
+# fails the build when less than AK_STACK_MIN_MARGIN bytes of RAM stay free
+# below the deepest call chain plus nested interrupts, or on recursion.
+option(AK_STACK_REPORT "Check the worst-case stack of boot/app at link time" ON)
+set(AK_STACK_MIN_MARGIN 2048 CACHE STRING "Bytes of stack RAM that must stay unused in the worst case")
+if(AK_STACK_REPORT AND NOT AK_LTO)
+	message(WARNING "AK_STACK_REPORT needs AK_LTO (one call graph of the final code): off")
+	set(AK_STACK_REPORT OFF)
+endif()
+
 # AK Base Kit with an nRF24 module in the socket (shares SPI1 with the SPI NOR)
 option(AK_KIT_NRF24 "Hold the nRF24 CSN (PB9) high" OFF)
 # Bootloader also runs an APP without image header (raw SWD flash, debug only)
@@ -120,7 +131,7 @@ if(AK_APP STREQUAL "rc_tx" OR AK_APP STREQUAL "rc_rx" OR AK_APP STREQUAL "fc")
 endif()
 set(BOARD_DEFS PORT_KIT_NRF24_CSN=$<BOOL:${AK_KIT_NRF24}> BOOT_ALLOW_RAW_APP=$<BOOL:${AK_BOOT_ALLOW_RAW_APP}>)
 set(MCU_DEFS USE_STDPERIPH_DRIVER STM32L1XX_MD)
-set(MCU_WARN -Wall -Wextra -Wno-unused-parameter -Wshadow -Wundef -Wdouble-promotion)
+set(MCU_WARN -Wall -Wextra -Wno-unused-parameter -Wshadow -Wundef -Wdouble-promotion -Wvla)
 
 # SPL compiled once, without our warning set (vendor code).
 add_library(spl STATIC ${SPL_SRC})
@@ -142,6 +153,9 @@ endif()
 add_library(nanomodbus STATIC ${ROOT}/third_party/nanomodbus/nanomodbus.c)
 target_include_directories(nanomodbus PUBLIC ${ROOT}/third_party/nanomodbus)
 target_compile_definitions(nanomodbus PUBLIC ${MB_DEFS})
+# its own switch: a fixed regs[125] for FC 23 instead of a variable-length
+# array, so the worst-case stack is known at build time (tools/stack_report.py)
+target_compile_definitions(nanomodbus PRIVATE __STDC_NO_VLA__=1)
 target_compile_options(nanomodbus PRIVATE ${MCU_FLAGS} -Os -g -ffunction-sections -fdata-sections)
 
 function(ak_firmware name ldscript)
@@ -158,6 +172,19 @@ function(ak_firmware name ldscript)
 		-Wl,--gc-sections -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/${name}.map -Wl,--print-memory-usage)
 	target_link_libraries(${name} PRIVATE spl ${SIGN_LIBS} c gcc)
 	set_target_properties(${name} PROPERTIES LINK_DEPENDS "${PORT_DIR}/${ldscript};${PORT_DIR}/sections.ld")
+	if(AK_STACK_REPORT)
+		target_link_options(${name} PRIVATE -fcallgraph-info=su)
+		# one .ci per LTO partition, named after the output: none left from an older link
+		add_custom_command(TARGET ${name} PRE_LINK
+			COMMAND ${CMAKE_COMMAND} -E rm -f ${name}.elf.ltrans0.ltrans.ci ${name}.elf.ltrans1.ltrans.ci
+				${name}.elf.ltrans2.ltrans.ci ${name}.elf.ltrans3.ltrans.ci
+			WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+		add_custom_command(TARGET ${name} POST_BUILD
+			COMMAND ${Python3_EXECUTABLE} ${ROOT}/tools/stack_report.py $<TARGET_FILE:${name}>
+				--nm ${CMAKE_NM} --min-margin ${AK_STACK_MIN_MARGIN} --glob
+				${CMAKE_CURRENT_BINARY_DIR}/${name}.elf.ltrans*.ci
+			COMMENT "${name}: worst-case stack")
+	endif()
 endfunction()
 
 ak_firmware(boot boot.ld

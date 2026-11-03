@@ -1,6 +1,6 @@
 # Host port: unit tests + ak_sim simulator
 set(HOST_DIR ${SRC}/port/host)
-set(HOST_WARN -Wall -Wextra -Wno-unused-parameter -Werror)
+set(HOST_WARN -Wall -Wextra -Wno-unused-parameter -Wvla -Werror)
 
 enable_testing()
 
@@ -113,6 +113,7 @@ add_test(NAME sys COMMAND test_sys)
 # --- Modbus services (vendor library built without our warning set) ---
 add_library(nanomodbus_host STATIC ${ROOT}/third_party/nanomodbus/nanomodbus.c)
 target_include_directories(nanomodbus_host PUBLIC ${ROOT}/third_party/nanomodbus)
+target_compile_definitions(nanomodbus_host PRIVATE __STDC_NO_VLA__=1)
 target_compile_options(nanomodbus_host PRIVATE -w -g)
 
 add_executable(test_modbus

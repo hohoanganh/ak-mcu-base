@@ -66,6 +66,10 @@ chưa kiểm chứng, phải đo trước khi dùng. Nguồn: [code size optimiz
 
 ### 5. Vùng chắn stack bằng MPU, và giới hạn stack lúc build
 
+> Phần "giới hạn stack lúc build" đã làm 03/11/2026, chặt hơn `-Wstack-usage`: đồ thị lời gọi của mã sau LTO, tính
+> cả lời gọi qua con trỏ và ngắt lồng nhau, build hỏng khi dư dưới 2 KB (`tools/stack_report.py`, xem
+> [tien-ich.md](tien-ich.md) mục 4). Vùng chắn MPU chưa làm: cần kit để thử MemManage.
+
 - **Là gì:** một vùng MPU cấm truy cập ở đáy stack, tràn stack sẽ ra lỗi MemManage ngay thay vì âm thầm đè heap.
   Kèm `-fstack-usage` và `-Wstack-usage=N` để biết hàm nào ăn stack lúc build.
 - **Chi phí:** một vùng MPU, tối thiểu 32 B, kích thước và căn lề theo luỹ thừa của 2.

@@ -63,6 +63,9 @@ python src/port/web/build.py
 - **Thay đổi chưa qua `make test` thì chưa xong.** Sửa `src/demo` phải chạy `test_demo` và dựng lại bản web rồi commit
   `docs/play/`. Sửa `tools/ak_fw.py` có `tests/test_ak_fw.py`.
 - Môi trường không có toolchain thì **nói rõ là chưa build, chưa test được**; không báo "đã build".
+- **Bản STM32L151 kiểm stack xấu nhất sau mỗi lần link** (`AK_STACK_REPORT`, `tools/stack_report.py`): build hỏng khi
+  dư dưới 2 KB, có đệ quy hay VLA. Thêm lời gọi qua con trỏ hàm ở tệp mới thì thêm mẫu tên đích vào `POINTER_TARGETS`
+  trong script (thiếu thì script in `pointer calls without a rule`). Mã build với `-Wvla`.
 - Linker script: section NOLOAD (`.bss`, `._heap`) phải có `AT > RAM`, không thì Renode nạp số 0 đè lên flash.
 - gcc 9 với ASan trong WSL treo vô hạn nếu không chạy qua `setarch x86_64 -R`.
 - PlatformIO và CMake build cùng một danh sách file: thêm file nguồn thì sửa **cả** `platformio.ini` **và**

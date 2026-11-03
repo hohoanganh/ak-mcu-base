@@ -9,6 +9,14 @@ Tổng hợp tính năng v1.2.0 – v1.3.0 (Modbus mới + OTA qua RS485):
 
 ## Chưa phát hành
 
+- **Stack xấu nhất tính lúc build (`AK_STACK_REPORT`, mặc định bật).** Sau mỗi lần link bản STM32L151, GCC ghi đồ thị
+  lời gọi của mã sau LTO kèm khung từng hàm (`-fcallgraph-info=su`); `tools/stack_report.py` tính đường gọi sâu nhất từ
+  `reset_handler` (lời gọi qua con trỏ giải theo bảng `POINTER_TARGETS`) cộng mọi ngắt lồng nhau, so với RAM còn cho
+  stack lấy từ `.elf`. Build hỏng khi dư dưới `AK_STACK_MIN_MARGIN` (2048 B), khi có đệ quy hay VLA. Đã thử: mảng cục
+  bộ 28 KB → `margin 620 B` hỏng build (trình link không thấy); hàm tự gọi mình → hỏng build. 11 biến thể đều dư trên
+  13 KB (bootloader 1 724 / 15 624 B, app base 1 852 / 29 640 B, demo 1 760 / 25 080 B). nanoMODBUS build với
+  `__STDC_NO_VLA__` (bỏ VLA duy nhất trong ảnh, mã hàm 23); mã của base build với `-Wvla`. Ghi lại số đo nén OTA:
+  không đáng làm (`docs/huong-toi-uu-sau-v1.3.9.md` mục 8).
 - **Cấu hình của sản phẩm trong EEPROM (`services/sys/settings.c`, `app/app_cfg.c`).** Bản ghi 32 B ở `[224,256)`
   (magic, version, len, data, CRC-16). App mẫu lưu địa chỉ Modbus và baud: shell `cfg` (`cfg unit 7`, `cfg baud
   19200`, `cfg save`, `cfg reset`), slave có thanh ghi 32–33 để master đặt địa chỉ từ xa; có hiệu lực sau reset. Bản
