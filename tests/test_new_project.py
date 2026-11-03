@@ -20,7 +20,7 @@ import tempfile
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tools", required=True)
-    ap.add_argument("--workdir", required=True)
+    ap.add_argument("--workdir", required=True, help="unused, kept like the other tests")
     ap.add_argument("--cmake", default="cmake")
     a = ap.parse_args()
 
@@ -35,7 +35,9 @@ def main():
     def run(*args):
         return subprocess.run([sys.executable, tool] + list(args), capture_output=True, text=True)
 
-    root = tempfile.mkdtemp(prefix="new_project_", dir=a.workdir)
+    # the system temp folder: new_project.py refuses a destination inside the base,
+    # and the build folder (--workdir) usually is inside it
+    root = tempfile.mkdtemp(prefix="ak_new_project_")
     try:
         dest = os.path.join(root, "meter")
 
@@ -47,6 +49,15 @@ def main():
 
         r = run(dest, "--board", "meter-v1", "--mb-unit", "5", "--mb-baud", "19200", "--mb-format", "8e1")
         check(r.returncode == 0, "export ok" + ("" if r.returncode == 0 else ": " + r.stderr.strip()))
+        if r.returncode != 0:
+            print("%d failed" % len(fails))
+            return 1
+
+        # and the refusal that just bit the test: a destination inside the base
+        inside = os.path.join(os.path.dirname(a.tools), "build", "new_project_inside")
+        r2 = run(inside)
+        check(r2.returncode != 0 and "inside the base" in r2.stderr and not os.path.exists(inside),
+              "refused: destination inside the base")
 
         def has(*p):
             return os.path.exists(os.path.join(dest, *p))
