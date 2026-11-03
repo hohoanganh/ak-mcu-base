@@ -21,3 +21,6 @@ __pycache__/
 
 # signing keys: never in the repository (python tools/ak_sign.py devkey)
 tools/keys/
+
+# Bản dump flash của kit trước khi nạp đè (có thể chứa dữ liệu EEPROM/cấu hình)
+fw_backup/
