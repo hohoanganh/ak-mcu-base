@@ -7,7 +7,7 @@ Các tiện ích dưới đây nằm sẵn trong base, đã kiểm trên AK Base
 | [Tạo dự án mới](#1-tạo-dự-án-mới) | Xuất một dự án độc lập, không phụ thuộc repo base | `tools/new_project.py` |
 | [Nhật ký sự cố](#2-nhật-ký-sự-cố-crash-log) | Biết board ngoài hiện trường reset vì đâu | shell `crash` |
 | [Giám sát task](#3-giám-sát-task) | Phát hiện task treo hoặc bị bỏ đói | `app/task_system.c` |
-| [Mức dùng stack](#4-mức-dùng-stack) | Biết còn bao nhiêu RAM chưa từng dùng | shell `stat` |
+| [Mức dùng stack](#4-mức-dùng-stack) | Biết còn bao nhiêu RAM chưa từng dùng; stack xấu nhất tính lúc build | shell `stat`, `tools/stack_report.py` |
 | [Build PlatformIO](#5-build) | Build và nạp như các dự án khác | `pio run` |
 | Modbus RTU / RS485 | Slave, master, OTA qua RS485 | [modbus.md](modbus.md) |
 | Demo trên kit | Đồng hồ số, Snake, Flappy trên OLED | [demo-kit.md](demo-kit.md) |
@@ -137,6 +137,44 @@ stack: 12728 B never used, crash log: 4 record(s)
 
 Con số này giảm dần khi stack ăn sâu hơn hoặc heap lớn lên. Theo dõi nó sau khi chạy đủ các tình huống nặng nhất;
 còn dưới vài trăm byte là phải xem lại (biến cục bộ lớn, đệ quy, pool message). Hàm: `hal_stack_unused()`.
+
+### Stack xấu nhất, tính lúc build
+
+`stat` chỉ biết những gì đã chạy. Bản build STM32L151 còn tính **chặn trên** của stack trước khi nạp
+(`AK_STACK_REPORT`, mặc định bật cùng LTO): GCC ghi đồ thị lời gọi của mã cuối cùng sau LTO kèm khung stack từng hàm
+(`-fcallgraph-info=su`), `tools/stack_report.py` đi hết đồ thị đó sau mỗi lần link:
+
+```
+app: worst-case stack
+main stack (reset_handler): 1548 B
+  reset_handler 64 > task_poll_modbus 360 > ... > hal_nvm_write 32 > FLASH_WaitForLastOperation 16
+deepest functions reached through a pointer:
+   1196  task_poll_modbus
+    644  task_console
+    ...
+interrupts (+32 B frame each, all nested):
+    200  systick_handler
+     40  usart2_irq_handler
+     ...
+worst case: 1852 B
+RAM for the stack: 29640 B (_heap_start 0x20000C38 .. _estack 0x20008000), margin 27788 B
+```
+
+- **Build hỏng** khi phần dư dưới `AK_STACK_MIN_MARGIN` (mặc định 2048 B), khi có đệ quy (kể cả qua con trỏ hàm), hay
+  khi có mảng độ dài thay đổi (VLA). Trình link thì chỉ kiểm vùng stack tối thiểu 2 KB, nên một mảng cục bộ 28 KB
+  vẫn link được, còn bước này báo `margin 620 B < 2048 B` (đã thử).
+- Ngắt được tính như thể **mọi** ngắt lồng nhau cùng lúc (+32 B khung mỗi lần): chặn trên, thực tế ít tầng hơn.
+- Lời gọi qua con trỏ (handler của task, lệnh shell, màn hình demo, hook xuất ký tự, callback của nanoMODBUS…) được
+  giải theo bảng `POINTER_TARGETS` trong script: mỗi tệp nguồn có một mẫu tên hàm đích. **Thêm lời gọi qua con trỏ
+  ở tệp mới thì thêm một dòng vào bảng đó**; thiếu thì script in `pointer calls without a rule` và tạm tính như thể
+  con trỏ tới được mọi hàm bị lấy địa chỉ (có thể ra đệ quy giả).
+- Mã của base build với `-Wvla`; nanoMODBUS build với `__STDC_NO_VLA__` (công tắc có sẵn của nó: mảng cố định
+  `regs[125]` cho mã hàm 23 thay vì VLA).
+- Hàm của newlib (`memcpy`, `strcmp`…) không có số khung, tính 0 B; script liệt kê chúng.
+
+Số đo 03/11/2026 (gcc 13.2.1), stack xấu nhất / RAM còn cho stack: bootloader 1 724 / 15 624 B (bản ký 2 552); app
+base 1 852 / 29 640 B; demo 1 760 / 25 080 B; kit_tools 2 000 / 19 976 B; fc 2 092 / 27 192 B. Mọi bản dư trên
+13 KB. Trên kit, bản demo đo bằng `stat` còn 24 KB chưa dùng (30/10/2026): khớp với chặn trên.
 
 ## 5. Build
 

@@ -242,7 +242,7 @@ Cortex-M3) thay cho bảng 4 bit ở `common/crc.c`. Ước chỉ tiết kiệm 
 | 5 | I2C OLED đúng 400 kHz (mục 1) | S | Cần máy phân tích logic và kit |
 | 6 | Vùng nhớ chung cho màn hình (mục 3) | M | Khi `kit_tools` hoặc demo cần thêm RAM |
 | 7 | Bỏ polling → tickless → Stop (mục 4) | L | Khi có sản phẩm chạy pin |
-| 8 | Nén/delta OTA phía app (mục 6) | M – L | Khi OTA qua RS485 chậm thành vấn đề thật |
+| 8 | Nén/delta OTA phía app (mục 6) | M – L | Khi OTA qua RS485 chậm thành vấn đề thật. **Đo 03/11/2026: không đáng.** zlib mức 9 chỉ bớt 24–26 % (`app.img` base 24 364 → 18 083 B, demo 61 704 → 46 840 B); LZSS cửa sổ 1–4 KB (kiểu giải nén được trên chip với ít RAM) chỉ bớt 11–14 %. Delta vẫn có thể đáng khi bản mới chỉ khác ít, nhưng cần giữ đúng ảnh gốc |
 
 ## 9. Không nên làm
 

@@ -33,7 +33,7 @@ if(AK_LTO)
 endif()
 
 set(MCU_DEFS STM32G071xx)
-set(MCU_WARN -Wall -Wextra -Wno-unused-parameter -Wshadow -Wundef -Wdouble-promotion)
+set(MCU_WARN -Wall -Wextra -Wno-unused-parameter -Wshadow -Wundef -Wdouble-promotion -Wvla)
 
 function(ak_firmware name ldscript)
 	cmake_parse_arguments(FW "" "" "SOURCES;DEFS;INCS" ${ARGN})
