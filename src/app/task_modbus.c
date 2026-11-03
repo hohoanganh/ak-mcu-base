@@ -18,6 +18,7 @@
  *    16..19  R/W  scratch registers, kept until reset
  *    32  R/W  this unit's address (1..247)      } saved to NVM, in force at
  *    33  R/W  RS485 baud rate / 100 (96 = 9600) } the next reset (app_cfg)
+ *    34  R/W  character format: 0 8N1, 1 8E1, 2 8O1, 3 8N2 }
  ******************************************************************************
 **/
 
@@ -52,20 +53,22 @@
 
 static uint16_t info_regs[4];
 static uint16_t user_regs[4];
-static uint16_t cfg_regs[2];
+static uint16_t cfg_regs[3];
 /* what the port runs with (app_cfg may already hold a newer, saved value) */
 static uint8_t run_unit;
+static uint8_t run_format;
 static uint32_t run_baud;
 
 static const mb_reg_block_t holding_blocks[] = {
 	{ 0,  4, info_regs, MB_REG_RO },
 	{ 16, 4, user_regs, MB_REG_RW },
-	{ 32, 2, cfg_regs,  MB_REG_RW },
+	{ 32, 3, cfg_regs,  MB_REG_RW },
 };
 
 static void cfg_regs_show(void) {
 	cfg_regs[0] = app_cfg.mb_unit;
 	cfg_regs[1] = (uint16_t)(app_cfg.mb_baud / 100U);
+	cfg_regs[2] = app_cfg.mb_format;
 }
 
 /* the master wrote the settings block: keep it if it makes sense */
@@ -74,14 +77,17 @@ static void cfg_regs_written(void) {
 
 	c.mb_unit = (uint8_t)cfg_regs[0];
 	c.mb_baud = (uint32_t)cfg_regs[1] * 100U;
-	if (cfg_regs[0] > 247 || !app_cfg_valid(&c)) {
-		LOG_W(TAG, "settings written over Modbus rejected: unit %u, baud %u\n", cfg_regs[0], c.mb_baud);
+	c.mb_format = (uint8_t)cfg_regs[2];
+	if (cfg_regs[0] > 247 || cfg_regs[2] > 255 || !app_cfg_valid(&c)) {
+		LOG_W(TAG, "settings written over Modbus rejected: unit %u, baud %u, format %u\n", cfg_regs[0], c.mb_baud,
+			  cfg_regs[2]);
 		cfg_regs_show();
 		return;
 	}
 	app_cfg_set(&c);
 	if (app_cfg_save() == 0) {
-		LOG_I(TAG, "settings saved over Modbus: unit %d, %u baud, in force after reset\n", c.mb_unit, c.mb_baud);
+		LOG_I(TAG, "settings saved over Modbus: unit %d, %u %s, in force after reset\n", c.mb_unit, c.mb_baud,
+			  app_cfg_format_str(c.mb_format));
 	}
 	else {
 		LOG_E(TAG, "settings save failed\n");
@@ -128,13 +134,15 @@ void app_modbus_init(void) {
 	cfg_regs_show();
 	run_unit = app_cfg.mb_unit;
 	run_baud = app_cfg.mb_baud;
+	run_format = app_cfg.mb_format;
 
+	hal_rs485_set_format(run_format);
 	if (mb_slave_init(run_unit, run_baud, &reg_map) != 0) {
 		LOG_E(TAG, "slave init failed\n");
 		return;
 	}
 	mb_slave_enable_ota(on_ota_commit);
-	LOG_I(TAG, "slave unit %d, %u 8N1\n", run_unit, run_baud);
+	LOG_I(TAG, "slave unit %d, %u %s\n", run_unit, run_baud, app_cfg_format_str(run_format));
 }
 
 void task_poll_modbus(void) {
@@ -155,8 +163,8 @@ void task_poll_modbus(void) {
 
 void cmd_mb(const char* args) {
 	(void)args;
-	xprintf("modbus slave unit %d, %u 8N1: %u byte(s) received, %u request(s) answered\n",
-			run_unit, run_baud, hal_rs485_rx_bytes(), mb_slave_request_count());
+	xprintf("modbus slave unit %d, %u %s: %u byte(s) received, %u request(s) answered\n",
+			run_unit, run_baud, app_cfg_format_str(run_format), hal_rs485_rx_bytes(), mb_slave_request_count());
 }
 
 /*----------------------------------------------------------------------------
@@ -165,6 +173,7 @@ void cmd_mb(const char* args) {
 #elif defined(APP_MODBUS_MASTER) || defined(APP_MODBUS_GATEWAY)
 
 #include "mb_master.h"
+#include "hal_rs485.h"
 #if defined(APP_MODBUS_GATEWAY)
 #include "mb_gateway.h"
 #include "hal_tcp.h"
@@ -174,11 +183,13 @@ static uint8_t gateway_up;
 #endif
 
 void app_modbus_init(void) {
-	if (mb_master_init(app_cfg.mb_baud, APP_MB_RESPONSE_TIMEOUT_MS) != MB_OK) {
+	hal_rs485_set_format(app_cfg.mb_format);
+	if (mb_master_init(app_cfg.mb_baud, app_cfg_timeout_ms()) != MB_OK) {
 		LOG_E(TAG, "master init failed\n");
 		return;
 	}
-	LOG_I(TAG, "master, %u 8N1, response timeout %d ms\n", app_cfg.mb_baud, APP_MB_RESPONSE_TIMEOUT_MS);
+	LOG_I(TAG, "master, %u %s, response timeout %u ms\n", app_cfg.mb_baud, app_cfg_format_str(app_cfg.mb_format),
+		  app_cfg_timeout_ms());
 #if defined(APP_MODBUS_GATEWAY)
 	if (hal_tcp_init(&net_cfg) != 0) {
 		LOG_E(TAG, "no Ethernet chip: gateway off, RS485 master still works\n");

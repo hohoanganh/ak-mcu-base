@@ -96,6 +96,8 @@ extern void host_rs485_inject(const uint8_t* data, uint32_t len);
 extern void host_rs485_keep_rx_on_init(uint8_t on);
 extern uint32_t host_rs485_take_tx(uint8_t* out, uint32_t max);
 extern uint32_t host_rs485_baud(void);
+/* format set by hal_rs485_set_format() (HAL_RS485_8N1 ...) */
+extern uint8_t host_rs485_format(void);
 
 /* Emulated Ethernet chip (hal_tcp.h): present or not, a client that
  * connects / disconnects, its bytes in and the firmware's bytes out. */

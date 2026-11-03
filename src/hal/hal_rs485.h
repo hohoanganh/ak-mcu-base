@@ -21,6 +21,17 @@ extern "C"
 
 #include <stdint.h>
 
+/* Character format: 8 data bits, parity, stop bits. Modbus RTU names 8E1 as
+ * the default and 8N2 as the choice without parity; many devices ship 8N1. */
+#define HAL_RS485_8N1		(0)
+#define HAL_RS485_8E1		(1)
+#define HAL_RS485_8O1		(2)
+#define HAL_RS485_8N2		(3)
+
+/* Format used by the following hal_rs485_init() calls (8N1 until set). A
+ * byte with a parity error is kept: the frame then fails its CRC. */
+extern void hal_rs485_set_format(uint8_t format);
+
 extern void hal_rs485_init(uint32_t baudrate);
 
 /* One received byte, -1 if none. Never blocks. */

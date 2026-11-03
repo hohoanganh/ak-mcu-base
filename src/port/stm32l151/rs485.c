@@ -57,6 +57,12 @@ void usart2_irq_handler(void) {
 	}
 }
 
+static uint8_t format = HAL_RS485_8N1;
+
+void hal_rs485_set_format(uint8_t f) {
+	format = f <= HAL_RS485_8N2 ? f : HAL_RS485_8N1;
+}
+
 void hal_rs485_init(uint32_t baudrate) {
 	GPIO_InitTypeDef gpio;
 	USART_InitTypeDef uart;
@@ -86,6 +92,14 @@ void hal_rs485_init(uint32_t baudrate) {
 	USART_StructInit(&uart);
 	uart.USART_BaudRate = baudrate;
 	uart.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+	if (format == HAL_RS485_8E1 || format == HAL_RS485_8O1) {
+		/* 8 data bits + parity = a 9-bit word; DR keeps the data in bits 0..7 */
+		uart.USART_WordLength = USART_WordLength_9b;
+		uart.USART_Parity = format == HAL_RS485_8E1 ? USART_Parity_Even : USART_Parity_Odd;
+	}
+	else if (format == HAL_RS485_8N2) {
+		uart.USART_StopBits = USART_StopBits_2;
+	}
 	USART_Init(USART2, &uart);
 
 	rx_head = rx_tail = 0;

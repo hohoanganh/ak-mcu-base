@@ -129,6 +129,15 @@ static void test_slave_read(void) {
 
 	setup_slave(0);
 	CHECK_EQ(host_rs485_baud(), 9600);
+	CHECK_EQ(host_rs485_format(), HAL_RS485_8N1);
+	/* the format set before init reaches the port, and stays for the next init */
+	hal_rs485_set_format(HAL_RS485_8E1);
+	CHECK_EQ(mb_slave_init(1, 19200, &map), 0);
+	CHECK_EQ(host_rs485_format(), HAL_RS485_8E1);
+	CHECK_EQ(host_rs485_baud(), 19200);
+	hal_rs485_set_format(99);					/* unknown: 8N1 */
+	CHECK_EQ(host_rs485_format(), HAL_RS485_8N1);
+	CHECK_EQ(mb_slave_init(1, 9600, &map), 0);
 	CHECK_EQ(nmbs_read_holding_registers(&peer, 0, 3, r), NMBS_ERROR_NONE);
 	CHECK_EQ(r[0], 0x0102);
 	CHECK_EQ(r[2], 777);

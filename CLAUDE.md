@@ -68,10 +68,10 @@ python src/port/web/build.py
   trong script (thiếu thì script in `pointer calls without a rule`). Mã build với `-Wvla`.
 - Linker script: section NOLOAD (`.bss`, `._heap`) phải có `AT > RAM`, không thì Renode nạp số 0 đè lên flash.
 - gcc 9 với ASan trong WSL treo vô hạn nếu không chạy qua `setarch x86_64 -R`.
-- PlatformIO và CMake build cùng một danh sách file: thêm file nguồn thì sửa **cả** `platformio.ini` **và**
-  `CMakeLists.txt` / `src/port/*/port.cmake`. File trong `src/app`, `src/demo` tự vào build của PlatformIO; `src/demo`
-  và `src/remote` cũng tự vào CMake (`file(GLOB)`, `AK_APP`), còn `src/app` trong CMake và `src/port/web/build.py` thì
-  phải khai.
+- PlatformIO, CMake và bản web (`src/port/web/build.py`) lấy nguồn **theo thư mục** (`kernel/src`, `common`,
+  `services/*`, `boot`, `app`, `demo`…): thêm file `.c` vào một thư mục đã có là cả ba tự nhận (CMake: `file(GLOB
+  CONFIGURE_DEPENDS)`). Chỉ phải khai tay khi thêm **thư mục** mới, file của `port/`, hay file `services/fw` cho bản web
+  (nó liệt kê từng file để bỏ phần ký số).
 - Trong `platformio.ini`: `-I…` tính từ gốc repo (`-Isrc/kernel/inc`), còn `build_src_filter` tính từ `src_dir = src`.
 
 ## 4. Kernel AK: luật không được phá
@@ -100,7 +100,8 @@ Thêm lệnh shell: một dòng trong `shell_cmds[]` của `src/app/task_console
 - Bản đồ bộ nhớ: BOOT 12K `0x08000000` · APP 116K `0x08003000` (header ảnh 256 B, vector ở `0x08003100`) · ảnh chờ cài
   ở flash SPI ngoài `0x80000`, bản sao app cũ (quay lui) ở `0xA0000` · EEPROM: `[0,64)` boot_ctrl, `[64,224)` nhật ký
   sự cố, `[224,256)` cấu hình (`services/sys/settings.c`: một bản ghi magic/version/len/data[26]/crc16; app khai
-  `app_cfg_t` trong `app.h`, thêm trường thì tăng `APP_CFG_VERSION`; shell `cfg`, thanh ghi Modbus 32–33). Kho media của demo là flash SPI `[0,0x80000)`: clip từ 0, log thời tiết ở 16
+  `app_cfg_t` trong `app.h`, thêm trường thì tăng `APP_CFG_VERSION`; shell `cfg`, thanh ghi Modbus 32–34; test
+  `test_sys`, `tests/test_sim_cfg.py`). Kho media của demo là flash SPI `[0,0x80000)`: clip từ 0, log thời tiết ở 16
   sector cuối trừ một, chương trình khối ở sector cuối.
 - **RAM 32K** (chip STM32L151CB của kit là loại Cat.2, DEV_ID `0x429`; con số 16K cũ sót lại từ kit 2.1). Mặc định build
   32K; chip Cat.1 (DEV_ID `0x416`, 16K) thì `ram_size_kb = 16` / `-DAK_RAM_SIZE=16K`. Bootloader và app cùng giá trị;

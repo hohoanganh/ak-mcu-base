@@ -41,28 +41,13 @@ set(SRC ${ROOT}/src)
 # ------------------------------------------------------------------------------
 # Chip-independent components
 # ------------------------------------------------------------------------------
-set(KERNEL_SRC
-	${SRC}/kernel/src/fsm.c
-	${SRC}/kernel/src/tsm.c
-	${SRC}/kernel/src/message.c
-	${SRC}/kernel/src/task.c
-	${SRC}/kernel/src/timer.c
-)
+# Sources by folder, as PlatformIO (build_src_filter) and port/web/build.py take
+# them: a new .c file in one of these folders is in every build, nothing to list.
+file(GLOB KERNEL_SRC CONFIGURE_DEPENDS ${SRC}/kernel/src/*.c)
 
-set(COMMON_SRC
-	${SRC}/common/xprintf.c
-	${SRC}/common/crc.c
-	${SRC}/common/ak_log.c
-	${SRC}/common/sha256.c
-)
+file(GLOB COMMON_SRC CONFIGURE_DEPENDS ${SRC}/common/*.c)
 
-set(FW_SRC
-	${SRC}/services/fw/fw_image.c
-	${SRC}/services/fw/fw_update.c
-	${SRC}/services/fw/fw_proto.c
-	${SRC}/services/fw/boot_ctrl.c
-	${SRC}/services/fw/fw_pubkey.c
-)
+file(GLOB FW_SRC CONFIGURE_DEPENDS ${SRC}/services/fw/*.c)
 
 # Rust modules of ak-mcu-rust (crate ak-ffi -> libak_ffi.a), checked out at AK_RUST_DIR;
 # need cargo. The bootloader keeps C.
@@ -103,11 +88,7 @@ function(ak_use_rust tgt rust_target)
 	target_link_libraries(${tgt} PRIVATE c ${lib})
 endfunction()
 
-set(SYS_SRC
-	${SRC}/services/sys/crash_log.c
-	${SRC}/services/sys/flog.c
-	${SRC}/services/sys/settings.c
-)
+file(GLOB SYS_SRC CONFIGURE_DEPENDS ${SRC}/services/sys/*.c)
 
 # Signed images: bootloader and app refuse images not signed with the key in
 # src/services/fw/fw_pubkey.c (see fw_sign.h). AK_SIGN_KEY signs app.img.
@@ -121,13 +102,7 @@ set(P256M_INC ${ROOT}/third_party/p256-m)
 # nanoMODBUS serves the slave only (unless AK_RUST_MODBUS); master and gateway
 # are mb_master.c / mb_gateway.c, no library
 set(AK_MODBUS "slave" CACHE STRING "Modbus role of the app: slave | master | gateway | none")
-set(MB_SRC
-	${SRC}/services/modbus/mb_port.c
-	${SRC}/services/modbus/mb_slave.c
-	${SRC}/services/modbus/mb_ota.c
-	${SRC}/services/modbus/mb_master.c
-	${SRC}/services/modbus/mb_gateway.c
-)
+file(GLOB MB_SRC CONFIGURE_DEPENDS ${SRC}/services/modbus/*.c)
 set(MB_INC ${SRC}/services/modbus ${ROOT}/third_party/nanomodbus)
 if(AK_MODBUS STREQUAL "slave")
 	set(MB_DEFS APP_MODBUS_SLAVE NMBS_CLIENT_DISABLED NMBS_STRERROR_DISABLED)
@@ -186,20 +161,9 @@ endif()
 # A project that wants them removes this (message.h default: 8).
 set(APP_KERNEL_DEFS AK_DYNAMIC_MSG_POOL_SIZE=0)
 
-set(BOOT_SRC
-	${SRC}/boot/boot_core.c
-	${SRC}/boot/boot_main.c
-)
+file(GLOB BOOT_SRC CONFIGURE_DEPENDS ${SRC}/boot/*.c)
 
-set(APP_SRC
-	${SRC}/app/main.c
-	${SRC}/app/task_list.c
-	${SRC}/app/task_system.c
-	${SRC}/app/task_console.c
-	${SRC}/app/task_fw.c
-	${SRC}/app/task_modbus.c
-	${SRC}/app/app_cfg.c
-)
+file(GLOB APP_SRC CONFIGURE_DEPENDS ${SRC}/app/*.c)
 
 set(BASE_INC
 	${SRC}/kernel/inc

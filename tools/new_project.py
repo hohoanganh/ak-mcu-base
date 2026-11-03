@@ -7,6 +7,7 @@ set-up. A product project needs none of that, so this script copies the base
 alone into one self-contained folder:
 
   python tools/new_project.py D:/work/my-product --board my-board
+  python tools/new_project.py D:/work/meter --board meter-v1 --mb-unit 5 --mb-baud 19200 --mb-format 8E1
 
   my-product/
     src/              kernel/ hal/ common/ services/ boot/ app/ demo/ port/
@@ -35,6 +36,10 @@ SKIP_DIRS = {"build", ".pio", ".gradle", "__pycache__", "legacy", ".git", ".gith
 SKIP_DOCS = {"play", "superpowers"}
 SKIP_FILES = {"ak_sim_flash.bin", ".mcp.json", "README.en.md"}
 SKIP_EXT = {".img", ".pyc"}
+
+# what app_cfg.c accepts (cfg baud / cfg format)
+BAUDS = (1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200)
+FORMATS = ("8N1", "8E1", "8O1", "8N2")
 
 
 def fail(msg):
@@ -90,6 +95,10 @@ def main(argv=None):
     ap.add_argument("--board", help="board name stored in the image header, max 15 chars "
                                     "(default: keep the base's name). Images built for another "
                                     "board name are refused by the bootloader.")
+    ap.add_argument("--mb-unit", type=int, help="default Modbus slave address, 1..247 (APP_MB_UNIT_ID; the field "
+                                                 "sets its own with 'cfg unit', saved in EEPROM)")
+    ap.add_argument("--mb-baud", type=int, help="default RS485 baud rate (APP_MB_BAUD): " + " ".join(map(str, BAUDS)))
+    ap.add_argument("--mb-format", help="default RS485 character format (APP_MB_FORMAT): " + " ".join(FORMATS))
     a = ap.parse_args(argv)
 
     dest = os.path.abspath(a.dest)
@@ -99,6 +108,12 @@ def main(argv=None):
         fail("destination exists and is not empty: " + dest)
     if a.board and not re.fullmatch(r"[A-Za-z0-9_.-]{1,15}", a.board):
         fail("--board: 1..15 characters of A-Z a-z 0-9 _ . -")
+    if a.mb_unit is not None and not 1 <= a.mb_unit <= 247:
+        fail("--mb-unit: 1..247")
+    if a.mb_baud is not None and a.mb_baud not in BAUDS:
+        fail("--mb-baud: one of " + " ".join(map(str, BAUDS)))
+    if a.mb_format is not None and a.mb_format.upper() not in FORMATS:
+        fail("--mb-format: one of " + " ".join(FORMATS))
     if not os.path.isdir(os.path.join(BASE, "third_party", "stm32l1", "STM32L1xx_StdPeriph_Driver")):
         fail("SPL not found below " + os.path.join(BASE, "third_party", "stm32l1"))
 
@@ -110,6 +125,17 @@ def main(argv=None):
             (r'^(#define PORT_BOARD_NAME\s+)"[^"]*"', r'\1"%s"' % a.board),
         ])
 
+    # build defaults of the settings (a device keeps what was saved with 'cfg save')
+    subs = []
+    if a.mb_unit is not None:
+        subs.append((r'^(#define APP_MB_UNIT_ID\s+)\(\d+\)', r'\g<1>(%d)' % a.mb_unit))
+    if a.mb_baud is not None:
+        subs.append((r'^(#define APP_MB_BAUD\s+)\(\d+\)', r'\g<1>(%d)' % a.mb_baud))
+    if a.mb_format is not None:
+        subs.append((r'^(#define APP_MB_FORMAT\s+)\(\d+\)', r'\g<1>(%d)' % FORMATS.index(a.mb_format.upper())))
+    if subs:
+        edit(os.path.join(dest, "src", "app", "app.h"), subs)
+
     ver = base_version()
     with open(os.path.join(dest, "BASE_VERSION"), "w", encoding="utf-8", newline="\n") as f:
         f.write("base: ak-mcu-base %s\n" % ver)
@@ -117,6 +143,10 @@ def main(argv=None):
         f.write("exported: %s\n" % time.strftime("%Y-%m-%d"))
         if a.board:
             f.write("board name: %s\n" % a.board)
+        if subs:
+            f.write("modbus defaults: unit %s, %s baud, %s\n" % (
+                a.mb_unit if a.mb_unit is not None else "base", a.mb_baud if a.mb_baud is not None else "base",
+                a.mb_format.upper() if a.mb_format is not None else "base"))
 
     print("exported %d files (base + vendor SPL/CMSIS) to %s" % (n, dest))
     print("base version: " + ver)

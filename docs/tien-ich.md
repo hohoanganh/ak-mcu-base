@@ -28,6 +28,10 @@ pio run                 # app
 pio run -e boot         # bootloader
 ```
 
+- `--mb-unit 5 --mb-baud 19200 --mb-format 8E1`: mặc định Modbus lúc build của dự án (`APP_MB_UNIT_ID`, `APP_MB_BAUD`,
+  `APP_MB_FORMAT` trong `app/app.h`); từng thiết bị vẫn đổi được tại hiện trường bằng `cfg` (mục 2a). Giá trị ngoài
+  danh sách bị từ chối trước khi chép gì. Test: `tests/test_new_project.py` (xuất ra thư mục tạm, kiểm các giá trị đã
+  ghi, rồi build `test_sys` ngay trong dự án vừa xuất).
 - `--board` là tên board ghi trong header ảnh (tối đa 15 ký tự). Bootloader từ chối ảnh mang tên board khác, nên
   **mỗi dòng sản phẩm đặt một tên riêng** để không nạp nhầm firmware giữa các sản phẩm.
 - Script chép base, phần SPL/CMSIS mà build cần (`third_party/stm32l1/`), file board, và ghi `BASE_VERSION`
@@ -76,18 +80,25 @@ Một bản ghi 32 B ở cuối EEPROM (`[224,256)`): magic, version, len, tới
 `APP_CFG_VERSION`, bản ghi cũ trong EEPROM khi đó bị bỏ qua (dùng mặc định), không phải chuyển đổi gì.
 
 ```
-cfg                 modbus unit 1, baud 9600 (defaults)
-cfg unit 7          unit 7, baud 9600 (not saved yet: 'cfg save')
+cfg                 modbus unit 1, baud 9600 8N1, timeout 200 ms (defaults)
+cfg unit 7          unit 7, baud 9600 8N1, timeout 200 ms (not saved yet: 'cfg save')
 cfg baud 19200
+cfg format 8E1      8N1 | 8E1 | 8O1 | 8N2
+cfg timeout 300     master / gateway: chờ trả lời 20..5000 ms
 cfg save            saved, takes effect after 'reboot'
-cfg reset           về mặc định (APP_MB_UNIT_ID, APP_MB_BAUD), rồi 'cfg save'
+cfg reset           về mặc định lúc build (APP_MB_*), rồi 'cfg save'
 ```
+
+`app_cfg_t` vẫn 8 byte: định dạng và thời gian chờ nằm vào ba byte dự trữ vốn luôn bằng 0, và 0 nghĩa là "mặc định"
+(8N1, `APP_MB_RESPONSE_TIMEOUT_MS`). Thiết bị đã lưu cấu hình bằng bản trước vẫn đọc được bản ghi cũ, không mất địa chỉ khi
+cập nhật firmware.
 
 Cổng RS485 được dựng một lần lúc khởi động nên giá trị mới có hiệu lực sau `reboot`; `mb` in giá trị cổng **đang**
 chạy, `cfg` in giá trị đang giữ. Master cũng đặt được qua thanh ghi 32–33 ([modbus.md](modbus.md)). Mất điện giữa lúc
 ghi: bản ghi sai CRC, lần sau lên bằng mặc định (một ô, không có bản cũ để lùi: ghi hiếm và do người vận hành làm).
 Test: `tests/test_sys.c` (EEPROM trắng 0x00 và 0xFF, lưu rồi đọc, bản ghi khác layout, bản ghi bị cắt, không đè lên
-`boot_ctrl` và nhật ký sự cố).
+`boot_ctrl` và nhật ký sự cố); `tests/test_sim_cfg.py` chạy lệnh `cfg` trên `ak_sim` qua ba lần khởi động (giá trị sai bị
+từ chối, cổng chỉ nhận giá trị mới sau reset, `cfg reset`).
 
 ## 2b. Log bản ghi trên flash (`services/sys/flog.c`)
 
