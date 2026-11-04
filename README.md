@@ -12,6 +12,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/hohoanganh/ak-mcu-base/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-0366d6" alt="license MIT"></a>
   <a href="https://github.com/hohoanganh/ak-mcu-base/actions/workflows/ak-mcu-base.yml"><img src="https://github.com/hohoanganh/ak-mcu-base/actions/workflows/ak-mcu-base.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/hohoanganh/ak-mcu-base/stargazers"><img src="https://img.shields.io/github/stars/hohoanganh/ak-mcu-base?logo=github&amp;label=sao" alt="stars"></a>
   <a href="https://github.com/hohoanganh/ak-mcu-base/commits/main"><img src="https://img.shields.io/github/last-commit/hohoanganh/ak-mcu-base?label=commit%20cu%E1%BB%91i" alt="last commit"></a>
@@ -178,3 +179,8 @@ So sánh chi tiết, kèm những gì base mới còn thiếu: **[xem trang so s
   (AK Embedded Base Kit, GaoKong), bản build bằng Makefile.
 - Mô hình PlatformIO (build ngoài repo, script cờ biên dịch, tự chép release) rút từ một dự án sản phẩm
   trước đó, không công khai.
+
+## Giấy phép
+
+[MIT](LICENSE). Kernel AK và phần dựng lại từ ak-base-kit-stm32l151 giữ thông báo bản quyền của AK Foundation (cũng MIT).
+Mã bên thứ ba trong `third_party/` và `src/port/web/vendor/` theo giấy phép riêng ghi trong thư mục của chúng.

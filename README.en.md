@@ -12,6 +12,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/hohoanganh/ak-mcu-base/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-0366d6" alt="license MIT"></a>
   <a href="https://github.com/hohoanganh/ak-mcu-base/actions/workflows/ak-mcu-base.yml"><img src="https://github.com/hohoanganh/ak-mcu-base/actions/workflows/ak-mcu-base.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/hohoanganh/ak-mcu-base/stargazers"><img src="https://img.shields.io/github/stars/hohoanganh/ak-mcu-base?logo=github&amp;label=stars" alt="stars"></a>
   <a href="https://github.com/hohoanganh/ak-mcu-base/commits/main"><img src="https://img.shields.io/github/last-commit/hohoanganh/ak-mcu-base?label=last%20commit" alt="last commit"></a>
@@ -119,3 +120,8 @@ Most of the documentation is in Vietnamese; the code and its comments are in Eng
 - [What the new base changes](docs/so-voi-base-cu.md) (Vietnamese)
 - [Project page](https://hohoanganh.github.io/ak-mcu-base/) (Vietnamese)
 - [Changelog](CHANGELOG.md) (Vietnamese)
+
+## License
+
+[MIT](LICENSE). The AK kernel and the parts rebuilt from ak-base-kit-stm32l151 keep AK Foundation's copyright notice
+(also MIT). Third-party code in `third_party/` and `src/port/web/vendor/` keeps the licence stated in its folder.
