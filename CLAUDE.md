@@ -173,6 +173,9 @@ máy tính.
   một việc, đọc `_mailbox/den-ak-kit.md` và xử lý các tin còn `[ ]`; quy ước ở `_mailbox/README.md`.
 - Nhánh `main`. Thông điệp commit tiếng Việt, ngắn, nói thay đổi gì và đã kiểm bằng gì.
 - Không commit `.pio/`, `build/`, `*.img`, `__pycache__/` (đã có trong `.gitignore`).
+- Hàng huy hiệu đầu `README.md` và `README.en.md` có **số đếm tĩnh**: test (số test `make test` báo: `ctest -LE fast_only`),
+  biến thể build (`stm32-all` trong `Makefile`), màn hình demo (`src/demo/scr_*.c`), port (`src/port/`). Đổi các con
+  số đó thì sửa huy hiệu ở cả hai README. CI, sao, commit cuối thì shields.io tự cập nhật.
 - Repo là **cá nhân**: không đưa tên công ty, thông tin liên hệ hay tên sản phẩm thương mại vào mã và tài liệu.
 - Ảnh kit trong `docs/kit/` là của AK Foundation (MIT, có ghi nguồn); các sơ đồ SVG sinh từ script trong `tools/`:
   đổi số liệu thì sửa script rồi chạy lại, không sửa tay file SVG.
