@@ -7,24 +7,17 @@
 </p>
 
 <p align="center">
-  <a href="https://hohoanganh.github.io/ak-mcu-base/play/"><img src="https://img.shields.io/badge/%E2%96%B6%20CH%E1%BA%A0Y%20TH%E1%BB%AC%20NGAY-tr%C3%AAn%20tr%C3%ACnh%20duy%E1%BB%87t-a8ff3e?style=for-the-badge&labelColor=0b0f14" alt="Chạy thử firmware ngay trên trình duyệt"></a>
-  <a href="https://hohoanganh.github.io/ak-mcu-base/play/pong.html"><img src="https://img.shields.io/badge/HAI%20KIT-ch%C6%A1i%20Pong%20qua%20RS485-d9e1ea?style=for-the-badge&labelColor=0b0f14" alt="Hai kit chơi Pong qua RS485"></a>
+  <a href="https://hohoanganh.github.io/ak-mcu-base/play/"><img src="https://img.shields.io/badge/%E2%96%B6%20RUN%20IT-in%20your%20browser-a8ff3e?style=for-the-badge&labelColor=0b0f14" alt="Run the firmware in your browser"></a>
+  <a href="https://hohoanganh.github.io/ak-mcu-base/play/pong.html"><img src="https://img.shields.io/badge/TWO%20KITS-play%20Pong%20over%20RS485-d9e1ea?style=for-the-badge&labelColor=0b0f14" alt="Two kits play Pong over RS485"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/hohoanganh/ak-mcu-base/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-0366d6" alt="license MIT"></a>
-  <a href="https://github.com/hohoanganh/ak-mcu-base/actions/workflows/ak-mcu-base.yml"><img src="https://github.com/hohoanganh/ak-mcu-base/actions/workflows/ak-mcu-base.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/hohoanganh/ak-mcu-base/stargazers"><img src="https://img.shields.io/github/stars/hohoanganh/ak-mcu-base?logo=github&amp;label=sao" alt="stars"></a>
-  <a href="https://github.com/hohoanganh/ak-mcu-base/commits/main"><img src="https://img.shields.io/github/last-commit/hohoanganh/ak-mcu-base?label=commit%20cu%E1%BB%91i" alt="last commit"></a>
-  <img src="https://hits.sh/github.com/hohoanganh/ak-mcu-base.svg?style=flat-square&amp;label=Repo%20Traffic&amp;color=007ec6" alt="Repo Traffic">
-  <br>
-  <a href="https://github.com/hohoanganh/ak-mcu-base/blob/main/docs/ak-mcu-base.md"><img src="https://img.shields.io/badge/chip-STM32L151-03234B?logo=stmicroelectronics" alt="chip STM32L151"></a>
-  <a href="https://github.com/hohoanganh/ak-mcu-base/blob/main/docs/ak-mcu-base.md#kernel-ak-kh%C3%A1c-g%C3%AC-b%E1%BA%A3n-g%E1%BB%91c"><img src="https://img.shields.io/badge/kernel-AK%20%C2%B7%20kh%C3%B4ng%20RTOS-6f42c1" alt="kernel AK"></a>
-  <a href="https://github.com/hohoanganh/ak-mcu-base/tree/main/tests"><img src="https://img.shields.io/badge/test-16-2ea44f" alt="16 test suites"></a>
-  <a href="https://github.com/hohoanganh/ak-mcu-base/blob/main/Makefile"><img src="https://img.shields.io/badge/bi%E1%BA%BFn%20th%E1%BB%83%20build-11-e36209" alt="11 build variants"></a>
-  <a href="https://github.com/hohoanganh/ak-mcu-base/blob/main/docs/demo-kit.md"><img src="https://img.shields.io/badge/m%C3%A0n%20h%C3%ACnh%20demo-17-d73a49" alt="17 demo screens"></a>
-  <a href="https://github.com/hohoanganh/ak-mcu-base/blob/main/docs/porting.md"><img src="https://img.shields.io/badge/port-4-0366d6" alt="4 ports"></a>
-  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/built%20with-Claude%20Code-d97757?logo=claude&amp;logoColor=white" alt="built with Claude Code"></a>
+  <a href="https://github.com/hohoanganh/ak-mcu-base/actions/workflows/ak-mcu-base.yml"><img src="https://img.shields.io/github/actions/workflow/status/hohoanganh/ak-mcu-base/ak-mcu-base.yml?branch=main&amp;label=CI&amp;logo=githubactions&amp;logoColor=white&amp;style=flat-square&amp;labelColor=0b0f14" alt="CI"></a>
+  <a href="https://github.com/hohoanganh/ak-mcu-base/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-d9e1ea?style=flat-square&amp;labelColor=0b0f14" alt="license MIT"></a>
+  <a href="https://github.com/hohoanganh/ak-mcu-base/blob/main/docs/ak-mcu-base.md"><img src="https://img.shields.io/badge/chip-STM32L151-d9e1ea?style=flat-square&amp;labelColor=0b0f14&amp;logo=stmicroelectronics&amp;logoColor=white" alt="chip STM32L151"></a>
+  <a href="https://github.com/hohoanganh/ak-mcu-base/blob/main/docs/ak-mcu-base.md"><img src="https://img.shields.io/badge/C99-no%20RTOS-d9e1ea?style=flat-square&amp;labelColor=0b0f14&amp;logo=c&amp;logoColor=white" alt="C99, no RTOS"></a>
+  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/built%20with-Claude%20Code-d9e1ea?style=flat-square&amp;labelColor=0b0f14&amp;logo=claude&amp;logoColor=white" alt="built with Claude Code"></a>
+  <img src="https://hits.sh/github.com/hohoanganh/ak-mcu-base.svg?style=flat-square&amp;label=visitors&amp;color=d9e1ea&amp;labelColor=0b0f14" alt="visitors">
 </p>
 
 Nền firmware bare-metal cho **STM32L151CBT6** (AK Base Kit): kernel AK hướng sự kiện không cần RTOS, bootloader có quay lui,
