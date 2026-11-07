@@ -112,6 +112,9 @@ Most of the documentation is in Vietnamese; the code and its comments are in Eng
 - [The demo, screen by screen](docs/demo-kit.md) (Vietnamese)
 - [What the new base changes](docs/so-voi-base-cu.md) (Vietnamese)
 - [Project page](https://hohoanganh.github.io/ak-mcu-base/) (Vietnamese)
+- [Claude Code skill](.claude/skills/ak-mcu-firmware/SKILL.md) (Vietnamese): kernel rules, memory map, adding a task,
+  review checklist. Loaded automatically when you open this repo, or a project exported with `tools/new_project.py`,
+  in Claude Code; to use it elsewhere, copy the folder into `~/.claude/skills/`.
 - [Changelog](CHANGELOG.md) (Vietnamese)
 
 ## License

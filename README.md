@@ -123,6 +123,7 @@ File `.img` và `.bin` của mọi bản: [Releases](https://github.com/hohoanga
 | Phương án dùng base làm tay điều khiển drone và FC cho drone chổi than cỡ nhỏ | [docs/drone-ak-mcu.md](docs/drone-ak-mcu.md) |
 | Biết bản nào sửa lỗi gì | [CHANGELOG.md](CHANGELOG.md) |
 | Cho AI assistant tra tài liệu kernel AK | [docs/ak-mcp-docs-server.md](docs/ak-mcp-docs-server.md) — repo có sẵn [.mcp.json](.mcp.json) |
+| Cho Claude Code biết luật của kernel AK, bản đồ bộ nhớ, cách thêm task, checklist review | skill [.claude/skills/ak-mcu-firmware](.claude/skills/ak-mcu-firmware/SKILL.md): mở repo (hoặc dự án xuất bằng `new_project.py`) bằng Claude Code là tự có. Dùng ở dự án khác: chép thư mục đó vào `~/.claude/skills/` |
 
 ## Cấu trúc thư mục
 
