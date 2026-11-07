@@ -17,6 +17,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      # the agent skill ships twice: .claude/skills (Claude Code) and .agents/skills (Codex and
+      # other Agent Skills tools); no symlink, Windows clones break them. Both copies must match.
+      - name: Agent skill copies identical
+        run: diff -r .claude/skills .agents/skills
       # ASan needs a smaller ASLR range than some runner kernels default to
       - run: sudo sysctl -w vm.mmap_rnd_bits=28
       - name: Build

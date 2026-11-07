@@ -177,8 +177,10 @@ máy tính.
   cùng kiểu `flat-square`, nhãn nền `0b0f14`, nội dung `d9e1ea`. Không đặt số đếm (test, biến thể, màn hình) vào huy hiệu:
   để ở phần chữ, đỡ phải sửa tay.
 - Repo là **cá nhân**: không đưa tên công ty, thông tin liên hệ hay tên sản phẩm thương mại vào mã và tài liệu.
-- Skill công khai `.claude/skills/ak-mcu-firmware/SKILL.md` là bản rút gọn của file này cho dự án xuất bằng
-  `new_project.py` (nó được chép theo). Đổi API, bản đồ bộ nhớ, lệnh shell hay luật kernel đã ghi trong skill thì sửa
-  skill cùng commit. Không ghi đường dẫn, tên máy hay cổng COM riêng vào skill.
+- Skill công khai `ak-mcu-firmware` là bản rút gọn của file này cho dự án xuất bằng `new_project.py` (nó được chép
+  theo). Có **hai bản giống hệt**: `.claude/skills/` (Claude Code) và `.agents/skills/` (Codex và công cụ theo chuẩn Agent
+  Skills); CI `diff -r` hai thư mục. Đổi API, bản đồ bộ nhớ, lệnh shell hay luật kernel đã ghi trong skill thì sửa cả hai
+  cùng commit. `AGENTS.md` là bản tóm tắt cho agent khác, trỏ về file này. Không ghi đường dẫn, tên máy hay cổng COM
+  riêng vào skill.
 - Ảnh kit trong `docs/kit/` là của AK Foundation (MIT, có ghi nguồn); các sơ đồ SVG sinh từ script trong `tools/`:
   đổi số liệu thì sửa script rồi chạy lại, không sửa tay file SVG.

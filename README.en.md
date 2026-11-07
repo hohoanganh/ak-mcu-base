@@ -112,9 +112,11 @@ Most of the documentation is in Vietnamese; the code and its comments are in Eng
 - [The demo, screen by screen](docs/demo-kit.md) (Vietnamese)
 - [What the new base changes](docs/so-voi-base-cu.md) (Vietnamese)
 - [Project page](https://hohoanganh.github.io/ak-mcu-base/) (Vietnamese)
-- [Claude Code skill](.claude/skills/ak-mcu-firmware/SKILL.md) (Vietnamese): kernel rules, memory map, adding a task,
-  review checklist. Loaded automatically when you open this repo, or a project exported with `tools/new_project.py`,
-  in Claude Code; to use it elsewhere, copy the folder into `~/.claude/skills/`.
+- Agent skill `ak-mcu-firmware` (Vietnamese, [Agent Skills](https://agentskills.io) format): kernel rules, memory map,
+  adding a task, review checklist. Two identical copies: [.claude/skills](.claude/skills/ak-mcu-firmware/SKILL.md) for
+  Claude Code and [.agents/skills](.agents/skills/ak-mcu-firmware/SKILL.md) for Codex and other tools; [AGENTS.md](AGENTS.md)
+  for any agent; what it changes, with an example: [docs/agent-skill.md](docs/agent-skill.md) (Vietnamese). Loaded automatically in this repo or a project exported with `tools/new_project.py`; elsewhere, copy the
+  folder into `~/.claude/skills/` or `~/.agents/skills/`.
 - [Changelog](CHANGELOG.md) (Vietnamese)
 
 ## License
